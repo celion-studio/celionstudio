@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { trpc } from "@/lib/trpc";
@@ -46,117 +45,113 @@ export default function Automations() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Automations</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Automations</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage your Instagram comment-to-DM automation rules.
           </p>
         </div>
-        <Button onClick={() => setLocation("/automations/new")}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button size="sm" onClick={() => setLocation("/automations/new")} className="h-9 text-xs">
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           New Automation
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-5">
-                <Skeleton className="h-5 w-1/3 mb-3" />
-                <Skeleton className="h-4 w-2/3" />
-              </CardContent>
-            </Card>
+            <div key={i} className="rounded-xl border border-border bg-card p-4">
+              <Skeleton className="h-5 w-1/3 mb-2" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
           ))}
         </div>
       ) : !automations?.length ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <Zap className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-1">No automations yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first automation rule to start sending DMs automatically.
-            </p>
-            <Button onClick={() => setLocation("/automations/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Automation
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-card flex flex-col items-center justify-center py-16 text-center">
+          <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+            <Zap className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-1">No automations yet</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Create your first automation rule to start sending DMs automatically.
+          </p>
+          <Button size="sm" onClick={() => setLocation("/automations/new")} className="h-8 text-xs">
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Create Automation
+          </Button>
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {automations.map((auto: any) => (
-            <Card
+            <div
               key={auto.id}
-              className="hover:border-primary/30 transition-colors"
+              className="rounded-xl border border-border bg-card p-4 hover:border-primary/20 transition-colors group"
             >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold truncate">{auto.name}</h3>
-                      <Badge variant={auto.isActive ? "default" : "secondary"}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${auto.isActive ? "bg-primary/8" : "bg-muted"}`}>
+                    <Zap className={`h-4 w-4 ${auto.isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-foreground truncate">{auto.name}</h3>
+                      <Badge
+                        variant={auto.isActive ? "default" : "secondary"}
+                        className="text-[10px] h-5 shrink-0"
+                      >
                         {auto.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>
-                        Keywords:{" "}
-                        {(auto.triggerKeywords as string[])?.map((k: string) => (
-                          <Badge
-                            key={k}
-                            variant="outline"
-                            className="mr-1 text-xs"
-                          >
-                            {k}
-                          </Badge>
-                        ))}
-                      </span>
-                      {auto.igMediaId && (
-                        <span>Post: {auto.igMediaId}</span>
-                      )}
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {(auto.triggerKeywords as string[])?.map((k: string) => (
+                        <span
+                          key={k}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary text-muted-foreground border border-border"
+                        >
+                          {k}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0 ml-4">
-                    <Switch
-                      checked={auto.isActive}
-                      onCheckedChange={() =>
-                        toggleMutation.mutate({
-                          id: auto.id,
-                          isActive: !auto.isActive,
-                        })
-                      }
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setLocation(`/automations/${auto.id}/edit`)
-                          }
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setDeleteId(auto.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-2 shrink-0 ml-3">
+                  <Switch
+                    checked={auto.isActive}
+                    onCheckedChange={() =>
+                      toggleMutation.mutate({
+                        id: auto.id,
+                        isActive: !auto.isActive,
+                      })
+                    }
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={() => setLocation(`/automations/${auto.id}/edit`)}
+                        className="text-[13px]"
+                      >
+                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive text-[13px]"
+                        onClick={() => setDeleteId(auto.id)}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
@@ -166,7 +161,7 @@ export default function Automations() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete automation?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this automation rule. DMs will no longer be sent for this trigger.
+              This will permanently delete this automation rule.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

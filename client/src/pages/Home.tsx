@@ -1,38 +1,51 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { getLoginUrl } from "@/const";
-import { Zap, BookOpen, MessageSquare, BarChart3, ArrowRight, CheckCircle2 } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  MessageCircle,
+  Zap,
+  Shield,
+  BarChart3,
+  Sparkles,
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background">
       {/* Nav */}
-      <nav className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-50 bg-background/80">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold tracking-tight">SellMate</span>
+      <nav className="border-b border-border/60 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container flex items-center justify-between h-16">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Zap className="h-4.5 w-4.5 text-primary" />
+            </div>
+            <span className="text-lg font-semibold tracking-tight text-foreground">SellMate</span>
           </div>
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
-              <Button onClick={() => setLocation("/dashboard")}>
+              <Button onClick={() => setLocation("/dashboard")} size="sm">
                 Dashboard
-                <ArrowRight className="ml-1 h-4 w-4" />
+                <ArrowRight className="h-3.5 w-3.5 ml-1" />
               </Button>
             ) : (
               <>
                 <Button
                   variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
                   onClick={() => (window.location.href = getLoginUrl())}
                 >
                   Sign in
                 </Button>
-                <Button onClick={() => (window.location.href = getLoginUrl())}>
+                <Button size="sm" onClick={() => (window.location.href = getLoginUrl())}>
                   Get Started
+                  <ArrowRight className="h-3.5 w-3.5 ml-1" />
                 </Button>
               </>
             )}
@@ -42,26 +55,28 @@ export default function Home() {
 
       {/* Hero */}
       <section className="py-24 md:py-32">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-sm text-primary mb-8">
-            <Zap className="h-3.5 w-3.5" />
-            Built for Creators
+        <div className="container max-w-3xl text-center">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-border bg-secondary/50 text-xs font-medium text-muted-foreground mb-8">
+            <Sparkles className="h-3 w-3 text-primary" />
+            Built for creators who sell
           </div>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-6">
-            Create Ebooks.{" "}
+
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1] mb-6">
+            Create ebooks.{" "}
             <span className="text-primary">Automate DMs.</span>
             <br />
-            Sell on Autopilot.
+            Sell on autopilot.
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed">
             SellMate combines a digital product studio with Instagram comment-to-DM
-            automation. Write ebooks, set keyword triggers, and let your sales
-            happen automatically.
+            automation. Write, publish, and sell — all from one place.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+
+          <div className="flex items-center justify-center gap-3">
             <Button
               size="lg"
-              className="text-base px-8"
+              className="px-6 h-11 text-sm font-medium"
               onClick={() =>
                 isAuthenticated
                   ? setLocation("/dashboard")
@@ -69,136 +84,170 @@ export default function Home() {
               }
             >
               Start Free
-              <ArrowRight className="ml-2 h-4 w-4" />
+              <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
             <Button
-              size="lg"
               variant="outline"
-              className="text-base px-8 bg-transparent"
+              size="lg"
+              className="px-6 h-11 text-sm font-medium"
               onClick={() => {
                 document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
               }}
             >
-              See How It Works
+              How it works
             </Button>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 border-t border-border/50">
-        <div className="max-w-6xl mx-auto px-4">
+      <section id="features" className="py-20 border-t border-border/60">
+        <div className="container max-w-5xl">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-3">
               Everything you need to sell digital products
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Stop juggling between Canva, ManyChat, and Gumroad. SellMate brings it all together.
+            <p className="text-muted-foreground max-w-lg mx-auto">
+              No more juggling between 4 different tools. One platform, from creation to sale.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-6">
             <FeatureCard
-              icon={<BookOpen className="h-6 w-6" />}
-              title="Product Studio"
-              description="Write ebooks with our markdown editor or upload existing PDFs. Generate download links instantly."
+              icon={<BookOpen className="h-5 w-5" />}
+              title="Ebook Studio"
+              description="Write in markdown, upload PDFs, or start from scratch. Your content, beautifully formatted and ready to sell."
             />
             <FeatureCard
-              icon={<MessageSquare className="h-6 w-6" />}
-              title="DM Automation"
-              description="Set keyword triggers on Instagram posts. When followers comment, they get your sales link via DM automatically."
+              icon={<MessageCircle className="h-5 w-5" />}
+              title="Comment-to-DM Automation"
+              description="Set keyword triggers on your Instagram posts. When followers comment, they instantly receive your product link via DM."
             />
             <FeatureCard
-              icon={<BarChart3 className="h-6 w-6" />}
-              title="Analytics & Logs"
-              description="Track every DM sent, monitor success rates, and understand your conversion funnel at a glance."
+              icon={<Zap className="h-5 w-5" />}
+              title="Instant Delivery"
+              description="No manual work. Your digital product is delivered automatically the moment someone triggers your automation."
+            />
+            <FeatureCard
+              icon={<BarChart3 className="h-5 w-5" />}
+              title="Analytics Dashboard"
+              description="Track DMs sent, conversion rates, and product performance. Know exactly what's working."
+            />
+            <FeatureCard
+              icon={<Shield className="h-5 w-5" />}
+              title="Flexible Payments"
+              description="Connect your own checkout link — Gumroad, Stripe, Stan Store, or any payment processor you prefer."
+            />
+            <FeatureCard
+              icon={<Sparkles className="h-5 w-5" />}
+              title="Pro Plan"
+              description="Unlimited DMs, priority support, and advanced automation features. Scale without limits."
             />
           </div>
         </div>
       </section>
 
       {/* How it works */}
-      <section className="py-20 border-t border-border/50">
-        <div className="max-w-4xl mx-auto px-4">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-16">
+      <section className="py-20 border-t border-border/60 bg-secondary/30">
+        <div className="container max-w-3xl">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground text-center mb-14">
             How it works
           </h2>
-          <div className="space-y-8">
-            <StepItem
-              step="01"
+
+          <div className="space-y-10">
+            <Step
+              number="1"
               title="Create your digital product"
-              description="Use our markdown editor to write an ebook from scratch, or upload an existing PDF. We host it and generate a download link."
+              description="Write an ebook with our markdown editor or upload an existing PDF. Add a title, description, and your checkout link."
             />
-            <StepItem
-              step="02"
+            <Step
+              number="2"
               title="Set up automation rules"
-              description='Choose an Instagram post, define trigger keywords like "ebook" or "guide", and write your DM template with the product link.'
+              description="Choose an Instagram post, define trigger keywords (e.g., 'ebook', 'link'), and craft your DM template with the product link."
             />
-            <StepItem
-              step="03"
+            <Step
+              number="3"
               title="Watch sales happen"
-              description="When followers comment with your keyword, SellMate instantly sends them a DM with your product link. You sell while you sleep."
+              description="When a follower comments your keyword, SellMate sends them a DM with your product link instantly. You sell while you sleep."
             />
           </div>
         </div>
       </section>
 
       {/* Pricing teaser */}
-      <section className="py-20 border-t border-border/50">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+      <section className="py-20 border-t border-border/60">
+        <div className="container max-w-2xl text-center">
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-3">
             Simple, transparent pricing
           </h2>
-          <p className="text-muted-foreground text-lg mb-10">
-            Start free with 100 DMs/month. Upgrade to Pro for unlimited everything.
+          <p className="text-muted-foreground mb-8">
+            Start free with 100 DMs/month. Upgrade when you're ready to scale.
           </p>
-          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
-            <div className="rounded-xl border border-border p-6 text-left bg-card">
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-lg mx-auto">
+            <div className="rounded-xl border border-border bg-card p-6 text-left">
               <p className="text-sm font-medium text-muted-foreground mb-1">Free</p>
-              <p className="text-3xl font-bold mb-4">$0<span className="text-base font-normal text-muted-foreground">/mo</span></p>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 100 DMs / month</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Basic editor</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> 3 automation rules</li>
+              <p className="text-3xl font-bold text-foreground mb-3">$0</p>
+              <ul className="text-sm text-muted-foreground space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> 100 DMs / month
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> Unlimited products
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> Markdown editor
+                </li>
               </ul>
             </div>
-            <div className="rounded-xl border-2 border-primary p-6 text-left bg-card relative">
-              <div className="absolute -top-3 left-6 bg-primary text-primary-foreground text-xs font-medium px-3 py-0.5 rounded-full">
+            <div className="rounded-xl border-2 border-primary bg-card p-6 text-left relative">
+              <div className="absolute -top-2.5 left-4 px-2 py-0.5 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full uppercase tracking-wider">
                 Popular
               </div>
               <p className="text-sm font-medium text-muted-foreground mb-1">Pro</p>
-              <p className="text-3xl font-bold mb-4">$29<span className="text-base font-normal text-muted-foreground">/mo</span></p>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Unlimited DMs</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Premium templates</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Unlimited automations</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Priority support</li>
+              <p className="text-3xl font-bold text-foreground mb-3">
+                $29<span className="text-sm font-normal text-muted-foreground">/mo</span>
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> Unlimited DMs
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> Advanced automations
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-primary mt-0.5">✓</span> Priority support
+                </li>
               </ul>
             </div>
           </div>
+
           <Button
-            size="lg"
-            className="mt-10 text-base px-8"
+            className="mt-8"
             onClick={() =>
               isAuthenticated
                 ? setLocation("/pricing")
                 : (window.location.href = getLoginUrl())
             }
           >
-            Get Started Free
-            <ArrowRight className="ml-2 h-4 w-4" />
+            View full pricing
+            <ArrowRight className="h-4 w-4 ml-1.5" />
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border/50 py-8">
-        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between text-sm text-muted-foreground">
+      <footer className="py-10 border-t border-border/60">
+        <div className="container flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-foreground">SellMate</span>
+            <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center">
+              <Zap className="h-3 w-3 text-primary" />
+            </div>
+            <span className="text-sm font-medium text-foreground">SellMate</span>
           </div>
-          <p>&copy; {new Date().getFullYear()} SellMate. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">
+            &copy; {new Date().getFullYear()} SellMate. All rights reserved.
+          </p>
         </div>
       </footer>
     </div>
@@ -215,33 +264,33 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-6 hover:border-primary/30 transition-colors">
-      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary mb-4">
+    <div className="rounded-xl border border-border bg-card p-6 hover:border-primary/20 transition-colors">
+      <div className="h-10 w-10 rounded-lg bg-primary/8 flex items-center justify-center text-primary mb-4">
         {icon}
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
     </div>
   );
 }
 
-function StepItem({
-  step,
+function Step({
+  number,
   title,
   description,
 }: {
-  step: string;
+  number: string;
   title: string;
   description: string;
 }) {
   return (
-    <div className="flex gap-6 items-start">
-      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-        {step}
+    <div className="flex gap-5">
+      <div className="flex-shrink-0 h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+        {number}
       </div>
-      <div>
-        <h3 className="text-lg font-semibold mb-1">{title}</h3>
-        <p className="text-muted-foreground leading-relaxed">{description}</p>
+      <div className="pt-0.5">
+        <h3 className="text-base font-semibold text-foreground mb-1">{title}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
       </div>
     </div>
   );

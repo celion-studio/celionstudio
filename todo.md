@@ -25,3 +25,11 @@
 - [x] Settings 라우터 (get, updateInstagram, disconnectInstagram)
 - [x] Polar API 키 사용자 설정 가이드 및 Webhook URL 안내 (환경변수 방식)
 - [x] Polar 설정 상태 검증 로직 (billing 라우터에서 env 누락 시 메시지 반환)
+- [x] 디자인 리디자인: Perplexity/Claude 스타일 라이트 테마 적용
+- [x] 디자인 리디자인: index.css 글로벌 테마 변경 (다크→라이트)
+- [x] 디자인 리디자인: 랜딩 페이지 리디자인
+- [x] 디자인 리디자인: DashboardLayout 사이드바 리디자인
+- [x] 디자인 리디자인: 대시보드 및 내부 페이지 리디자인 (Products, Automations, DmLogs, Pricing, Settings, ProductEditor, AutomationEditor)
+- [x] 디자인 리디자인: UI 폴리싱 및 최종 확인
+- [x] 디자인 QA: 리디자인된 모든 내부 페이지 브라우저에서 최종 확인 및 깨짐/레이아웃 이슈 수정
+- [x] 디자인 QA: 빈 상태, 로딩 상태, 오류 상태 UI 폴리싱 및 최종 점검

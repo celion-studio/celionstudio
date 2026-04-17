@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -58,7 +57,7 @@ export default function ProductEditor() {
   });
 
   const convertPdfMutation = trpc.products.convertToPdf.useMutation({
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success("PDF generated and hosted!");
       utils.products.list.invalidate();
       if (isEditing) {
@@ -129,159 +128,153 @@ export default function ProductEditor() {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
+    <div className="max-w-3xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
           onClick={() => setLocation("/products")}
+          className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-accent transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-        </Button>
+        </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             {isEditing ? "Edit Product" : "New Product"}
           </h1>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
+        <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-9 text-xs">
+          <Save className="mr-1.5 h-3.5 w-3.5" />
           {isSaving ? "Saving..." : "Save"}
         </Button>
       </div>
 
       {/* Basic Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Basic Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              placeholder="My Awesome Ebook"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="A brief description of your product..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="checkout">External Checkout URL (optional)</Label>
-            <Input
-              id="checkout"
-              placeholder="https://gumroad.com/l/your-product"
-              value={externalCheckoutUrl}
-              onChange={(e) => setExternalCheckoutUrl(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Your Stripe, Gumroad, or other payment link. This will be included in DM messages.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-medium text-foreground">Basic Information</h2>
+        <div className="space-y-1.5">
+          <Label htmlFor="title" className="text-xs text-muted-foreground">Title</Label>
+          <Input
+            id="title"
+            placeholder="My Awesome Ebook"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="description" className="text-xs text-muted-foreground">Description</Label>
+          <Textarea
+            id="description"
+            placeholder="A brief description of your product..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="checkout" className="text-xs text-muted-foreground">External Checkout URL (optional)</Label>
+          <Input
+            id="checkout"
+            placeholder="https://gumroad.com/l/your-product"
+            value={externalCheckoutUrl}
+            onChange={(e) => setExternalCheckoutUrl(e.target.value)}
+            className="h-9 text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Your Stripe, Gumroad, or other payment link. This will be included in DM messages.
+          </p>
+        </div>
+      </div>
 
       {/* Content Editor */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span>Content Editor</span>
-            {isEditing && contentMarkdown && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => convertPdfMutation.mutate({ id: Number(params.id) })}
-                disabled={convertPdfMutation.isPending}
-              >
-                <FileText className="mr-2 h-3.5 w-3.5" />
-                {convertPdfMutation.isPending ? "Generating..." : "Generate PDF"}
-              </Button>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={editorTab} onValueChange={setEditorTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="write">Write</TabsTrigger>
-              <TabsTrigger value="preview">
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                Preview
-              </TabsTrigger>
-            </TabsList>
-            <TabsContent value="write">
-              <Textarea
-                placeholder="Write your ebook content in Markdown..."
-                value={contentMarkdown}
-                onChange={(e) => setContentMarkdown(e.target.value)}
-                rows={20}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Supports Markdown formatting: **bold**, *italic*, # headings, - lists, etc.
-              </p>
-            </TabsContent>
-            <TabsContent value="preview">
-              <div className="min-h-[400px] rounded-md border border-border bg-card p-6 prose prose-invert max-w-none">
-                {contentMarkdown ? (
-                  <Streamdown>{contentMarkdown}</Streamdown>
-                ) : (
-                  <p className="text-muted-foreground italic">
-                    Nothing to preview yet. Start writing in the editor.
-                  </p>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-medium text-foreground">Content Editor</h2>
+          {isEditing && contentMarkdown && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => convertPdfMutation.mutate({ id: Number(params.id) })}
+              disabled={convertPdfMutation.isPending}
+            >
+              <FileText className="mr-1.5 h-3 w-3" />
+              {convertPdfMutation.isPending ? "Generating..." : "Generate PDF"}
+            </Button>
+          )}
+        </div>
+        <Tabs value={editorTab} onValueChange={setEditorTab}>
+          <TabsList className="mb-3 h-8">
+            <TabsTrigger value="write" className="text-xs h-7 px-3">Write</TabsTrigger>
+            <TabsTrigger value="preview" className="text-xs h-7 px-3">
+              <Eye className="mr-1 h-3 w-3" />
+              Preview
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="write">
+            <Textarea
+              placeholder="Write your ebook content in Markdown..."
+              value={contentMarkdown}
+              onChange={(e) => setContentMarkdown(e.target.value)}
+              rows={20}
+              className="font-mono text-sm"
+            />
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Supports Markdown: **bold**, *italic*, # headings, - lists, etc.
+            </p>
+          </TabsContent>
+          <TabsContent value="preview">
+            <div className="min-h-[400px] rounded-lg border border-border bg-background p-6 prose max-w-none">
+              {contentMarkdown ? (
+                <Streamdown>{contentMarkdown}</Streamdown>
+              ) : (
+                <p className="text-muted-foreground italic text-sm">
+                  Nothing to preview yet. Start writing in the editor.
+                </p>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
 
       {/* PDF Upload */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Upload PDF</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-            <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground mb-3">
-              Upload an existing PDF file (max 20MB)
-            </p>
-            <label>
-              <input
-                type="file"
-                accept=".pdf"
-                className="hidden"
-                onChange={handleFileUpload}
-                disabled={uploading}
-              />
-              <Button variant="outline" asChild disabled={uploading}>
-                <span>{uploading ? "Uploading..." : "Choose File"}</span>
-              </Button>
-            </label>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-sm font-medium text-foreground mb-4">Upload PDF</h2>
+        <div className="border border-dashed border-border rounded-xl p-8 text-center bg-background">
+          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center mx-auto mb-3">
+            <Upload className="h-4 w-4 text-muted-foreground" />
           </div>
-          {product?.fileUrl && (
-            <div className="mt-4 flex items-center gap-2 text-sm">
-              <FileText className="h-4 w-4 text-primary" />
-              <a
-                href={product.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline truncate"
-              >
-                Current file: {product.fileUrl}
-              </a>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          <p className="text-xs text-muted-foreground mb-3">
+            Upload an existing PDF file (max 20MB)
+          </p>
+          <label>
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={uploading}
+            />
+            <Button variant="outline" size="sm" asChild disabled={uploading} className="h-8 text-xs">
+              <span>{uploading ? "Uploading..." : "Choose File"}</span>
+            </Button>
+          </label>
+        </div>
+        {product?.fileUrl && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <FileText className="h-3.5 w-3.5 text-primary" />
+            <a
+              href={product.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline truncate"
+            >
+              Current file: {product.fileUrl}
+            </a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Package, Zap, MessageSquare, TrendingUp, AlertTriangle } from "lucide-react";
+import { Package, Zap, MessageSquare, TrendingUp, AlertTriangle, ArrowRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,16 +9,17 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-4xl space-y-8">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Overview of your products, automations, and DM activity.
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Products"
           value={stats?.productCount}
@@ -58,78 +58,48 @@ export default function Dashboard() {
       {/* DM Limit Warning */}
       {stats?.subscriptionStatus === "free" &&
         stats.monthlyDmCount >= 80 && (
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="flex items-center gap-4 py-4">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">
-                  {stats.monthlyDmCount >= 100
-                    ? "You've reached your monthly DM limit (100/100)."
-                    : `You're approaching your monthly DM limit (${stats.monthlyDmCount}/100).`}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Upgrade to Pro for unlimited DM sends.
-                </p>
-              </div>
-              <Button size="sm" onClick={() => setLocation("/pricing")}>
-                Upgrade
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                {stats.monthlyDmCount >= 100
+                  ? "Monthly DM limit reached (100/100)"
+                  : `Approaching DM limit (${stats.monthlyDmCount}/100)`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Upgrade to Pro for unlimited sends.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 text-xs h-8" onClick={() => setLocation("/pricing")}>
+              Upgrade
+              <ArrowRight className="h-3 w-3 ml-1" />
+            </Button>
+          </div>
         )}
 
       {/* Quick Actions */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card
-          className="hover:border-primary/30 transition-colors cursor-pointer"
-          onClick={() => setLocation("/products/new")}
-        >
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4 text-primary" />
-              Create a Product
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Write an ebook with our editor or upload an existing PDF.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="hover:border-primary/30 transition-colors cursor-pointer"
-          onClick={() => setLocation("/automations/new")}
-        >
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Zap className="h-4 w-4 text-primary" />
-              Set Up Automation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Define keyword triggers and DM templates for your Instagram posts.
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="hover:border-primary/30 transition-colors cursor-pointer"
-          onClick={() => setLocation("/logs")}
-        >
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              View DM Logs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Check your DM delivery history, success rates, and errors.
-            </p>
-          </CardContent>
-        </Card>
+      <div>
+        <h2 className="text-sm font-medium text-muted-foreground mb-3">Quick actions</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <QuickAction
+            icon={<Package className="h-4 w-4" />}
+            title="Create a Product"
+            description="Write an ebook or upload a PDF"
+            onClick={() => setLocation("/products/new")}
+          />
+          <QuickAction
+            icon={<Zap className="h-4 w-4" />}
+            title="Set Up Automation"
+            description="Define keyword triggers and DM templates"
+            onClick={() => setLocation("/automations/new")}
+          />
+          <QuickAction
+            icon={<MessageSquare className="h-4 w-4" />}
+            title="View DM Logs"
+            description="Check delivery history and success rates"
+            onClick={() => setLocation("/logs")}
+          />
+        </div>
       </div>
     </div>
   );
@@ -149,25 +119,46 @@ function StatCard({
   isLoading: boolean;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-        <div className="text-muted-foreground">{icon}</div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-8 w-20" />
-        ) : (
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold">{value ?? 0}</span>
-            {subtitle && (
-              <span className="text-xs text-muted-foreground">{subtitle}</span>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-muted-foreground">{title}</span>
+        <div className="text-muted-foreground/60">{icon}</div>
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-7 w-16" />
+      ) : (
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-semibold text-foreground">{value ?? 0}</span>
+          {subtitle && (
+            <span className="text-[11px] text-muted-foreground">{subtitle}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickAction({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/25 hover:bg-accent/30 transition-all group"
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div className="text-primary">{icon}</div>
+        <span className="text-sm font-medium text-foreground">{title}</span>
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+    </button>
   );
 }

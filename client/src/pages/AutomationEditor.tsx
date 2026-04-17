@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Save, X, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -110,137 +108,132 @@ export default function AutomationEditor() {
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
+    <div className="max-w-3xl space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
           onClick={() => setLocation("/automations")}
+          className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-accent transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-        </Button>
+        </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             {isEditing ? "Edit Automation" : "New Automation"}
           </h1>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
-          <Save className="mr-2 h-4 w-4" />
+        <Button size="sm" onClick={handleSave} disabled={isSaving} className="h-9 text-xs">
+          <Save className="mr-1.5 h-3.5 w-3.5" />
           {isSaving ? "Saving..." : "Save"}
         </Button>
       </div>
 
-      {/* Basic Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Automation Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Ebook Sales Automation"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="product">Linked Product (optional)</Label>
-            <Select value={productId} onValueChange={setProductId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a product" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No product linked</SelectItem>
-                {products?.map((p: any) => (
-                  <SelectItem key={p.id} value={String(p.id)}>
-                    {p.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Automation Details */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-medium text-foreground">Automation Details</h2>
+        <div className="space-y-1.5">
+          <Label htmlFor="name" className="text-xs text-muted-foreground">Name</Label>
+          <Input
+            id="name"
+            placeholder="e.g., Ebook Sales Automation"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="product" className="text-xs text-muted-foreground">Linked Product (optional)</Label>
+          <Select value={productId} onValueChange={setProductId}>
+            <SelectTrigger className="h-9 text-sm">
+              <SelectValue placeholder="Select a product" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No product linked</SelectItem>
+              {products?.map((p: any) => (
+                <SelectItem key={p.id} value={String(p.id)}>
+                  {p.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-      {/* Trigger */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Trigger Settings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="mediaId">Instagram Post ID (optional)</Label>
+      {/* Trigger Settings */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-medium text-foreground">Trigger Settings</h2>
+        <div className="space-y-1.5">
+          <Label htmlFor="mediaId" className="text-xs text-muted-foreground">Instagram Post ID (optional)</Label>
+          <Input
+            id="mediaId"
+            placeholder="Leave empty to apply to all posts"
+            value={igMediaId}
+            onChange={(e) => setIgMediaId(e.target.value)}
+            className="h-9 text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            If empty, the automation triggers on comments from any of your posts.
+          </p>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Trigger Keywords</Label>
+          <div className="flex gap-2">
             <Input
-              id="mediaId"
-              placeholder="Leave empty to apply to all posts"
-              value={igMediaId}
-              onChange={(e) => setIgMediaId(e.target.value)}
+              placeholder="e.g., ebook"
+              value={keywordInput}
+              onChange={(e) => setKeywordInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addKeyword();
+                }
+              }}
+              className="h-9 text-sm"
             />
-            <p className="text-xs text-muted-foreground">
-              If empty, the automation triggers on comments from any of your posts.
-            </p>
+            <Button variant="outline" onClick={addKeyword} type="button" size="sm" className="h-9 w-9 p-0 shrink-0">
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label>Trigger Keywords</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g., ebook"
-                value={keywordInput}
-                onChange={(e) => setKeywordInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addKeyword();
-                  }
-                }}
-              />
-              <Button variant="outline" onClick={addKeyword} type="button">
-                <Plus className="h-4 w-4" />
-              </Button>
+          {keywords.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {keywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-muted-foreground border border-border"
+                >
+                  {kw}
+                  <button
+                    onClick={() => removeKeyword(kw)}
+                    className="hover:text-destructive transition-colors"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
             </div>
-            {keywords.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {keywords.map((kw) => (
-                  <Badge key={kw} variant="secondary" className="gap-1 pr-1">
-                    {kw}
-                    <button
-                      onClick={() => removeKeyword(kw)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              When a follower comments with any of these keywords, a DM will be sent.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            When a follower comments with any of these keywords, a DM will be sent.
+          </p>
+        </div>
+      </div>
 
       {/* DM Template */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">DM Message Template</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Textarea
-              placeholder={`Hi {{name}}! 👋\n\nThanks for your interest! Here's the link to grab your copy:\n\n{{link}}\n\nLet me know if you have any questions!`}
-              value={dmTemplate}
-              onChange={(e) => setDmTemplate(e.target.value)}
-              rows={8}
-            />
-            <p className="text-xs text-muted-foreground">
-              Use {"{{link}}"} to insert the product checkout URL. Use {"{{name}}"} for the commenter's name.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <h2 className="text-sm font-medium text-foreground">DM Message Template</h2>
+        <div className="space-y-1.5">
+          <Textarea
+            placeholder={`Hi {{name}}! 👋\n\nThanks for your interest! Here's the link to grab your copy:\n\n{{link}}\n\nLet me know if you have any questions!`}
+            value={dmTemplate}
+            onChange={(e) => setDmTemplate(e.target.value)}
+            rows={8}
+            className="text-sm"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Use {"{{link}}"} to insert the product checkout URL. Use {"{{name}}"} for the commenter's name.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

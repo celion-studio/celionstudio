@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { CheckCircle2, Crown, Zap } from "lucide-react";
+import { Check, Crown, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 const FREE_FEATURES = [
@@ -32,7 +31,7 @@ export default function Pricing() {
       if (data.checkoutUrl) {
         window.open(data.checkoutUrl, "_blank");
       } else {
-        toast.error(data.message || "Checkout is not available. Please configure Polar API keys in Settings > Secrets.");
+        toast.error(data.message || "Checkout is not available. Please configure Polar API keys.");
       }
     },
     onError: (err) => toast.error(err.message),
@@ -43,108 +42,98 @@ export default function Pricing() {
       if (data.portalUrl) {
         window.open(data.portalUrl, "_blank");
       } else {
-        toast.error(data.message || "Subscription portal is not available. Please configure Polar API keys in Settings > Secrets.");
+        toast.error(data.message || "Subscription portal is not available.");
       }
     },
     onError: (err) => toast.error(err.message),
   });
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Pricing</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Choose the plan that fits your creator journey.
         </p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-6">
+      <div className="grid sm:grid-cols-2 gap-4">
         {/* Free Plan */}
-        <Card className={subscriptionStatus === "free" ? "border-primary/50" : ""}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Free</CardTitle>
-              {subscriptionStatus === "free" && (
-                <Badge variant="outline">Current Plan</Badge>
-              )}
-            </div>
-            <div className="mt-2">
-              <span className="text-4xl font-bold">$0</span>
-              <span className="text-muted-foreground ml-1">/month</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {FREE_FEATURES.map((feature) => (
-                <li key={feature} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+        <div className={`rounded-xl border bg-card p-6 ${subscriptionStatus === "free" ? "border-primary/30" : "border-border"}`}>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-muted-foreground">Free</span>
             {subscriptionStatus === "free" && (
-              <Button variant="outline" className="w-full mt-6 bg-transparent" disabled>
-                Current Plan
-              </Button>
+              <Badge variant="secondary" className="text-[10px] h-5">Current</Badge>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          <div className="mb-5">
+            <span className="text-3xl font-bold text-foreground">$0</span>
+            <span className="text-sm text-muted-foreground ml-1">/month</span>
+          </div>
+          <ul className="space-y-2.5 mb-6">
+            {FREE_FEATURES.map((feature) => (
+              <li key={feature} className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                <Check className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+          {subscriptionStatus === "free" && (
+            <Button variant="outline" className="w-full h-9 text-xs bg-transparent" disabled>
+              Current Plan
+            </Button>
+          )}
+        </div>
 
         {/* Pro Plan */}
-        <Card className={`border-2 ${subscriptionStatus === "pro" ? "border-primary" : "border-primary/50"} relative`}>
-          <div className="absolute -top-3 left-6 bg-primary text-primary-foreground text-xs font-medium px-3 py-0.5 rounded-full flex items-center gap-1">
-            <Crown className="h-3 w-3" />
-            Recommended
+        <div className={`rounded-xl border-2 bg-card p-6 relative ${subscriptionStatus === "pro" ? "border-primary" : "border-primary/40"}`}>
+          <div className="absolute -top-2.5 left-4 px-2.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-semibold rounded-full uppercase tracking-wider flex items-center gap-1">
+            <Crown className="h-2.5 w-2.5" />
+            Popular
           </div>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Pro</CardTitle>
-              {subscriptionStatus === "pro" && (
-                <Badge>Active</Badge>
-              )}
-            </div>
-            <div className="mt-2">
-              <span className="text-4xl font-bold">$29</span>
-              <span className="text-muted-foreground ml-1">/month</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {PRO_FEATURES.map((feature) => (
-                <li key={feature} className="flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-            {subscriptionStatus === "pro" ? (
-              <Button
-                variant="outline"
-                className="w-full mt-6 bg-transparent"
-                onClick={() => manageMutation.mutate()}
-                disabled={manageMutation.isPending}
-              >
-                Manage Subscription
-              </Button>
-            ) : (
-              <Button
-                className="w-full mt-6"
-                onClick={() => checkoutMutation.mutate()}
-                disabled={checkoutMutation.isPending}
-              >
-                <Zap className="mr-2 h-4 w-4" />
-                {checkoutMutation.isPending ? "Loading..." : "Upgrade to Pro"}
-              </Button>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium text-muted-foreground">Pro</span>
+            {subscriptionStatus === "pro" && (
+              <Badge className="text-[10px] h-5">Active</Badge>
             )}
-          </CardContent>
-        </Card>
+          </div>
+          <div className="mb-5">
+            <span className="text-3xl font-bold text-foreground">$29</span>
+            <span className="text-sm text-muted-foreground ml-1">/month</span>
+          </div>
+          <ul className="space-y-2.5 mb-6">
+            {PRO_FEATURES.map((feature) => (
+              <li key={feature} className="flex items-center gap-2 text-[13px] text-foreground">
+                <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+          {subscriptionStatus === "pro" ? (
+            <Button
+              variant="outline"
+              className="w-full h-9 text-xs bg-transparent"
+              onClick={() => manageMutation.mutate()}
+              disabled={manageMutation.isPending}
+            >
+              Manage Subscription
+            </Button>
+          ) : (
+            <Button
+              className="w-full h-9 text-xs"
+              onClick={() => checkoutMutation.mutate()}
+              disabled={checkoutMutation.isPending}
+            >
+              <Zap className="mr-1.5 h-3.5 w-3.5" />
+              {checkoutMutation.isPending ? "Loading..." : "Upgrade to Pro"}
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="text-center text-sm text-muted-foreground">
-        <p>
-          Payments are processed securely via Polar. Cancel anytime.
-        </p>
-      </div>
+      <p className="text-center text-xs text-muted-foreground">
+        Payments are processed securely via Polar. Cancel anytime.
+      </p>
     </div>
   );
 }

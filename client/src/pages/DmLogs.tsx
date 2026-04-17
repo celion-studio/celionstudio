@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -15,102 +14,92 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function DmLogs() {
   const { data: logs, isLoading } = trpc.dmLogs.list.useQuery();
 
-  const statusIcon = (status: string) => {
-    switch (status) {
-      case "success":
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case "failed":
-        return <XCircle className="h-4 w-4 text-destructive" />;
-      case "rate_limited":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const statusBadge = (status: string) => {
-    const variant =
-      status === "success"
-        ? "default"
-        : status === "failed"
-          ? "destructive"
-          : "secondary";
-    return <Badge variant={variant as any}>{status}</Badge>;
+  const statusConfig: Record<string, { icon: React.ReactNode; label: string; variant: "default" | "destructive" | "secondary" }> = {
+    success: {
+      icon: <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />,
+      label: "Success",
+      variant: "default",
+    },
+    failed: {
+      icon: <XCircle className="h-3.5 w-3.5 text-destructive" />,
+      label: "Failed",
+      variant: "destructive",
+    },
+    rate_limited: {
+      icon: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
+      label: "Rate Limited",
+      variant: "secondary",
+    },
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">DM Logs</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">DM Logs</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           View the history of all automated DM sends.
         </p>
       </div>
 
       {isLoading ? (
-        <Card>
-          <CardContent className="p-5">
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
       ) : !logs?.length ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <ScrollText className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold mb-1">No DM logs yet</h3>
-            <p className="text-sm text-muted-foreground">
-              Logs will appear here once your automations start sending DMs.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed border-border bg-card flex flex-col items-center justify-center py-16 text-center">
+          <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+            <ScrollText className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <h3 className="text-sm font-semibold text-foreground mb-1">No DM logs yet</h3>
+          <p className="text-xs text-muted-foreground">
+            Logs will appear here once your automations start sending DMs.
+          </p>
+        </div>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Automation</TableHead>
-                  <TableHead>Recipient</TableHead>
-                  <TableHead>Comment ID</TableHead>
-                  <TableHead>Error</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs.map((log: any) => (
-                  <TableRow key={log.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {statusIcon(log.status)}
-                        {statusBadge(log.status)}
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium text-muted-foreground h-10">Status</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground h-10">Automation</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground h-10">Recipient</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground h-10">Error</TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground h-10">Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {logs.map((log: any) => {
+                const config = statusConfig[log.status] || statusConfig.failed;
+                return (
+                  <TableRow key={log.id} className="hover:bg-accent/30">
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-1.5">
+                        {config.icon}
+                        <Badge variant={config.variant} className="text-[10px] h-5">
+                          {config.label}
+                        </Badge>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="text-[13px] text-foreground">
                       {log.automationName || `#${log.automationId}`}
                     </TableCell>
-                    <TableCell className="text-sm font-mono">
+                    <TableCell className="text-[13px] font-mono text-muted-foreground">
                       {log.igSenderId}
                     </TableCell>
-                    <TableCell className="text-sm font-mono text-muted-foreground">
-                      {log.igCommentId}
-                    </TableCell>
-                    <TableCell className="text-sm text-destructive max-w-[200px] truncate">
+                    <TableCell className="text-[13px] text-destructive max-w-[200px] truncate">
                       {log.errorMessage || "—"}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell className="text-[13px] text-muted-foreground">
                       {new Date(log.createdAt).toLocaleString()}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );
