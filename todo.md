@@ -1,0 +1,24 @@
+# SellMate TODO
+
+- [x] DB 스키마 설계 (products, automations, dm_logs 테이블)
+- [x] 글로벌 테마 및 색상 팔레트 설정 (다크 테마 기반)
+- [x] DashboardLayout 기반 사이드바 네비게이션 구성
+- [x] 랜딩 페이지 (Hero + 기능 소개 + CTA)
+- [x] 크리에이터 대시보드 (프로덕트 수, 활성 자동화 수, 월간 DM 발송량 지표)
+- [x] 마크다운 에디터 기반 전자책 작성 기능
+- [x] 마크다운 → styled HTML 변환 및 호스팅 기능 (marked 라이브러리 사용)
+- [x] 기존 PDF 파일 업로드 및 다운로드 링크 생성
+- [x] 프로덕트 목록 페이지 (CRUD)
+- [x] 자동화 룰 관리 UI (트리거 키워드 설정, DM 템플릿 작성)
+- [x] 자동화 룰 목록 페이지 (활성/비활성 토글)
+- [x] Meta Graph API Webhook 수신 엔드포인트
+- [x] 키워드 매칭 후 자동 DM 발송 로직 (Webhook 핸들러 구현 완료)
+- [x] Polar API 연동으로 실제 Checkout URL 및 Customer Portal URL 생성
+- [x] 구독 상태 관리 (Polar Webhook 수신)
+- [x] Free 플랜 월간 DM 발송량 100건 제한 로직
+- [x] 한도 도달 시 업그레이드 유도 UI
+- [x] DM 발송 로그 및 성공/실패 이력 조회 페이지
+- [x] Pricing 페이지를 실제 Polar Checkout에 연결
+- [x] Vitest 테스트 작성
+- [ ] Polar API 키 연동 (실제 결제 활성화 - 사용자 설정 필요)
+- [ ] Instagram Graph API 토큰 설정 UI (사용자 설정 필요)

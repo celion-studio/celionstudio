@@ -5,31 +5,70 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import ProductEditor from "./pages/ProductEditor";
+import Automations from "./pages/Automations";
+import AutomationEditor from "./pages/AutomationEditor";
+import DmLogs from "./pages/DmLogs";
+import Pricing from "./pages/Pricing";
+import DashboardLayout from "./components/DashboardLayout";
+
+function WithDashboard({ children }: { children: React.ReactNode }) {
+  return <DashboardLayout>{children}</DashboardLayout>;
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/" component={Home} />
+
+      <Route path="/dashboard">
+        <WithDashboard><Dashboard /></WithDashboard>
+      </Route>
+
+      <Route path="/products">
+        <WithDashboard><Products /></WithDashboard>
+      </Route>
+      <Route path="/products/new">
+        <WithDashboard><ProductEditor /></WithDashboard>
+      </Route>
+      <Route path="/products/:id/edit">
+        {(params) => (
+          <WithDashboard><ProductEditor /></WithDashboard>
+        )}
+      </Route>
+
+      <Route path="/automations">
+        <WithDashboard><Automations /></WithDashboard>
+      </Route>
+      <Route path="/automations/new">
+        <WithDashboard><AutomationEditor /></WithDashboard>
+      </Route>
+      <Route path="/automations/:id/edit">
+        {(params) => (
+          <WithDashboard><AutomationEditor /></WithDashboard>
+        )}
+      </Route>
+
+      <Route path="/logs">
+        <WithDashboard><DmLogs /></WithDashboard>
+      </Route>
+
+      <Route path="/pricing">
+        <WithDashboard><Pricing /></WithDashboard>
+      </Route>
+
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster />
           <Router />
