@@ -19,6 +19,9 @@
 - [x] 한도 도달 시 업그레이드 유도 UI
 - [x] DM 발송 로그 및 성공/실패 이력 조회 페이지
 - [x] Pricing 페이지를 실제 Polar Checkout에 연결
-- [x] Vitest 테스트 작성
-- [ ] Polar API 키 연동 (실제 결제 활성화 - 사용자 설정 필요)
-- [ ] Instagram Graph API 토큰 설정 UI (사용자 설정 필요)
+- [x] Vitest 테스트 작성 (17개 통과)
+- [x] Settings 페이지 - Instagram Graph API 토큰 설정 UI (연결/해제/업데이트)
+- [x] Settings 페이지 - Polar API 키 설정 가이드 및 Webhook URL 안내
+- [x] Settings 라우터 (get, updateInstagram, disconnectInstagram)
+- [x] Polar API 키 사용자 설정 가이드 및 Webhook URL 안내 (환경변수 방식)
+- [x] Polar 설정 상태 검증 로직 (billing 라우터에서 env 누락 시 메시지 반환)

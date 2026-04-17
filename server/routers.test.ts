@@ -149,6 +149,42 @@ describe("automations.create validation", () => {
   });
 });
 
+describe("settings", () => {
+  it("settings.get throws UNAUTHORIZED when not logged in", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.settings.get()).rejects.toThrow("Please login");
+  });
+
+  it("settings.updateInstagram rejects empty igAccountId", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.settings.updateInstagram({
+        igAccountId: "",
+        igPageAccessToken: "some-token",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("settings.updateInstagram rejects empty igPageAccessToken", async () => {
+    const { ctx } = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.settings.updateInstagram({
+        igAccountId: "12345",
+        igPageAccessToken: "",
+      })
+    ).rejects.toThrow();
+  });
+
+  it("settings.disconnectInstagram throws UNAUTHORIZED when not logged in", async () => {
+    const ctx = createUnauthContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.settings.disconnectInstagram()).rejects.toThrow("Please login");
+  });
+});
+
 describe("billing", () => {
   it("createCheckout returns config message when no Polar key", async () => {
     const { ctx } = createAuthContext();

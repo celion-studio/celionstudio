@@ -12,6 +12,7 @@ import Automations from "./pages/Automations";
 import AutomationEditor from "./pages/AutomationEditor";
 import DmLogs from "./pages/DmLogs";
 import Pricing from "./pages/Pricing";
+import Settings from "./pages/Settings";
 import DashboardLayout from "./components/DashboardLayout";
 
 function WithDashboard({ children }: { children: React.ReactNode }) {
@@ -57,6 +58,10 @@ function Router() {
 
       <Route path="/pricing">
         <WithDashboard><Pricing /></WithDashboard>
+      </Route>
+
+      <Route path="/settings">
+        <WithDashboard><Settings /></WithDashboard>
       </Route>
 
       <Route path="/404" component={NotFound} />

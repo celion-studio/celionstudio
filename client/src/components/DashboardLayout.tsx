@@ -33,6 +33,7 @@ import {
   ScrollText,
   CreditCard,
   Crown,
+  Settings,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -238,6 +239,19 @@ function DashboardLayoutContent({
                     className={`h-4 w-4 ${location === "/pricing" ? "text-primary" : ""}`}
                   />
                   <span>Pricing</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/settings"}
+                  onClick={() => setLocation("/settings")}
+                  tooltip="Settings"
+                  className="h-10 transition-all font-normal"
+                >
+                  <Settings
+                    className={`h-4 w-4 ${location === "/settings" ? "text-primary" : ""}`}
+                  />
+                  <span>Settings</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

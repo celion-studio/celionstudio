@@ -20,6 +20,8 @@ import {
   getDmLogsByUserId,
   getDmStatsByUserId,
   getUserMonthlyDmCount,
+  getUserSettings,
+  updateUserInstagramSettings,
 } from "./db";
 import { storagePut } from "./storage";
 import { nanoid } from "nanoid";
@@ -284,6 +286,44 @@ ${markdownHtml}
   dmLogs: router({
     list: protectedProcedure.query(async ({ ctx }) => {
       return getDmLogsByUserId(ctx.user.id);
+    }),
+  }),
+
+  // ── Settings ──
+  settings: router({
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const settings = await getUserSettings(ctx.user.id);
+      return {
+        igAccountId: settings?.igAccountId ?? null,
+        igConnected: !!settings?.igPageAccessToken,
+        subscriptionStatus: settings?.subscriptionStatus ?? "free",
+        polarSubscriptionId: settings?.polarSubscriptionId ?? null,
+        email: settings?.email ?? null,
+        name: settings?.name ?? null,
+      };
+    }),
+
+    updateInstagram: protectedProcedure
+      .input(
+        z.object({
+          igAccountId: z.string().min(1),
+          igPageAccessToken: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await updateUserInstagramSettings(ctx.user.id, {
+          igAccountId: input.igAccountId,
+          igPageAccessToken: input.igPageAccessToken,
+        });
+        return { success: true };
+      }),
+
+    disconnectInstagram: protectedProcedure.mutation(async ({ ctx }) => {
+      await updateUserInstagramSettings(ctx.user.id, {
+        igAccountId: null,
+        igPageAccessToken: null,
+      });
+      return { success: true };
     }),
   }),
 

@@ -233,3 +233,32 @@ export async function resetMonthlyDmCount(userId: number) {
   if (!db) throw new Error("Database not available");
   await db.update(users).set({ monthlyDmCount: 0, lastDmResetAt: new Date() }).where(eq(users.id, userId));
 }
+
+// ── User settings helpers ──
+
+export async function getUserSettings(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db
+    .select({
+      igAccountId: users.igAccountId,
+      igPageAccessToken: users.igPageAccessToken,
+      subscriptionStatus: users.subscriptionStatus,
+      polarSubscriptionId: users.polarSubscriptionId,
+      email: users.email,
+      name: users.name,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return result[0] ?? null;
+}
+
+export async function updateUserInstagramSettings(
+  userId: number,
+  data: { igAccountId?: string | null; igPageAccessToken?: string | null }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(users).set(data).where(eq(users.id, userId));
+}
