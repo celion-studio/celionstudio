@@ -4,9 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { z } from "zod";
-import { createGuideRecord } from "@/lib/celion-model";
-import { saveGuide } from "@/lib/guide-storage";
 import type { GuideSource, SourceKind } from "@/types/guide";
+import type { GuideRecord } from "@/types/guide";
 import { useGuideWizardStore } from "@/store/useGuideWizardStore";
 import { SourceStep } from "@/components/wizard/SourceStep";
 import { ProfileStep } from "@/components/wizard/ProfileStep";
@@ -77,7 +76,7 @@ export function GuideWizard({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (guide: GuideRecord) => void;
 }) {
   const router = useRouter();
   const {
@@ -157,22 +156,35 @@ export function GuideWizard({
         return;
       }
 
-      const guide = createGuideRecord({
-        sources,
-        profile: {
-          targetAudience,
-          goal,
-          depth,
-          tone,
-          structureStyle,
-          readerLevel,
+      const response = await fetch("/api/guides", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          sources,
+          profile: {
+            targetAudience,
+            goal,
+            depth,
+            tone,
+            structureStyle,
+            readerLevel,
+          },
+        }),
       });
 
-      saveGuide(guide);
+      const payload = (await response.json().catch(() => null)) as
+        | { guide?: GuideRecord; message?: string }
+        | null;
+
+      if (!response.ok || !payload?.guide) {
+        throw new Error(payload?.message ?? "Celion could not create the draft.");
+      }
+
       reset();
-      onCreated();
-      router.push(`/builder/${guide.id}`);
+      onCreated(payload.guide);
+      router.push(`/builder/${payload.guide.id}`);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -190,7 +202,7 @@ export function GuideWizard({
         <div className="flex items-center justify-between border-b border-line px-6 py-5 md:px-8">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted">
-              New ebook wizard
+              New draft wizard
             </p>
             <h2 className="mt-2 font-display text-4xl tracking-[-0.03em] text-text">
               Shape the draft before the builder opens
@@ -217,7 +229,7 @@ export function GuideWizard({
             <div className="mt-5 space-y-3">
               {[
                 "1. Source intake",
-                "2. Ebook direction",
+                "2. Draft direction",
                 "3. Style tuning",
               ].map((label, index) => (
                 <div

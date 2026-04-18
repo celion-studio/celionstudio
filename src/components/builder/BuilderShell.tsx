@@ -3,12 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import { withGeneratedHtml } from "@/lib/celion-model";
-import { getGuideById, saveGuide } from "@/lib/guide-storage";
-import type { GuideRecord } from "@/types/guide";
 import { SourcePanel } from "@/components/builder/SourcePanel";
 import { PreviewPanel } from "@/components/builder/PreviewPanel";
 import { ActionPanel } from "@/components/builder/ActionPanel";
+import type { GuideRecord } from "@/types/guide";
 
 function readSectionIds(html: string) {
   return Array.from(html.matchAll(/data-section="([^"]+)"/g)).map(
@@ -20,9 +18,53 @@ export function BuilderShell({ guideId }: { guideId: string }) {
   const [guide, setGuide] = useState<GuideRecord | null>(null);
   const [revisionPrompt, setRevisionPrompt] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setGuide(getGuideById(guideId));
+    let active = true;
+
+    async function loadGuide() {
+      setLoading(true);
+      setFeedback("");
+
+      try {
+        const response = await fetch(`/api/guides/${guideId}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { guide?: GuideRecord; message?: string }
+          | null;
+
+        if (!response.ok || !payload?.guide) {
+          throw new Error(payload?.message ?? "Could not load this draft.");
+        }
+
+        if (active) {
+          setGuide(payload.guide);
+        }
+      } catch (caught) {
+        if (active) {
+          setGuide(null);
+          setFeedback(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load this draft.",
+          );
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadGuide();
+
+    return () => {
+      active = false;
+    };
   }, [guideId]);
 
   const sectionIds = useMemo(
@@ -30,25 +72,65 @@ export function BuilderShell({ guideId }: { guideId: string }) {
     [guide?.html],
   );
 
-  const updateGuide = (nextGuide: GuideRecord, message: string) => {
-    saveGuide(nextGuide);
-    setGuide(nextGuide);
-    setFeedback(message);
-  };
+  async function applyMutation(
+    body:
+      | { action: "generate" | "regenerate" | "mark-exported" }
+      | { action: "revise"; revisionPrompt: string }
+      | {
+          action: "regenerate-section";
+          targetSection: string;
+          revisionPrompt?: string;
+        },
+    successMessage: string,
+  ) {
+    const response = await fetch(`/api/guides/${guideId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { guide?: GuideRecord; message?: string }
+      | null;
+
+    if (!response.ok || !payload?.guide) {
+      throw new Error(payload?.message ?? "Could not update this draft.");
+    }
+
+    setGuide(payload.guide);
+    setFeedback(successMessage);
+  }
+
+  if (loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-bg p-6">
+        <div className="max-w-xl rounded-[32px] border border-line bg-white/75 p-8 text-center shadow-float">
+          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+            Loading
+          </p>
+          <h1 className="mt-3 font-display text-4xl tracking-[-0.03em] text-text">
+            Pulling the latest draft...
+          </h1>
+        </div>
+      </main>
+    );
+  }
 
   if (!guide) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-bg p-6">
         <div className="max-w-xl rounded-[32px] border border-line bg-white/75 p-8 text-center shadow-float">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            Ebook not found
+            Draft unavailable
           </p>
           <h1 className="mt-3 font-display text-4xl tracking-[-0.03em] text-text">
-            This draft is not in local storage.
+            This record could not be loaded.
           </h1>
           <p className="mt-4 text-sm leading-7 text-muted">
-            Open the dashboard, create an ebook from the wizard, and the builder
-            will have a local record to work with.
+            {feedback ||
+              "Open the dashboard, sign in, and create a new draft from the account-backed workspace."}
           </p>
           <Link
             href="/dashboard"
@@ -90,45 +172,79 @@ export function BuilderShell({ guideId }: { guideId: string }) {
           revisionPrompt={revisionPrompt}
           feedback={feedback}
           onRevisionPromptChange={setRevisionPrompt}
-          onGenerateFirstDraft={() => {
-            updateGuide(
-              withGeneratedHtml(guide),
-              "First HTML draft generated locally for the current shell.",
-            );
+          onGenerateFirstDraft={async () => {
+            try {
+              await applyMutation(
+                { action: "generate" },
+                "First HTML draft generated and saved to the database.",
+              );
+            } catch (caught) {
+              setFeedback(
+                caught instanceof Error
+                  ? caught.message
+                  : "Could not generate the first draft.",
+              );
+            }
           }}
-          onRegenerateDraft={() => {
-            updateGuide(
-              withGeneratedHtml(guide),
-              "Draft regenerated from the current source bundle.",
-            );
+          onRegenerateDraft={async () => {
+            try {
+              await applyMutation(
+                { action: "regenerate" },
+                "Draft regenerated from the stored source bundle.",
+              );
+            } catch (caught) {
+              setFeedback(
+                caught instanceof Error
+                  ? caught.message
+                  : "Could not regenerate the draft.",
+              );
+            }
           }}
-          onReviseDraft={() => {
+          onReviseDraft={async () => {
             if (!guide.html) {
               setFeedback("Generate a first draft before asking for revisions.");
               return;
             }
 
-            updateGuide(
-              withGeneratedHtml(guide, { revisionPrompt }),
-              "Whole-draft revision applied locally. The real AI revision route comes next.",
-            );
+            try {
+              await applyMutation(
+                { action: "revise", revisionPrompt },
+                "Whole-draft revision saved.",
+              );
+            } catch (caught) {
+              setFeedback(
+                caught instanceof Error
+                  ? caught.message
+                  : "Could not revise the draft.",
+              );
+            }
           }}
-          onRegenerateSection={(sectionId) => {
+          onRegenerateSection={async (sectionId) => {
             if (!guide.html) {
               setFeedback("Generate a first draft before regenerating a section.");
               return;
             }
 
-            updateGuide(
-              withGeneratedHtml(guide, {
-                revisionPrompt:
-                  revisionPrompt || `Refresh ${sectionId} for stronger clarity.`,
-                targetSection: sectionId,
-              }),
-              `${sectionId} was regenerated with the current local shell logic.`,
-            );
+            try {
+              await applyMutation(
+                {
+                  action: "regenerate-section",
+                  targetSection: sectionId,
+                  revisionPrompt:
+                    revisionPrompt ||
+                    `Refresh ${sectionId} for stronger clarity.`,
+                },
+                `${sectionId} was regenerated and stored as a new revision.`,
+              );
+            } catch (caught) {
+              setFeedback(
+                caught instanceof Error
+                  ? caught.message
+                  : "Could not regenerate that section.",
+              );
+            }
           }}
-          onExportPdf={() => {
+          onExportPdf={async () => {
             if (!guide.html) {
               setFeedback("PDF export is unavailable before the first draft exists.");
               return;
@@ -145,10 +261,19 @@ export function BuilderShell({ guideId }: { guideId: string }) {
             popup.document.close();
             popup.focus();
             popup.print();
-            updateGuide(
-              { ...guide, status: "exported", updatedAt: new Date().toISOString() },
-              "Browser print opened. Save it as PDF from the print dialog.",
-            );
+
+            try {
+              await applyMutation(
+                { action: "mark-exported" },
+                "Browser print opened. Save it as PDF from the print dialog.",
+              );
+            } catch (caught) {
+              setFeedback(
+                caught instanceof Error
+                  ? caught.message
+                  : "Print opened, but export status could not be saved.",
+              );
+            }
           }}
           onFigmaHandoff={async () => {
             if (!guide.html) {

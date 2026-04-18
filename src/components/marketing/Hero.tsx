@@ -1,66 +1,84 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, FileText, Sparkles, Wand2, FileStack } from "lucide-react";
+import { useState } from "react";
+import {
+  ArrowRight,
+  FileStack,
+  FileText,
+  Sparkles,
+  Wand2,
+} from "lucide-react";
+import { AuthModal } from "@/components/auth/AuthModal";
 
 export function Hero() {
+  const [authOpen, setAuthOpen] = useState(false);
+
   return (
     <main className="relative min-h-screen bg-[#FAF9F5]">
-
-      {/* ── Pill Nav ───────────────────────────────────────── */}
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
       <nav className="absolute inset-x-0 top-0 z-30 flex justify-center px-4 pt-5 sm:px-6 sm:pt-6">
         <div className="w-full max-w-[760px]">
-          <div className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-white pl-3 pr-1.5 py-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-white py-1.5 pl-3 pr-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1F1F1F]">
-                <span className="font-mono text-[10px] font-bold text-white">C</span>
+                <span className="font-mono text-[10px] font-bold text-white">
+                  C
+                </span>
               </div>
-              <span className="text-[14px] font-medium tracking-tight text-[#1F1F1F]">Celion</span>
+              <span className="text-[14px] font-medium tracking-tight text-[#1F1F1F]">
+                Celion
+              </span>
             </div>
             <div className="hidden items-center md:flex">
               {["How it works", "Pricing", "Docs"].map((item) => (
-                <a key={item} href="#" className="px-3.5 py-2 text-[13px] font-medium text-[#71717a] transition hover:text-[#1F1F1F]">
+                <a
+                  key={item}
+                  href="#"
+                  className="px-3.5 py-2 text-[13px] font-medium text-[#71717a] transition hover:text-[#1F1F1F]"
+                >
                   {item}
                 </a>
               ))}
             </div>
-            <Link
-              href="/dashboard"
+            <button
+              type="button"
+              onClick={() => setAuthOpen(true)}
               className="rounded-xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-2 text-[13px] font-medium text-[#1F1F1F] transition hover:bg-[#F0EDE6]"
             >
-              Open dashboard
-            </Link>
+              Sign in
+            </button>
           </div>
         </div>
       </nav>
 
-      {/* ── Hero copy ──────────────────────────────────────── */}
       <section className="relative px-6 pb-[130px] pt-28 sm:pb-[160px] sm:pt-32 lg:pb-[200px]">
         <div className="mx-auto max-w-[900px] text-center">
-
-          {/* Label */}
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#C4622D]" />
-            <span className="text-[11px] font-medium tracking-[0.14em] text-[#71717a] uppercase">
-              Knowledge in · Ebook out
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">
+              Knowledge in, polished output out
             </span>
           </div>
 
-          {/* Headline */}
           <h1 className="mx-auto mb-6 max-w-[700px] text-[clamp(40px,5.2vw,62px)] font-semibold leading-[1.08] tracking-[-0.03em] text-[#1F1F1F]">
-            You know it.<br />Now package it.
+            You know it.
+            <br />
+            Now package it.
           </h1>
 
-          {/* Subtitle */}
-          <p className="mx-auto mb-9 max-w-[480px] text-[16px] leading-[1.8] tracking-[-0.01em] text-[#71717a]">
-            Paste your notes, upload a transcript, drop in a draft. Celion reads what you know and produces a polished, structured ebook — ready to sell.
+          <p className="mx-auto mb-9 max-w-[540px] text-[16px] leading-[1.8] tracking-[-0.01em] text-[#71717a]">
+            Paste your notes, upload a transcript, or drop in a draft. Celion
+            turns what you know into a polished HTML draft ready to revise,
+            export, and hand off.
           </p>
 
-          {/* CTAs */}
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/dashboard"
               className="inline-flex items-center gap-2 rounded-xl bg-[#1F1F1F] px-6 py-3.5 text-[14px] font-medium text-white transition hover:opacity-80"
             >
-              Turn my notes into an ebook
+              Open the workspace
               <ArrowRight className="size-4" />
             </Link>
             <a
@@ -70,21 +88,16 @@ export function Hero() {
               See how it works
             </a>
           </div>
-          <p className="mt-4 text-[12px] text-[#a1a1aa]">
-            No account needed · Stored locally · Free to start
-          </p>
+
         </div>
       </section>
 
-      {/* ── Visual band + Builder mockup overlap ───────────── */}
-      <section className="relative">
+      <section className="relative" id="how">
         <div className="h-[380px] w-full bg-[#1F1F1F] sm:h-[480px] lg:h-[560px]" />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 -translate-y-[80px] px-4 sm:-translate-y-[110px] sm:px-6 lg:-translate-y-[150px]">
           <div className="pointer-events-auto mx-auto max-w-[980px]">
             <div className="overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_48px_120px_-24px_rgba(0,0,0,0.5),0_24px_60px_-12px_rgba(0,0,0,0.3)]">
-
-              {/* Window chrome */}
               <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#161616] px-5 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex gap-1.5">
@@ -93,56 +106,88 @@ export function Hero() {
                     <div className="h-3 w-3 rounded-full bg-[#28c840]" />
                   </div>
                   <div className="ml-2">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Builder</p>
-                    <p className="text-[15px] font-medium leading-tight text-white/90">Instagram Growth Playbook</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
+                      Builder
+                    </p>
+                    <p className="text-[15px] font-medium leading-tight text-white/90">
+                      Launch Content Playbook
+                    </p>
                   </div>
                 </div>
-                <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/40">Dashboard</div>
+                <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/40">
+                  Dashboard
+                </div>
               </div>
 
-              {/* 3-panel body */}
-              <div className="grid grid-cols-[200px_1fr_240px] bg-[#FAF9F5]" style={{ minHeight: 340 }}>
-
-                {/* Left — Source panel */}
+              <div
+                className="grid grid-cols-[200px_1fr_240px] bg-[#FAF9F5]"
+                style={{ minHeight: 340 }}
+              >
                 <div className="flex flex-col gap-3 border-r border-[#E8E4DB] bg-[#F4F2EC] p-4">
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Status</p>
-                    <p className="mt-1.5 text-base font-medium text-[#1F1F1F]">draft</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      Status
+                    </p>
+                    <p className="mt-1.5 text-base font-medium text-[#1F1F1F]">
+                      draft
+                    </p>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Ebook profile</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      Profile
+                    </p>
                     <dl className="mt-2 space-y-2">
                       <div>
-                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">Audience</dt>
-                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">Creators, marketers</dd>
+                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
+                          Audience
+                        </dt>
+                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">
+                          Founders, marketers
+                        </dd>
                       </div>
                       <div>
-                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">Tone</dt>
-                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">Practical</dd>
+                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
+                          Tone
+                        </dt>
+                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">
+                          Practical
+                        </dd>
                       </div>
                     </dl>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Sources</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      Sources
+                    </p>
                     <div className="mt-2 space-y-1.5">
-                      {["notes.md", "transcript.txt"].map((f) => (
-                        <div key={f} className="flex items-center gap-1.5 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-2.5 py-1.5">
+                      {["notes.md", "transcript.txt"].map((fileName) => (
+                        <div
+                          key={fileName}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-2.5 py-1.5"
+                        >
                           <FileText className="size-3 text-[#7A7670]" />
-                          <span className="font-mono text-[9px] text-[#1F1F1F]">{f}</span>
+                          <span className="font-mono text-[9px] text-[#1F1F1F]">
+                            {fileName}
+                          </span>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Center — Preview */}
                 <div className="flex flex-col border-r border-[#E8E4DB] bg-white">
                   <div className="flex items-center justify-between border-b border-[#E8E4DB] px-4 py-3">
                     <div>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Live preview</p>
-                      <p className="text-[15px] font-medium text-[#1F1F1F]">Instagram Growth Playbook</p>
+                      <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                        Live preview
+                      </p>
+                      <p className="text-[15px] font-medium text-[#1F1F1F]">
+                        Launch Content Playbook
+                      </p>
                     </div>
-                    <div className="rounded-full border border-[#E8E4DB] bg-[#F4F2EC] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">HTML</div>
+                    <div className="rounded-full border border-[#E8E4DB] bg-[#F4F2EC] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
+                      HTML
+                    </div>
                   </div>
                   <div className="flex-1 px-6 py-5">
                     <div className="space-y-2.5">
@@ -164,14 +209,17 @@ export function Hero() {
                   </div>
                 </div>
 
-                {/* Right — Actions */}
                 <div className="flex flex-col gap-3 bg-white p-4">
                   <div className="rounded-xl border border-[#E8E4DB] bg-[#F4F2EC] p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">AI actions</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      AI actions
+                    </p>
                     <div className="mt-2.5 grid gap-2">
                       <div className="flex items-center gap-2 rounded-lg bg-[#1F1F1F] px-3 py-2">
                         <Sparkles className="size-3 text-white/80" />
-                        <span className="text-[11px] font-medium text-white">Generate first draft</span>
+                        <span className="text-[11px] font-medium text-white">
+                          Generate first draft
+                        </span>
                       </div>
                       <div className="rounded-lg border border-[#E8E4DB] bg-white px-3 py-2 text-[11px] text-[#7A7670]">
                         Regenerate full draft
@@ -179,21 +227,29 @@ export function Hero() {
                     </div>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Revision prompt</p>
-                    <div className="mt-2 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-3 py-2 text-[10px] text-[#a1a1aa]">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      Revision prompt
+                    </p>
+                    <div className="mt-2 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-3 py-2 text-[10px] text-[#A1A1AA]">
                       Make the intro sharper...
                     </div>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Output</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
+                      Output
+                    </p>
                     <div className="mt-2.5 grid gap-1.5">
                       <div className="flex items-center gap-2 rounded-lg border border-[#E8E4DB] bg-white px-3 py-2">
                         <FileStack className="size-3 text-[#7A7670]" />
-                        <span className="text-[10px] font-medium text-[#1F1F1F]">Export PDF</span>
+                        <span className="text-[10px] font-medium text-[#1F1F1F]">
+                          Export PDF
+                        </span>
                       </div>
                       <div className="flex items-center gap-2 rounded-lg border border-[#E8E4DB] bg-white px-3 py-2">
                         <Wand2 className="size-3 text-[#7A7670]" />
-                        <span className="text-[10px] font-medium text-[#1F1F1F]">Copy HTML for Figma</span>
+                        <span className="text-[10px] font-medium text-[#1F1F1F]">
+                          Copy HTML for Figma
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -203,7 +259,6 @@ export function Hero() {
           </div>
         </div>
       </section>
-
     </main>
   );
 }

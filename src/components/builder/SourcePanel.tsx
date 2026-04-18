@@ -11,14 +11,14 @@ export function SourcePanel({ guide }: { guide: GuideRecord }) {
           {guide.status}
         </p>
         <p className="mt-3 text-sm leading-7 text-muted">
-          This shell stores guide drafts locally for now. Database-backed
-          versioning comes next.
+          This draft is account-backed now. Source files and HTML revisions are
+          loaded from the database instead of local browser storage.
         </p>
       </div>
 
       <div className="rounded-[24px] border border-line bg-white p-4">
         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          Ebook profile
+          Draft profile
         </p>
         <dl className="mt-4 grid gap-4 text-sm">
           <div>
