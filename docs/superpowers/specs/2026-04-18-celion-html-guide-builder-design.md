@@ -119,7 +119,7 @@ Normalization responsibilities:
 - extract text from supported files
 - merge multiple source inputs into a working corpus
 - remove obvious duplication where useful
-- preserve the user’s unique knowledge and phrasing when possible
+- preserve the user's unique knowledge and phrasing when possible
 - flag empty or too-thin inputs
 
 The system must bias toward preserving user expertise, not replacing it with generic LLM filler.
