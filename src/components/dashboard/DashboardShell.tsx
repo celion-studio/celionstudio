@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { Plus, BookOpen } from "lucide-react";
 import { getGuides } from "@/lib/guide-storage";
 import type { GuideRecord } from "@/types/guide";
 import { GuideList } from "@/components/dashboard/GuideList";
-import { NewGuideButton } from "@/components/dashboard/NewGuideButton";
 import { GuideWizard } from "@/components/wizard/GuideWizard";
 
 export function DashboardShell() {
@@ -17,38 +16,87 @@ export function DashboardShell() {
     setGuides(getGuides());
   }, []);
 
+  const exported = guides.filter((g) => g.status === "exported").length;
+
   return (
-    <main className="min-h-screen bg-bg px-5 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-col gap-6 border-b border-line pb-8 pt-6 md:flex-row md:items-end md:justify-between">
-          <div className="space-y-4">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-muted transition hover:text-accent"
-            >
-              <ArrowLeft className="size-4" />
-              Back to landing
+    <main className="min-h-screen bg-[#FAF9F5]">
+
+      {/* ── Top bar ─────────────────────────────────────────── */}
+      <header className="border-b border-[#E8E4DB] bg-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1F1F1F]">
+                <span className="font-mono text-[10px] font-bold text-white">C</span>
+              </div>
+              <span className="text-[14px] font-medium text-[#1F1F1F]">Celion</span>
             </Link>
-            <div>
-              <h1 className="font-display text-5xl leading-none tracking-[-0.01em] text-text">
-                Your guides
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-muted">
-                Keep the top-level product small. Start in the wizard. Land in
-                the builder. Export or hand off when the HTML preview feels
-                right.
-              </p>
-            </div>
+            <span className="text-[#E8E4DB]">/</span>
+            <span className="text-[13px] text-[#71717a]">Guides</span>
           </div>
-          <NewGuideButton onClick={() => setWizardOpen(true)} />
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F1F1F] px-4 py-2 text-[13px] font-medium text-white transition hover:opacity-80"
+          >
+            <Plus className="size-3.5" />
+            New guide
+          </button>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-5xl px-6 py-10">
+
+        {/* ── Page title + stats ──────────────────────────── */}
+        <div className="mb-8">
+          <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-[#1F1F1F]">
+            Your guides
+          </h1>
+          <p className="mt-1.5 text-[14px] text-[#71717a]">
+            Paste your knowledge, export a guide. It&apos;s that direct.
+          </p>
+
+          {guides.length > 0 && (
+            <div className="mt-6 flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#1F1F1F]">{guides.length}</span>
+                <span className="text-[13px] text-[#71717a]">guides</span>
+              </div>
+              <div className="h-4 w-px bg-[#E8E4DB]" />
+              <div className="flex items-center gap-2">
+                <span className="text-[22px] font-semibold tracking-[-0.02em] text-[#1F1F1F]">{exported}</span>
+                <span className="text-[13px] text-[#71717a]">exported</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <section className="mt-8">
-          <GuideList guides={guides} />
-        </section>
+        {/* ── Guide list ──────────────────────────────────── */}
+        <GuideList guides={guides} />
+
+        {/* ── Empty state ─────────────────────────────────── */}
+        {guides.length === 0 && (
+          <div className="mt-4 rounded-2xl border border-dashed border-[#E8E4DB] bg-white px-8 py-14 text-center">
+            <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-[#F4F2EC]">
+              <BookOpen className="size-5 text-[#7A7670]" />
+            </div>
+            <p className="text-[15px] font-medium text-[#1F1F1F]">No guides yet</p>
+            <p className="mx-auto mt-2 max-w-xs text-[13px] leading-relaxed text-[#71717a]">
+              Paste your notes or upload a file. Celion turns what you know into a structured, sellable guide.
+            </p>
+            <button
+              type="button"
+              onClick={() => setWizardOpen(true)}
+              className="mt-6 inline-flex items-center gap-1.5 rounded-xl bg-[#1F1F1F] px-5 py-2.5 text-[13px] font-medium text-white transition hover:opacity-80"
+            >
+              <Plus className="size-3.5" />
+              Create your first guide
+            </button>
+          </div>
+        )}
       </div>
 
-      {wizardOpen ? (
+      {wizardOpen && (
         <GuideWizard
           onClose={() => setWizardOpen(false)}
           onCreated={() => {
@@ -56,7 +104,7 @@ export function DashboardShell() {
             setWizardOpen(false);
           }}
         />
-      ) : null}
+      )}
     </main>
   );
 }

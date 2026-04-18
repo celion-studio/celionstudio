@@ -9,32 +9,22 @@ export function Hero() {
       <nav className="absolute inset-x-0 top-0 z-30 flex justify-center px-4 pt-5 sm:px-6 sm:pt-6">
         <div className="w-full max-w-[760px]">
           <div className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-white pl-3 pr-1.5 py-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-
-            {/* Logo */}
             <div className="flex items-center gap-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1F1F1F]">
                 <span className="font-mono text-[10px] font-bold text-white">C</span>
               </div>
-              <span className="text-[14px] font-semibold tracking-tight text-[#1F1F1F]">Celion</span>
+              <span className="text-[14px] font-medium tracking-tight text-[#1F1F1F]">Celion</span>
             </div>
-
-            {/* Desktop links */}
             <div className="hidden items-center md:flex">
               {["How it works", "Pricing", "Docs"].map((item) => (
-                <a
-                  key={item}
-                  href="#"
-                  className="px-3.5 py-2 text-[13px] font-medium text-[#71717a] transition hover:text-[#1F1F1F]"
-                >
+                <a key={item} href="#" className="px-3.5 py-2 text-[13px] font-medium text-[#71717a] transition hover:text-[#1F1F1F]">
                   {item}
                 </a>
               ))}
             </div>
-
-            {/* CTA */}
             <Link
               href="/dashboard"
-              className="rounded-xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-2 text-[13px] font-semibold text-[#1F1F1F] transition hover:bg-[#F0EDE6]"
+              className="rounded-xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-2 text-[13px] font-medium text-[#1F1F1F] transition hover:bg-[#F0EDE6]"
             >
               Open dashboard
             </Link>
@@ -47,51 +37,49 @@ export function Hero() {
         <div className="mx-auto max-w-[900px] text-center">
 
           {/* Label */}
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#C4622D]" />
-            <span className="text-[11px] font-medium tracking-[0.12em] text-[#71717a] uppercase">
-              Guide creation · HTML export
+            <span className="text-[11px] font-medium tracking-[0.14em] text-[#71717a] uppercase">
+              Knowledge in · Guide out
             </span>
           </div>
 
-          {/* Headline — Geist, tight */}
-          <h1 className="mx-auto mb-6 max-w-[720px] text-[clamp(38px,5vw,60px)] font-bold leading-[1.1] tracking-[-0.03em] text-[#1F1F1F]">
-            Bring the notes.<br />Leave with a finished guide.
+          {/* Headline */}
+          <h1 className="mx-auto mb-6 max-w-[700px] text-[clamp(40px,5.2vw,62px)] font-semibold leading-[1.08] tracking-[-0.03em] text-[#1F1F1F]">
+            You know it.<br />Now package it.
           </h1>
 
           {/* Subtitle */}
-          <p className="mx-auto mb-9 max-w-[500px] text-[16px] leading-[1.75] tracking-[-0.01em] text-[#71717a]">
-            Drop in your drafts, transcripts, and research. Shape the tone, lock the reader level, and get a structured HTML guide ready to export.
+          <p className="mx-auto mb-9 max-w-[480px] text-[16px] leading-[1.8] tracking-[-0.01em] text-[#71717a]">
+            Paste your notes, upload a transcript, drop in a draft. Celion reads what you know and produces a polished, structured guide — ready to sell.
           </p>
 
           {/* CTAs */}
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1F1F1F] px-6 py-3.5 text-[14px] font-semibold text-white transition hover:opacity-80"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1F1F1F] px-6 py-3.5 text-[14px] font-medium text-white transition hover:opacity-80"
             >
-              Start a guide
+              Turn my notes into a guide
               <ArrowRight className="size-4" />
             </Link>
             <a
               href="#how"
-              className="inline-flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-6 py-3.5 text-[14px] font-semibold text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#FAF9F5]"
+              className="inline-flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-6 py-3.5 text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#FAF9F5]"
             >
               See how it works
             </a>
           </div>
           <p className="mt-4 text-[12px] text-[#a1a1aa]">
-            No account needed · Stored locally
+            No account needed · Stored locally · Free to start
           </p>
         </div>
       </section>
 
       {/* ── Visual band + Builder mockup overlap ───────────── */}
       <section className="relative">
-        {/* Dark band */}
         <div className="h-[380px] w-full bg-[#1F1F1F] sm:h-[480px] lg:h-[560px]" />
 
-        {/* Builder mockup — overlaps white hero */}
         <div className="pointer-events-none absolute inset-x-0 top-0 -translate-y-[80px] px-4 sm:-translate-y-[110px] sm:px-6 lg:-translate-y-[150px]">
           <div className="pointer-events-auto mx-auto max-w-[980px]">
             <div className="overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_48px_120px_-24px_rgba(0,0,0,0.5),0_24px_60px_-12px_rgba(0,0,0,0.3)]">
@@ -106,7 +94,7 @@ export function Hero() {
                   </div>
                   <div className="ml-2">
                     <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Builder</p>
-                    <p className="text-[15px] font-semibold leading-tight text-white/90">Instagram Growth Playbook</p>
+                    <p className="text-[15px] font-medium leading-tight text-white/90">Instagram Growth Playbook</p>
                   </div>
                 </div>
                 <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/40">Dashboard</div>
@@ -119,7 +107,7 @@ export function Hero() {
                 <div className="flex flex-col gap-3 border-r border-[#E8E4DB] bg-[#F4F2EC] p-4">
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
                     <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Status</p>
-                    <p className="mt-1.5 text-base font-semibold text-[#1F1F1F]">draft</p>
+                    <p className="mt-1.5 text-base font-medium text-[#1F1F1F]">draft</p>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
                     <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Guide profile</p>
@@ -152,7 +140,7 @@ export function Hero() {
                   <div className="flex items-center justify-between border-b border-[#E8E4DB] px-4 py-3">
                     <div>
                       <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Live preview</p>
-                      <p className="text-[15px] font-semibold text-[#1F1F1F]">Instagram Growth Playbook</p>
+                      <p className="text-[15px] font-medium text-[#1F1F1F]">Instagram Growth Playbook</p>
                     </div>
                     <div className="rounded-full border border-[#E8E4DB] bg-[#F4F2EC] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">HTML</div>
                   </div>
@@ -167,8 +155,8 @@ export function Hero() {
                       <div className="h-2.5 w-3/4 rounded-md bg-[#F4F2EC]" />
                       <div className="mt-4 rounded-xl border border-[#E8E4DB] bg-[#FBF0E8] p-3">
                         <div className="h-2.5 w-1/2 rounded-md bg-[#C4622D]/25" />
-                        <div className="mt-2 h-2.5 w-full rounded-md bg-[#C4622D]/12" />
-                        <div className="mt-1.5 h-2.5 w-4/5 rounded-md bg-[#C4622D]/12" />
+                        <div className="mt-2 h-2.5 w-full rounded-md bg-[#C4622D]/10" />
+                        <div className="mt-1.5 h-2.5 w-4/5 rounded-md bg-[#C4622D]/10" />
                       </div>
                       <div className="h-2.5 w-full rounded-md bg-[#F4F2EC]" />
                       <div className="h-2.5 w-2/3 rounded-md bg-[#F4F2EC]" />
@@ -183,7 +171,7 @@ export function Hero() {
                     <div className="mt-2.5 grid gap-2">
                       <div className="flex items-center gap-2 rounded-lg bg-[#1F1F1F] px-3 py-2">
                         <Sparkles className="size-3 text-white/80" />
-                        <span className="text-[11px] font-semibold text-white">Generate first draft</span>
+                        <span className="text-[11px] font-medium text-white">Generate first draft</span>
                       </div>
                       <div className="rounded-lg border border-[#E8E4DB] bg-white px-3 py-2 text-[11px] text-[#7A7670]">
                         Regenerate full draft

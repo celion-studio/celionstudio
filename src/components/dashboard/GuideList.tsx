@@ -1,72 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import type { GuideRecord } from "@/types/guide";
 
+const statusLabel: Record<string, string> = {
+  draft: "Draft",
+  exported: "Exported",
+  "in-progress": "In progress",
+};
+
 export function GuideList({ guides }: { guides: GuideRecord[] }) {
-  if (guides.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          No guides yet
-        </p>
-        <h2 className="mt-3 font-display text-4xl tracking-[-0.01em] text-text">
-          Start with your own material.
-        </h2>
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted">
-          Paste rough notes, upload a working draft, or combine several expert
-          sources. The wizard will shape the guide direction before the builder
-          opens.
-        </p>
-      </div>
-    );
-  }
+  if (guides.length === 0) return null;
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       {guides.map((guide) => (
         <Link
           key={guide.id}
           href={`/builder/${guide.id}`}
-          className="group grid gap-4 rounded-2xl border border-line bg-surface p-5 transition hover:border-accent md:grid-cols-[1.3fr_0.7fr]"
+          className="group flex items-center justify-between rounded-2xl border border-[#E8E4DB] bg-white px-5 py-4 transition hover:border-[#1F1F1F]/20 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
         >
-          <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              {guide.status}
-            </p>
-            <h2 className="mt-3 font-display text-3xl leading-tight tracking-[-0.01em] text-text">
-              {guide.title}
-            </h2>
-            <p className="mt-4 text-sm leading-7 text-muted">
-              {guide.profile.goal} for {guide.profile.targetAudience}. Built in a{" "}
-              {guide.profile.tone.toLowerCase()} tone with a{" "}
-              {guide.profile.structureStyle.toLowerCase()} structure.
-            </p>
+          <div className="flex min-w-0 items-center gap-4">
+            <span className={`h-2 w-2 flex-shrink-0 rounded-full ${guide.status === "exported" ? "bg-[#22c55e]" : "bg-[#E8E4DB]"}`} />
+            <div className="min-w-0">
+              <p className="truncate text-[14px] font-medium text-[#1F1F1F]">{guide.title}</p>
+              <p className="mt-0.5 text-[12px] text-[#71717a]">
+                {guide.profile.targetAudience} · {guide.profile.tone} · {statusLabel[guide.status] ?? guide.status}
+              </p>
+            </div>
           </div>
-          <div className="grid gap-3 rounded-xl border border-line bg-surface-subtle p-4 text-sm text-muted">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em]">
-                Sources
+
+          <div className="flex flex-shrink-0 items-center gap-4 pl-4">
+            <div className="hidden text-right sm:block">
+              <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[#a1a1aa]">
+                {guide.sources.length} {guide.sources.length === 1 ? "source" : "sources"}
               </p>
-              <p className="mt-1 text-text">{guide.sources.length}</p>
-            </div>
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em]">
-                Reader level
-              </p>
-              <p className="mt-1 text-text">{guide.profile.readerLevel}</p>
-            </div>
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em]">
-                Updated
-              </p>
-              <p className="mt-1 text-text">
-                {new Date(guide.updatedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
+              <p className="mt-0.5 text-[11px] text-[#a1a1aa]">
+                {new Date(guide.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
               </p>
             </div>
+            <ArrowRight className="size-4 text-[#a1a1aa] transition group-hover:text-[#1F1F1F]" />
           </div>
         </Link>
       ))}
