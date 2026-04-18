@@ -1,0 +1,83 @@
+- main [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e8]: C
+        - generic [ref=e9]: Celion
+      - generic [ref=e10]:
+        - link "How it works" [ref=e11] [cursor=pointer]:
+          - /url: "#"
+        - link "Pricing" [ref=e12] [cursor=pointer]:
+          - /url: "#"
+        - link "Docs" [ref=e13] [cursor=pointer]:
+          - /url: "#"
+      - link "Open dashboard" [ref=e14] [cursor=pointer]:
+        - /url: /dashboard
+  - generic [ref=e16]:
+    - generic [ref=e19]: Guide creation · HTML export
+    - heading "Bring the notes. Leave with a finished guide." [level=1] [ref=e20]:
+      - text: Bring the notes.
+      - text: Leave with a finished guide.
+    - paragraph [ref=e21]: Drop in your drafts, transcripts, and research. Shape the tone, lock the reader level, and get a structured HTML guide — ready to revise, export, or hand off.
+    - generic [ref=e22]:
+      - link "Start a guide" [ref=e23] [cursor=pointer]:
+        - /url: /dashboard
+        - text: Start a guide
+        - img [ref=e24]
+      - link "See how it works" [ref=e26] [cursor=pointer]:
+        - /url: "#how"
+    - paragraph [ref=e27]: No account needed · Stored locally
+  - generic [ref=e31]:
+    - generic [ref=e32]:
+      - generic [ref=e38]:
+        - paragraph [ref=e39]: Builder
+        - paragraph [ref=e40]: Instagram Growth Playbook
+      - generic [ref=e42]: Dashboard
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - paragraph [ref=e46]: Status
+          - paragraph [ref=e47]: draft
+        - generic [ref=e48]:
+          - paragraph [ref=e49]: Guide profile
+          - generic [ref=e50]:
+            - generic [ref=e51]:
+              - term [ref=e52]: Audience
+              - definition [ref=e53]: Creators, marketers
+            - generic [ref=e54]:
+              - term [ref=e55]: Tone
+              - definition [ref=e56]: Practical
+        - generic [ref=e57]:
+          - paragraph [ref=e58]: Sources
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - img [ref=e61]
+              - generic [ref=e64]: notes.md
+            - generic [ref=e65]:
+              - img [ref=e66]
+              - generic [ref=e69]: transcript.txt
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - paragraph [ref=e73]: Live preview
+          - paragraph [ref=e74]: Instagram Growth Playbook
+        - generic [ref=e75]: HTML
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - paragraph [ref=e93]: AI actions
+          - generic [ref=e94]:
+            - generic [ref=e95]:
+              - img [ref=e96]
+              - generic [ref=e99]: Generate first draft
+            - generic [ref=e100]: Regenerate full draft
+        - generic [ref=e101]:
+          - paragraph [ref=e102]: Revision prompt
+          - generic [ref=e103]: Make the intro sharper...
+        - generic [ref=e104]:
+          - paragraph [ref=e105]: Output
+          - generic [ref=e106]:
+            - generic [ref=e107]:
+              - img [ref=e108]
+              - generic [ref=e112]: Export PDF
+            - generic [ref=e113]:
+              - img [ref=e114]
+              - generic [ref=e117]: Copy HTML for Figma

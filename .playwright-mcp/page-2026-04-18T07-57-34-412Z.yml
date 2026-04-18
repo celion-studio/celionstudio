@@ -1,0 +1,29 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e7]:
+        - link "요금제" [ref=e8] [cursor=pointer]:
+          - /url: "#"
+        - link "기능" [ref=e9] [cursor=pointer]:
+          - /url: "#"
+          - text: 기능
+          - img [ref=e10]
+        - link "문서" [ref=e12] [cursor=pointer]:
+          - /url: "#"
+        - link "블로그" [ref=e13] [cursor=pointer]:
+          - /url: "#"
+      - button "시작하기" [ref=e14] [cursor=pointer]
+  - generic [ref=e16]:
+    - generic [ref=e19]: SASPO / FEEDBACK
+    - heading "고객의 모든 피드백을 한 곳에서 한눈에 보세요." [level=1] [ref=e21]:
+      - text: 고객의 모든 피드백을
+      - text: 한 곳에서 한눈에 보세요.
+    - paragraph [ref=e23]:
+      - text: 분산된 고객 피드백을 하나의 워크스페이스에서 수집하고, 분석하고, 실행까지 이어가세요.
+      - text: 팀 모두가 같은 인사이트로 움직입니다.
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - button "14일 무료 체험" [ref=e26] [cursor=pointer]
+        - button "데모 예약" [ref=e27] [cursor=pointer]
+      - paragraph [ref=e28]: 신용카드 없이 바로 시작
+  - img "Saspo 대시보드" [ref=e33]
