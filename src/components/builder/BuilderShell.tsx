@@ -41,13 +41,13 @@ export function BuilderShell({ guideId }: { guideId: string }) {
       <main className="flex min-h-screen items-center justify-center bg-bg p-6">
         <div className="max-w-xl rounded-[32px] border border-line bg-white/75 p-8 text-center shadow-float">
           <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            Guide not found
+            Ebook not found
           </p>
           <h1 className="mt-3 font-display text-4xl tracking-[-0.03em] text-text">
             This draft is not in local storage.
           </h1>
           <p className="mt-4 text-sm leading-7 text-muted">
-            Open the dashboard, create a guide from the wizard, and the builder
+            Open the dashboard, create an ebook from the wizard, and the builder
             will have a local record to work with.
           </p>
           <Link

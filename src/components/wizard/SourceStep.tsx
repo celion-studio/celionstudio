@@ -29,7 +29,7 @@ export function SourceStep({
         <textarea
           value={pastedText}
           onChange={(event) => onTextChange(event.target.value)}
-          placeholder="Drop in rough notes, old drafts, transcripts, or any text you want to turn into a guide."
+          placeholder="Drop in rough notes, old drafts, transcripts, or any text you want to turn into an ebook."
           className="mt-5 min-h-[280px] w-full rounded-[24px] border border-line bg-[#fcfaf4] px-5 py-4 text-sm leading-7 text-text outline-none transition focus:border-text"
         />
       </div>

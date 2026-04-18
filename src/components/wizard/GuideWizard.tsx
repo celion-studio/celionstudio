@@ -190,7 +190,7 @@ export function GuideWizard({
         <div className="flex items-center justify-between border-b border-line px-6 py-5 md:px-8">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted">
-              New guide wizard
+              New ebook wizard
             </p>
             <h2 className="mt-2 font-display text-4xl tracking-[-0.03em] text-text">
               Shape the draft before the builder opens
@@ -217,7 +217,7 @@ export function GuideWizard({
             <div className="mt-5 space-y-3">
               {[
                 "1. Source intake",
-                "2. Guide direction",
+                "2. Ebook direction",
                 "3. Style tuning",
               ].map((label, index) => (
                 <div

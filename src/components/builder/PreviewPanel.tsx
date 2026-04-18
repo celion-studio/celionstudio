@@ -27,7 +27,7 @@ export function PreviewPanel({
             HTML
           </div>
         </div>
-        <iframe title="Guide preview" srcDoc={html} className="h-full w-full border-0" />
+        <iframe title="Ebook preview" srcDoc={html} className="h-full w-full border-0" />
       </div>
     </div>
   );

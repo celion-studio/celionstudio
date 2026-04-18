@@ -18,7 +18,7 @@ export function SourcePanel({ guide }: { guide: GuideRecord }) {
 
       <div className="rounded-[24px] border border-line bg-white p-4">
         <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          Guide profile
+          Ebook profile
         </p>
         <dl className="mt-4 grid gap-4 text-sm">
           <div>

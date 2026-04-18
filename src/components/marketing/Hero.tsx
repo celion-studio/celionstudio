@@ -40,7 +40,7 @@ export function Hero() {
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <span className="h-1.5 w-1.5 rounded-full bg-[#C4622D]" />
             <span className="text-[11px] font-medium tracking-[0.14em] text-[#71717a] uppercase">
-              Knowledge in · Guide out
+              Knowledge in · Ebook out
             </span>
           </div>
 
@@ -51,7 +51,7 @@ export function Hero() {
 
           {/* Subtitle */}
           <p className="mx-auto mb-9 max-w-[480px] text-[16px] leading-[1.8] tracking-[-0.01em] text-[#71717a]">
-            Paste your notes, upload a transcript, drop in a draft. Celion reads what you know and produces a polished, structured guide — ready to sell.
+            Paste your notes, upload a transcript, drop in a draft. Celion reads what you know and produces a polished, structured ebook — ready to sell.
           </p>
 
           {/* CTAs */}
@@ -60,7 +60,7 @@ export function Hero() {
               href="/dashboard"
               className="inline-flex items-center gap-2 rounded-xl bg-[#1F1F1F] px-6 py-3.5 text-[14px] font-medium text-white transition hover:opacity-80"
             >
-              Turn my notes into a guide
+              Turn my notes into an ebook
               <ArrowRight className="size-4" />
             </Link>
             <a
@@ -110,7 +110,7 @@ export function Hero() {
                     <p className="mt-1.5 text-base font-medium text-[#1F1F1F]">draft</p>
                   </div>
                   <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Guide profile</p>
+                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">Ebook profile</p>
                     <dl className="mt-2 space-y-2">
                       <div>
                         <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">Audience</dt>
