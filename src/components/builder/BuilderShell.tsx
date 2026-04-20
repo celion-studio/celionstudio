@@ -105,14 +105,9 @@ export function BuilderShell({ guideId }: { guideId: string }) {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-bg p-6">
-        <div className="max-w-xl rounded-[32px] border border-line bg-white/75 p-8 text-center shadow-float">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            Loading
-          </p>
-          <h1 className="mt-3 font-display text-4xl tracking-[-0.03em] text-text">
-            Pulling the latest draft...
-          </h1>
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#F7F6F3", padding: "24px", fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: "13px", color: "#A1A1AA", fontFamily: "'Geist', sans-serif" }}>Loading draft…</p>
         </div>
       </main>
     );
@@ -120,21 +115,16 @@ export function BuilderShell({ guideId }: { guideId: string }) {
 
   if (!guide) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-bg p-6">
-        <div className="max-w-xl rounded-[32px] border border-line bg-white/75 p-8 text-center shadow-float">
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            Draft unavailable
-          </p>
-          <h1 className="mt-3 font-display text-4xl tracking-[-0.03em] text-text">
-            This record could not be loaded.
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-muted">
-            {feedback ||
-              "Open the dashboard, sign in, and create a new draft from the account-backed workspace."}
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#F7F6F3", padding: "24px", fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ maxWidth: "480px", textAlign: "center", background: "#fff", border: "1px solid #ECEAE5", borderRadius: "12px", padding: "40px 32px" }}>
+          <p style={{ margin: 0, fontSize: "11px", fontWeight: 500, fontFamily: "'Geist', sans-serif", textTransform: "uppercase", letterSpacing: "0.1em", color: "#A1A1AA" }}>Draft unavailable</p>
+          <h1 style={{ margin: "12px 0 0", fontFamily: "'Geist', sans-serif", fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em", color: "#111" }}>Could not load this draft.</h1>
+          <p style={{ margin: "12px 0 0", fontSize: "13.5px", lineHeight: 1.6, color: "#71717A" }}>
+            {feedback || "Sign in and try again from your dashboard."}
           </p>
           <Link
             href="/dashboard"
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-text px-5 py-3 text-sm font-medium text-white"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "20px", padding: "8px 18px", background: "#111", color: "#fff", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
           >
             Back to dashboard
           </Link>
@@ -144,26 +134,20 @@ export function BuilderShell({ guideId }: { guideId: string }) {
   }
 
   return (
-    <main className="min-h-screen bg-bg">
-      <div className="flex items-center justify-between border-b border-line bg-surface px-5 py-4">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-            Builder
-          </p>
-          <h1 className="mt-1 font-display text-4xl tracking-[-0.03em] text-text">
-            {guide.title}
-          </h1>
+    <main style={{ minHeight: "100vh", background: "#F7F6F3", fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column" }}>
+      {/* Builder top bar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #ECEAE5", background: "#fff", padding: "0 24px", height: "57px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", textDecoration: "none", color: "#71717A", fontSize: "13px" }}>
+            <ArrowLeft size={14} />
+            Dashboard
+          </Link>
+          <span style={{ color: "#D4D2CC", fontSize: "13px" }}>/</span>
+          <span style={{ fontSize: "13px", fontWeight: 500, color: "#111", fontFamily: "'Geist', sans-serif", maxWidth: "280px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{guide.title}</span>
         </div>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-text"
-        >
-          <ArrowLeft className="size-4" />
-          Dashboard
-        </Link>
       </div>
 
-      <section className="grid min-h-[calc(100vh-97px)] grid-cols-1 xl:grid-cols-[300px_1fr_340px]">
+      <section className="grid min-h-[calc(100vh-57px)] grid-cols-1 xl:grid-cols-[300px_1fr_340px]">
         <SourcePanel guide={guide} />
         <PreviewPanel html={guide.html} title={guide.title} />
         <ActionPanel

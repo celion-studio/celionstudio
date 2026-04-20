@@ -17,19 +17,26 @@ export function AuthButtons() {
 
     try {
       if (mode === "sign-up") {
-        await authClient.signUp.email({
+        const result = await authClient.signUp.email({
           name: name.trim() || "Celion User",
           email,
           password,
         });
-        setMessage("Account created. Continue into Celion after sign-up.");
+        if (result?.error) {
+          setMessage(result.error.message ?? "Sign up failed.");
+          return;
+        }
+        setMessage("Account created. Redirecting...");
       } else {
-        await authClient.signIn.email({
-          email,
-          password,
-        });
+        const result = await authClient.signIn.email({ email, password });
+        if (result?.error) {
+          setMessage(result.error.message ?? "Invalid email or password.");
+          return;
+        }
         setMessage("Signed in successfully.");
       }
+
+      window.location.assign("/dashboard");
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -138,7 +145,10 @@ export function AuthButtons() {
             setLoading("google");
             setMessage("");
             try {
-              await authClient.signIn.social({ provider: "google" });
+              await authClient.signIn.social({
+                provider: "google",
+                callbackURL: "/dashboard",
+              });
             } catch (error) {
               setMessage(
                 error instanceof Error ? error.message : "Google sign-in failed.",

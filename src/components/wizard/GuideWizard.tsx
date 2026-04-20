@@ -197,129 +197,85 @@ export function GuideWizard({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#161511]/70 p-4 backdrop-blur-sm md:p-6">
-      <div className="mx-auto flex h-full max-w-6xl flex-col rounded-[36px] border border-white/10 bg-bg shadow-float">
-        <div className="flex items-center justify-between border-b border-line px-6 py-5 md:px-8">
+    <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(17,17,15,0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+      <div style={{ width: "100%", maxWidth: "900px", height: "min(680px, 90vh)", background: "#fff", borderRadius: "16px", border: "1px solid #ECEAE5", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,0.18)", fontFamily: "'Inter', sans-serif" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 28px", borderBottom: "1px solid #ECEAE5", flexShrink: 0 }}>
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-muted">
-              New draft wizard
-            </p>
-            <h2 className="mt-2 font-display text-4xl tracking-[-0.03em] text-text">
-              Shape the draft before the builder opens
+            <p style={{ margin: 0, fontSize: "11px", fontFamily: "'Geist', sans-serif", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.12em", color: "#A1A1AA" }}>New draft</p>
+            <h2 style={{ margin: "4px 0 0", fontFamily: "'Geist', sans-serif", fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", color: "#111" }}>
+              {["Add your source material", "Set your target profile", "Tune the writing style"][step - 1]}
             </h2>
           </div>
           <button
             type="button"
-            onClick={() => {
-              reset();
-              onClose();
-            }}
-            className="rounded-full border border-line bg-white/70 p-3 text-text transition hover:bg-white"
+            onClick={() => { reset(); onClose(); }}
+            style={{ width: "32px", height: "32px", borderRadius: "8px", border: "1px solid #ECEAE5", background: "#FAFAF9", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#71717A" }}
             aria-label="Close wizard"
           >
-            <X className="size-5" />
+            <X size={15} />
           </button>
         </div>
 
-        <div className="grid flex-1 gap-6 overflow-hidden px-6 py-6 md:grid-cols-[240px_1fr] md:px-8">
-          <aside className="rounded-[28px] border border-line bg-white/70 p-5">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-              Flow
-            </p>
-            <div className="mt-5 space-y-3">
-              {[
-                "1. Source intake",
-                "2. Draft direction",
-                "3. Style tuning",
-              ].map((label, index) => (
-                <div
-                  key={label}
-                  className={`rounded-[20px] border px-4 py-4 text-sm transition ${
-                    step === index + 1
-                      ? "border-text bg-text text-white"
-                      : "border-line bg-[#fcfaf4] text-muted"
-                  }`}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          <div className="flex flex-col justify-between gap-6 overflow-y-auto rounded-[28px] border border-line bg-surface p-5 md:p-6">
-            <div className="space-y-5">
-              {step === 1 ? (
-                <SourceStep
-                  pastedText={pastedText}
-                  fileNames={files.map((file) => file.name)}
-                  error={error}
-                  onTextChange={setPastedText}
-                  onFilesChange={setFiles}
-                />
-              ) : null}
-
-              {step === 2 ? (
-                <ProfileStep
-                  targetAudience={targetAudience}
-                  goal={goal}
-                  depth={depth}
-                  onFieldChange={setField}
-                />
-              ) : null}
-
-              {step === 3 ? (
-                <StyleStep
-                  tone={tone}
-                  structureStyle={structureStyle}
-                  readerLevel={readerLevel}
-                  onFieldChange={setField}
-                />
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-4 border-t border-line pt-5 md:flex-row md:items-center md:justify-between">
-              {error ? (
-                <p className="rounded-[18px] bg-[#fff1e6] px-4 py-3 text-sm text-[#9b4c19]">
-                  {error}
+        {/* Step indicator */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #ECEAE5", flexShrink: 0 }}>
+          {["Source intake", "Draft direction", "Style tuning"].map((label, i) => {
+            const isActive = step === i + 1;
+            const isDone = step > i + 1;
+            return (
+              <div key={label} style={{ flex: 1, padding: "12px 20px", borderRight: i < 2 ? "1px solid #ECEAE5" : undefined, background: isActive ? "#F0EEE9" : "#FAFAF9", transition: "background 0.15s" }}>
+                <p style={{ margin: 0, fontSize: "11px", fontFamily: "'Geist', sans-serif", fontWeight: 500, color: isDone ? "#16A34A" : isActive ? "#111" : "#A1A1AA", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                  {`Step ${i + 1}`}
                 </p>
-              ) : (
-                <div />
-              )}
-
-              <div className="flex items-center gap-3 self-end">
-                {step > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setStep((step - 1) as 1 | 2 | 3)}
-                    className="inline-flex items-center gap-2 rounded-full border border-line bg-white/80 px-5 py-3 text-sm font-medium text-text transition hover:bg-white"
-                  >
-                    <ArrowLeft className="size-4" />
-                    Back
-                  </button>
-                ) : null}
-
-                {step < 3 ? (
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="inline-flex items-center gap-2 rounded-full bg-text px-5 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5"
-                  >
-                    Continue
-                    <ArrowRight className="size-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={handleCreate}
-                    className="inline-flex items-center gap-2 rounded-full bg-text px-5 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submitting ? "Creating..." : "Open builder"}
-                    <ArrowRight className="size-4" />
-                  </button>
-                )}
+                <p style={{ margin: "2px 0 0", fontSize: "12.5px", fontWeight: isActive ? 500 : 400, color: isActive ? "#111" : "#71717A" }}>{label}</p>
               </div>
-            </div>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflow: "auto", padding: "28px" }}>
+          {step === 1 && <SourceStep pastedText={pastedText} fileNames={files.map((f) => f.name)} error={error} onTextChange={setPastedText} onFilesChange={setFiles} />}
+          {step === 2 && <ProfileStep targetAudience={targetAudience} goal={goal} depth={depth} onFieldChange={setField} />}
+          {step === 3 && <StyleStep tone={tone} structureStyle={structureStyle} readerLevel={readerLevel} onFieldChange={setField} />}
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 28px", borderTop: "1px solid #ECEAE5", flexShrink: 0, background: "#FAFAF9" }}>
+          <div>
+            {error && <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19", background: "#FFF5F2", padding: "8px 14px", borderRadius: "8px" }}>{error}</p>}
+          </div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {step > 1 && (
+              <button
+                type="button"
+                onClick={() => setStep((step - 1) as 1 | 2 | 3)}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", border: "1px solid #ECEAE5", borderRadius: "8px", background: "#fff", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#111", cursor: "pointer" }}
+              >
+                <ArrowLeft size={13} />
+                Back
+              </button>
+            )}
+            {step < 3 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 16px", border: "none", borderRadius: "8px", background: "#111", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#fff", cursor: "pointer" }}
+              >
+                Continue
+                <ArrowRight size={13} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleCreate}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 20px", border: "none", borderRadius: "8px", background: "#111", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#fff", cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1 }}
+              >
+                {submitting ? "Creating..." : "Open builder"}
+                <ArrowRight size={13} />
+              </button>
+            )}
           </div>
         </div>
       </div>

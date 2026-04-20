@@ -1,0 +1,1122 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Celion Landing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap"
+    rel="stylesheet" />
+  <style>
+
+    :root {
+      --bg: #f7f4ee;
+      --bg-soft: #eee9e1;
+      --surface: #ffffff;
+      --ink: #11110f;
+      --ink-soft: #4d4943;
+      --ink-muted: #8c877e;
+      --line: rgba(17, 17, 15, 0.1);
+      --line-soft: rgba(17, 17, 15, 0.05);
+      --radius-xs: 4px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --container: 1180px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { border: 0; font: inherit; cursor: pointer; }
+
+    .container {
+      width: min(calc(100% - 48px), var(--container));
+      margin: 0 auto;
+    }
+
+    .font-geist { font-family: "Geist", sans-serif; }
+
+    .section-kicker {
+      font-family: "Geist", sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+
+    .btn {
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: var(--radius-sm);
+      font-family: "Geist", sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-dark {
+      background: var(--ink);
+      color: var(--bg);
+    }
+    .btn-dark:hover {
+      background: #000;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    }
+
+    .btn-light {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+    }
+    .btn-light:hover {
+      background: var(--line-soft);
+    }
+
+    /* NAV REVERT TO DARK BUT LESS ROUND */
+    .nav {
+      position: sticky;
+      top: 16px;
+      z-index: 40;
+      display: flex;
+      justify-content: center;
+      padding: 0 20px;
+    }
+    .nav-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 32px;
+      padding: 8px 8px 8px 20px;
+      background: #151412;
+      border-radius: var(--radius-sm); /* Reduced rounding here */
+      color: #f7f4ee;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.1);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: "Geist", sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .nav-link {
+      font-family: "Inter", sans-serif;
+      font-size: 13px;
+      color: rgba(247, 244, 238, 0.7);
+      transition: color 0.2s ease;
+    }
+    .nav-link:hover { color: #f7f4ee; }
+    .nav-actions .btn-light {
+      background: #f7f4ee;
+      color: #151412;
+      border: none;
+      border-radius: 6px;
+      min-height: 34px;
+      padding: 0 16px;
+    }
+    .nav-actions .btn-light:hover { background: #fff; }
+
+    /* EDITORIAL HERO REFRESH */
+    .hero {
+      padding: 110px 0 60px;
+      text-align: center;
+      position: relative;
+    }
+    .hero-icon {
+      margin: 0 auto 36px;
+      display: flex;
+      justify-content: center;
+    }
+    /* Updated minimal single color SVG logo in hero */
+    .hero h1 {
+      margin: 0;
+      font-family: "Geist", sans-serif;
+      font-size: clamp(48px, 6vw, 76px);
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .hero p {
+      max-width: 600px;
+      margin: 20px auto 0;
+      font-size: clamp(18px, 2.2vw, 24px);
+      line-height: 1.4;
+      font-weight: 400;
+      color: var(--ink-soft);
+      letter-spacing: -0.02em;
+    }
+
+    /* CAROUSEL ORBIT AREA */
+    .hero-carousel-stage {
+      position: relative;
+      margin: 80px auto 140px;
+      width: 100vw;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 420px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1200px; /* Gives a 3D depth to the orbit */
+      overflow: hidden;
+    }
+
+    /* The center floating button unaffected by rotation */
+    .hero-btn-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+    }
+
+    .carousel-item {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 240px;
+      height: 340px;
+      margin-left: -120px;
+      margin-top: -170px;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid var(--line-soft);
+      will-change: transform, opacity, z-index;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transform-style: preserve-3d;
+    }
+
+    /* Ebook Covers Designs */
+    .cover {
+      width: 100%;
+      height: 100%;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    /* Ebook 1 */
+    .cover-1 {
+      background: #efece5;
+      color: #111;
+      justify-content: space-between;
+    }
+    .cover-1::after {
+      content: '';
+      position: absolute;
+      left: 10px; top: 0; bottom: 0; width: 1px;
+      background: rgba(0,0,0,0.06);
+    }
+    /* Ebook 2 */
+    .cover-2 {
+      background: #111;
+      color: #fff;
+      text-align: center;
+      justify-content: center;
+    }
+    /* Ebook 3 */
+    .cover-3 {
+      background: #eb5e28;
+      color: #fff;
+    }
+    /* Ebook 4 */
+    .cover-4 {
+      background: #8fa0a8;
+      color: #fff;
+      justify-content: flex-end;
+    }
+    /* Ebook 5 */
+    .cover-5 {
+      background: #d6cfc5;
+      color: #111;
+      border-top: 18px solid #333;
+    }
+
+    .cover-title {
+      font-family: "Geist", sans-serif;
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+    }
+    .cover-sub {
+      font-size: 13px;
+      opacity: 0.7;
+      margin-top: auto;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .section {
+      padding: 120px 0;
+      border-top: 1px solid var(--line);
+    }
+
+    .section-head {
+      max-width: 680px;
+    }
+
+    .section-h {
+      margin: 16px 0 0;
+      font-family: "Geist", sans-serif;
+      font-size: clamp(32px, 4vw, 44px);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      font-weight: 400;
+    }
+
+    .section-aside {
+      margin: 20px 0 0;
+      font-size: 18px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+      max-width: 580px;
+    }
+
+    .process-grid {
+      margin-top: 80px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 40px;
+    }
+
+    .process-card {
+      padding-top: 24px;
+      border-top: 1px solid var(--ink);
+    }
+
+    .process-visual { display: none; }
+
+    .process-num {
+      font-family: "Geist", sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink);
+    }
+
+    .process-title {
+      margin: 16px 0 0;
+      font-family: "Geist", sans-serif;
+      font-size: 22px;
+      line-height: 1.2;
+      font-weight: 400;
+    }
+
+    .process-body {
+      margin: 12px 0 0;
+      color: var(--ink-soft);
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .preview-band {
+      margin-top: 80px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 60px;
+      align-items: center;
+    }
+
+    .preview-doc {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      min-height: 480px;
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+    }
+
+    .doc-toc {
+      padding: 32px 24px;
+      border-right: 1px solid var(--line);
+      background: #fdfdfc;
+    }
+
+    .doc-toc h4,
+    .doc-body h4 {
+      margin: 0;
+      font-family: "Geist", sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .doc-toc ul {
+      list-style: none;
+      padding: 0;
+      margin: 24px 0 0;
+      display: grid;
+      gap: 16px;
+    }
+
+    .doc-toc li {
+      font-size: 13px;
+      color: var(--ink-soft);
+    }
+
+    .doc-body {
+      padding: 48px;
+    }
+
+    .doc-title {
+      margin-top: 24px;
+      font-family: "Geist", sans-serif;
+      font-size: 32px;
+      line-height: 1.1;
+      font-weight: 400;
+    }
+
+    .doc-copy {
+      margin-top: 16px;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .doc-lines {
+      margin-top: 32px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .doc-line {
+      height: 8px;
+      background: var(--line-soft);
+      border-radius: 4px;
+    }
+
+    .doc-line.s { width: 40%; }
+    .doc-line.m { width: 70%; }
+
+    .preview-points {
+      margin-top: 40px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .preview-point {
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .preview-point strong {
+      display: block;
+      font-family: "Geist", sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .preview-point span {
+      display: block;
+      margin-top: 8px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+    }
+
+    .gradient-band {
+      display: grid;
+      grid-template-columns: 0.9fr 1.1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .gradient-link {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 32px;
+      font-family: "Geist", sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 2px;
+    }
+
+    .gradient-card {
+      position: relative;
+      min-height: 480px;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 26% 26%, rgba(216, 135, 104, 0.76), transparent 28%),
+        radial-gradient(circle at 76% 54%, rgba(107, 130, 164, 0.58), transparent 34%),
+        linear-gradient(128deg, #ab6853 0%, #cf8b6d 34%, #455467 100%);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.06);
+    }
+
+    .gradient-card-copy {
+      position: absolute;
+      left: 40px;
+      right: 40px;
+      bottom: 40px;
+      max-width: 320px;
+    }
+
+    .gradient-card-copy .section-kicker {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .gradient-card-title {
+      margin: 16px 0 0;
+      font-family: "Geist", sans-serif;
+      font-size: 32px;
+      line-height: 1.1;
+      font-weight: 400;
+      color: #ffffff;
+    }
+
+    .gradient-card-body {
+      margin: 12px 0 0;
+      font-size: 15px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .cta-band {
+      text-align: center;
+      padding: 100px 0;
+    }
+
+    .cta-band h3 {
+      margin: 16px auto 0;
+      max-width: 600px;
+      font-family: "Geist", sans-serif;
+      font-size: clamp(36px, 5vw, 56px);
+      line-height: 1.1;
+      font-weight: 400;
+    }
+
+    .cta-band p {
+      margin: 24px auto 0;
+      max-width: 500px;
+      color: var(--ink-soft);
+      font-size: 18px;
+    }
+
+    .cta-buttons {
+      margin-top: 40px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .site-footer {
+      margin-top: 0;
+      border-top: 0;
+      background: #151412;
+      color: #f7f4ee;
+      padding: 60px 0 46px;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 40px;
+    }
+
+    .footer-brand p {
+      margin: 16px 0 0;
+      max-width: 280px;
+      color: rgba(247, 244, 238, 0.7);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .footer-col h4 {
+      margin: 0;
+      font-family: "Geist", sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(247, 244, 238, 0.56);
+    }
+
+    .footer-col a {
+      display: block;
+      margin-top: 16px;
+      color: rgba(247, 244, 238, 0.78);
+      font-size: 14px;
+    }
+
+    .footer-col a:hover {
+      color: #f7f4ee;
+    }
+
+    .footer-bottom {
+      margin-top: 60px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(247, 244, 238, 0.18);
+      display: flex;
+      justify-content: space-between;
+      color: rgba(247, 244, 238, 0.58);
+      font-size: 13px;
+    }
+
+    @media (max-width: 1024px) {
+      .process-grid { grid-template-columns: 1fr; }
+      .preview-band, .gradient-band { grid-template-columns: 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .hero-carousel-stage { height: 600px; }
+    }
+
+    @media (max-width: 768px) {
+      .preview-doc { grid-template-columns: 1fr; }
+      .doc-toc { border-right: none; border-bottom: 1px solid var(--line); padding: 24px; }
+      .doc-body { padding: 24px; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; gap: 16px; }
+    }
+
+  
+    /* GRAIN AND EDITORIAL UPGRADES */
+    .grain-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* Asymmetrical Staggered Process Grid */
+    .process-grid {
+      margin-top: 120px;
+      display: flex;
+      flex-direction: column;
+      gap: 120px; /* Big gaps for editorial spacing */
+    }
+
+    .process-card {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      border: none;
+      padding: 0;
+    }
+
+    /* Reverse layout for even items */
+    .process-card:nth-child(even) {
+      direction: rtl;
+    }
+    .process-card:nth-child(even) > * {
+      direction: ltr; /* keep text normal */
+    }
+
+    .process-visual {
+      display: block !important;
+      width: 100%;
+      aspect-ratio: 4/5;
+      background: #eee9e1;
+      border-radius: 2px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .process-visual::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      box-shadow: inset 0 0 0 1px rgba(17,17,15,0.05);
+    }
+
+    .process-num-bg {
+      position: absolute;
+      font-family: "Geist", sans-serif;
+      font-size: clamp(120px, 15vw, 280px);
+      line-height: 0.8;
+      font-weight: 200;
+      color: rgba(17,17,15, 0.03);
+      top: 50%;
+      transform: translateY(-50%);
+      left: -5%;
+      pointer-events: none;
+      letter-spacing: -0.06em;
+      z-index: 0;
+    }
+    .process-card:nth-child(even) .process-num-bg {
+      left: auto;
+      right: -5%;
+    }
+
+    .process-content {
+      position: relative;
+      z-index: 2;
+      max-width: 400px;
+    }
+    .process-card:nth-child(even) .process-content {
+      margin-left: auto;
+    }
+
+    .process-num {
+      display: none; /* Hide old small number */
+    }
+
+    .process-title {
+      font-size: 28px;
+    }
+
+    /* Layered Manuscript Preview */
+    .preview-doc {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      min-height: 540px;
+      display: block !important;
+      position: relative;
+    }
+
+    .layered-paper {
+      position: absolute;
+      background: #fdfdfc;
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.03);
+      border-radius: 2px;
+      padding: 40px;
+    }
+
+    .paper-back {
+      width: 85%;
+      height: 90%;
+      top: 0;
+      right: 0;
+      transform: rotate(2.5deg);
+      z-index: 1;
+      background: #faf9f7;
+    }
+
+    .paper-front {
+      width: 90%;
+      height: 95%;
+      bottom: 0;
+      left: 0;
+      transform: rotate(-1.5deg);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .fade-up {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .fade-up.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="grain-overlay"></div>
+  
+  
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <svg class="brand-spark" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/></svg>
+        <span>celion</span>
+      </div>
+      <div class="nav-actions">
+        <a class="nav-link" href="#">Log in</a>
+        <button class="btn btn-light">Request early access</button>
+      </div>
+    </div>
+  </nav>
+
+  
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div class="hero-copy">
+          <div class="hero-icon fade-up">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/></svg>
+          </div>
+          <h1 class="font-geist">Your publishing OS.</h1>
+          <p class="font-geist">
+            Celion is domain-specific AI for brand builders, agencies, and publishers.
+          </p>
+        </div>
+
+        <div class="hero-carousel-stage" id="bookCarousel">
+          <div class="hero-btn-center">
+            <button class="btn btn-dark" style="padding: 0 24px; min-height: 48px; border-radius: var(--radius-sm); font-size: 15px; box-shadow: 0 10px 24px rgba(0,0,0,0.2);">Get started</button>
+          </div>
+
+          <!-- Carousel / Orbiting Book Covers -->
+          <article class="carousel-item">
+             <div class="cover cover-1">
+                <div class="cover-title">Operator<br>Essays</div>
+                <div class="cover-sub">Notes from the field</div>
+             </div>
+          </article>
+          
+          <article class="carousel-item">
+             <div class="cover cover-2">
+                <div class="cover-title" style="letter-spacing:-0.05em; font-size: 32px;">AESTHETIC<br/>FORM</div>
+                <div class="cover-sub" style="opacity:1;">VOL. 01</div>
+             </div>
+          </article>
+
+          <article class="carousel-item">
+             <div class="cover cover-3">
+                <div class="cover-sub" style="margin-top:0; margin-bottom: auto;">Manual</div>
+                <div class="cover-title">Release<br>Notes 2.0</div>
+             </div>
+          </article>
+
+          <article class="carousel-item">
+             <div class="cover cover-4">
+                <div class="cover-sub" style="margin-top: 0; margin-bottom: 20px;">04</div>
+                <div class="cover-title" style="font-size: 40px;">Taste</div>
+             </div>
+          </article>
+
+          <article class="carousel-item">
+             <div class="cover cover-5">
+                <div class="cover-title" style="margin-top: 40px;">Deep<br>Learning</div>
+                <div class="cover-sub">Systems</div>
+             </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+
+
+
+    <section class="section">
+      <div class="container">
+        <div class="section-kicker">How it works</div>
+        <div class="section-head fade-up">
+          <h2 class="section-h">
+            From source to shelf<br />
+            without the usual mess.
+          </h2>
+          <p class="section-aside">
+            Celion starts from material you already own, shapes it into a
+            readable structure, and exports a finished object that feels like
+            a book, not a doc dump.
+          </p>
+        </div>
+
+        <div class="process-grid">
+          <article class="process-card">
+            <div class="process-visual">
+              <div class="process-track w1"></div>
+            </div>
+            <div class="process-num">01</div>
+            <h3 class="process-title">Bring the raw material.</h3>
+            <p class="process-body">
+              Paste notes, upload markdown, drop transcripts, or import a
+              half-finished draft without changing your workflow first.
+            </p>
+          </article>
+
+          <article class="process-card">
+            <div class="process-visual">
+              <div class="process-track w2"></div>
+            </div>
+            <div class="process-num">02</div>
+            <h3 class="process-title">Shape the structure fast.</h3>
+            <p class="process-body">
+              Celion turns the pile into chapters and rhythm so the
+              manuscript feels intentional much earlier in the process.
+            </p>
+          </article>
+
+          <article class="process-card">
+            <div class="process-visual">
+              <div class="process-track w3"></div>
+            </div>
+            <div class="process-num">03</div>
+            <h3 class="process-title">Revise, then ship.</h3>
+            <p class="process-body">
+              Keep versions, refine paragraphs, and export HTML, PDF, or EPUB
+              when the manuscript reads like a finished object.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="section-kicker">Preview</div>
+        <div class="section-head" style="margin-bottom: 20px">
+          <h2 class="section-h">
+            It feels closer to publishing<br />
+            than to prompt engineering.
+          </h2>
+          <p class="section-aside">
+            The manuscript surface is designed for readability first, so
+            chapter flow and hierarchy are visible before final export.
+          </p>
+        </div>
+
+        <div class="preview-band">
+          <article class="preview-panel">
+            <div class="preview-doc">
+              <aside class="doc-toc">
+                <h4>Contents</h4>
+                <ul>
+                  <li>Intro</li>
+                  <li>Chapter 1</li>
+                  <li>Chapter 2</li>
+                  <li>Chapter 3</li>
+                  <li>Final Notes</li>
+                </ul>
+              </aside>
+              <div class="doc-body">
+                <h4>Chapter Preview</h4>
+                <div class="doc-title">A manuscript that feels composed.</div>
+                <div class="doc-copy">
+                  The point is not only better text. It is better shape:
+                  cleaner pacing, clearer hierarchy, and pages that feel like
+                  they belong together.
+                </div>
+                <div class="doc-lines">
+                  <div class="doc-line m"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line s"></div>
+                  <div class="doc-line"></div>
+                  <div class="doc-line m"></div>
+                  <div class="doc-line"></div>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="preview-copy">
+            <div class="section-kicker">Editorial result</div>
+            <h3>A tool for making books that people keep.</h3>
+            <p>
+              Celion should not look like another AI utility with floating
+              widgets. It should feel like publishing software for real work.
+            </p>
+            <div class="preview-points">
+              <div class="preview-point">
+                <strong>Faster first readability</strong>
+                <span>
+                  You see structure and layout sooner, which makes revision
+                  easier and more directional.
+                </span>
+              </div>
+              <div class="preview-point">
+                <strong>Better output taste</strong>
+                <span>
+                  Covers, chapters, and export surfaces all push toward a
+                  more finished editorial object.
+                </span>
+              </div>
+              <div class="preview-point">
+                <strong>Less formatting overhead</strong>
+                <span>
+                  Energy goes into the book itself instead of wrestling with
+                  layout and cleanup.
+                </span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="gradient-band">
+          <div class="gradient-copy">
+            <div class="section-kicker">Featured output</div>
+            <h3>A warmer visual accent, with the copy breathing beside it.</h3>
+            <p>
+              This section should read like editorial direction, not like a
+              banner with every sentence shoved into the artwork. The text
+              lives on the page, and the gradient carries the mood beside it.
+            </p>
+            <a class="gradient-link" href="#">See a sample release</a>
+          </div>
+
+          <article class="gradient-card">
+            <div class="gradient-card-copy">
+              <div class="section-kicker">Sample release</div>
+              <h3 class="gradient-card-title">Sample cover drop or featured release</h3>
+              <p class="gradient-card-body">
+                Keep only a small amount of copy inside the artwork so it
+                feels like a cover moment, not a sales block.
+              </p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="container">
+        <div class="cta-band">
+          <div class="cta-copy">
+            <div class="section-kicker">Start here</div>
+            <h3>Start with the draft you already have.</h3>
+            <p>Notes in, structure out, export when it reads like a real book.</p>
+          </div>
+          <div class="cta-buttons">
+            <button class="btn btn-light">Request early access</button>
+            <button class="btn btn-dark">Start a draft</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="name">
+            <span class="brand-mark"></span>
+            <span>celion</span>
+          </div>
+          <p>
+            Publishing software for founders, agencies, and operators
+            turning raw notes into finished ebooks.
+          </p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="#">How it works</a>
+          <a href="#">Preview</a>
+          <a href="#">Export</a>
+          <a href="#">Pricing</a>
+        </div>
+        <div class="footer-col">
+          <h4>Company</h4>
+          <a href="#">About</a>
+          <a href="#">Changelog</a>
+          <a href="#">Contact</a>
+          <a href="#">Careers</a>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <a href="#">Help center</a>
+          <a href="#">Writing guide</a>
+          <a href="#">Privacy</a>
+          <a href="#">Terms</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>Celion 2026. All rights reserved.</span>
+        <span>Designed for clear drafts and better books.</span>
+      </div>
+    </div>
+  </footer>
+
+  
+
+
+  
+  <script>
+    (function () {
+      const stage = document.getElementById("bookCarousel");
+      const cards = Array.from(document.querySelectorAll(".carousel-item"));
+      if (!stage || cards.length === 0) return;
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let start = performance.now();
+      
+      // 2D Semi-circle orbit (반원 그리는 듯한 느낌)
+      // We will map cards onto a large 2D circle boundary simulating a flat horizontal track with an arc.
+      
+      function render(now) {
+        const time = (now - start) / 1000;
+        const speed = reducedMotion ? 0.02 : 0.08; 
+        
+        const radius = window.innerWidth > 900 ? 800 : 500; 
+        
+        cards.forEach((card, index) => {
+          // Progress goes from 0 to 1 repeatedly
+          let progress = ((time * speed) + (index / cards.length)) % 1.0;
+          
+          // We map progress to an angle from -Math.PI/3 to Math.PI/3 (an arc of 120 degrees at the top of the circle)
+          const angle = -Math.PI / 3 + progress * (Math.PI * 2 / 3);
+          
+          // Circle math
+          const x = Math.sin(angle) * (radius * 1.5); // spread wider horizontally
+          const y = radius - Math.cos(angle) * radius; // y=0 at center, drops on sides
+          
+          // Fade out edges smoothly
+          let opacity = 1;
+          if (progress < 0.1) opacity = progress / 0.1;
+          else if (progress > 0.9) opacity = (1 - progress) / 0.1;
+          
+          // Rotation strictly along the arc for 2D flow
+          const tilt = angle * (180 / Math.PI);
+
+          card.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg)`;
+          card.style.opacity = opacity.toFixed(3);
+          card.style.zIndex = 10;
+        });
+
+        if (!reducedMotion) requestAnimationFrame(render);
+      }
+
+      requestAnimationFrame(render);
+    })();
+  </script>
+
+
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.15, rootMargin: "0px 0px -50px 0px" });
+
+      document.querySelectorAll(".fade-up").forEach(el => observer.observe(el));
+    });
+  </script>
+
+</body>
+
+</html>

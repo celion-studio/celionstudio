@@ -1,39 +1,34 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Geist, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Inter } from "next/font/google";
 import "@/styles/globals.css";
+import "@/styles/editorial.css";
 
-const display = Instrument_Serif({
+const geist = Geist({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-display",
-});
-
-const body = Geist({
-  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
   variable: "--font-body",
+  display: "swap",
 });
 
-const mono = IBM_Plex_Mono({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-mono",
-  weight: ["400", "500"],
+  weight: ["200", "300", "400", "500", "600"],
+  variable: "--font-display",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Celion",
-  description: "Turn your notes and expertise into a polished HTML guide.",
+  title: "Celion — Knowledge, packaged",
+  description:
+    "Paste notes, upload transcripts, drop a draft. Celion reshapes what you already know into a polished ebook.",
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${display.variable} ${body.variable} ${mono.variable} bg-bg text-text antialiased`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={`${geist.variable} ${inter.variable}`}>
+      <body className="bg-bg text-text antialiased">{children}</body>
     </html>
   );
 }

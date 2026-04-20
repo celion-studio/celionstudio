@@ -1,21 +1,49 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { createGuideRecord, withGeneratedHtml } from "@/lib/celion-model";
-import { db } from "@/lib/db";
-import {
-  guideProfiles,
-  guides,
-  htmlVersions,
-  sourceItems,
-} from "@/lib/db/schema";
-import type { GuideProfile, GuideRecord, GuideSource } from "@/types/guide";
+import { ensureAppSchema, sql } from "@/lib/db";
+import type { GuideProfile, GuideRecord, GuideSource, GuideStatus } from "@/types/guide";
 
 type GuideCreateInput = {
   profile: GuideProfile;
   sources: GuideSource[];
 };
 
+type GuideRow = {
+  id: string;
+  title: string;
+  status: GuideStatus;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  currentHtmlVersionId: string | null;
+};
+
+type ProfileRow = {
+  guideId: string;
+  targetAudience: string;
+  goal: string;
+  depth: string;
+  tone: string;
+  structureStyle: string;
+  readerLevel: string;
+};
+
+type SourceRow = {
+  id: string;
+  guideId: string;
+  sourceType: GuideSource["kind"];
+  originalFilename: string | null;
+  rawText: string;
+  normalizedText: string;
+  createdAt: Date | string;
+};
+
+type HtmlRow = {
+  guideId: string;
+  html: string;
+  versionNumber: number;
+};
+
 function toIsoString(value: Date | string) {
-  return value instanceof Date ? value.toISOString() : value;
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
 function normalizeGuideRecord(input: GuideRecord): GuideRecord {
@@ -25,20 +53,31 @@ function normalizeGuideRecord(input: GuideRecord): GuideRecord {
   };
 }
 
+function emptyProfile(): GuideProfile {
+  return {
+    targetAudience: "",
+    goal: "",
+    depth: "",
+    tone: "",
+    structureStyle: "",
+    readerLevel: "",
+  };
+}
+
 async function getCurrentHtmlMap(guideIds: string[]) {
   if (guideIds.length === 0) {
     return new Map<string, string>();
   }
 
-  const rows = await db
-    .select({
-      guideId: htmlVersions.guideId,
-      html: htmlVersions.html,
-      versionNumber: htmlVersions.versionNumber,
-    })
-    .from(htmlVersions)
-    .where(inArray(htmlVersions.guideId, guideIds))
-    .orderBy(desc(htmlVersions.versionNumber));
+  const rows = (await sql`
+    SELECT
+      guide_id::text AS "guideId",
+      html,
+      version_number AS "versionNumber"
+    FROM html_versions
+    WHERE guide_id::text = ANY(${guideIds})
+    ORDER BY version_number DESC
+  `) as HtmlRow[];
 
   const htmlMap = new Map<string, string>();
 
@@ -51,31 +90,68 @@ async function getCurrentHtmlMap(guideIds: string[]) {
   return htmlMap;
 }
 
+async function getNextVersionNumber(guideId: string) {
+  const [row] = (await sql`
+    SELECT coalesce(max(version_number), 0) AS count
+    FROM html_versions
+    WHERE guide_id::text = ${guideId}
+  `) as { count: number | string }[];
+
+  return Number(row?.count ?? 0) + 1;
+}
+
 export async function listGuideRecordsForUser(userId: string) {
-  const guideRows = await db
-    .select()
-    .from(guides)
-    .where(eq(guides.userId, userId))
-    .orderBy(desc(guides.updatedAt));
+  await ensureAppSchema();
+
+  const guideRows = (await sql`
+    SELECT
+      id::text AS id,
+      title,
+      status,
+      created_at AS "createdAt",
+      updated_at AS "updatedAt",
+      current_html_version_id::text AS "currentHtmlVersionId"
+    FROM guides
+    WHERE user_id = ${userId}
+    ORDER BY updated_at DESC
+  `) as GuideRow[];
 
   if (guideRows.length === 0) {
     return [] as GuideRecord[];
   }
 
   const guideIds = guideRows.map((row) => row.id);
-  const [profileRows, sourceRows] = await Promise.all([
-    db
-      .select()
-      .from(guideProfiles)
-      .where(inArray(guideProfiles.guideId, guideIds)),
-    db
-      .select()
-      .from(sourceItems)
-      .where(inArray(sourceItems.guideId, guideIds))
-      .orderBy(desc(sourceItems.createdAt)),
+  const [profileRowsResult, sourceRowsResult] = await Promise.all([
+    sql`
+      SELECT
+        guide_id::text AS "guideId",
+        target_audience AS "targetAudience",
+        goal,
+        depth,
+        tone,
+        structure_style AS "structureStyle",
+        reader_level AS "readerLevel"
+      FROM guide_profiles
+      WHERE guide_id::text = ANY(${guideIds})
+    `,
+    sql`
+      SELECT
+        id::text AS id,
+        guide_id::text AS "guideId",
+        source_type AS "sourceType",
+        original_filename AS "originalFilename",
+        raw_text AS "rawText",
+        normalized_text AS "normalizedText",
+        created_at AS "createdAt"
+      FROM source_items
+      WHERE guide_id::text = ANY(${guideIds})
+      ORDER BY created_at DESC
+    `,
   ]);
+  const profileRows = profileRowsResult as ProfileRow[];
+  const sourceRows = sourceRowsResult as SourceRow[];
 
-  const profileMap = new Map(
+  const profileMap = new Map<string, GuideProfile>(
     profileRows.map((row) => [
       row.guideId,
       {
@@ -85,7 +161,7 @@ export async function listGuideRecordsForUser(userId: string) {
         tone: row.tone,
         structureStyle: row.structureStyle,
         readerLevel: row.readerLevel,
-      } satisfies GuideProfile,
+      },
     ]),
   );
 
@@ -111,44 +187,65 @@ export async function listGuideRecordsForUser(userId: string) {
       createdAt: toIsoString(row.createdAt),
       updatedAt: toIsoString(row.updatedAt),
       sources: sourceMap.get(row.id) ?? [],
-      profile:
-        profileMap.get(row.id) ??
-        ({
-          targetAudience: "",
-          goal: "",
-          depth: "",
-          tone: "",
-          structureStyle: "",
-          readerLevel: "",
-        } satisfies GuideProfile),
+      profile: profileMap.get(row.id) ?? emptyProfile(),
       html: "",
     }),
   );
 }
 
 export async function getGuideRecordForUser(userId: string, guideId: string) {
-  const guideRow = await db.query.guides.findFirst({
-    where: (table, operators) =>
-      operators.and(
-        operators.eq(table.id, guideId),
-        operators.eq(table.userId, userId),
-      ),
-  });
+  await ensureAppSchema();
+
+  const [guideRow] = (await sql`
+    SELECT
+      id::text AS id,
+      title,
+      status,
+      created_at AS "createdAt",
+      updated_at AS "updatedAt",
+      current_html_version_id::text AS "currentHtmlVersionId"
+    FROM guides
+    WHERE id::text = ${guideId} AND user_id = ${userId}
+    LIMIT 1
+  `) as GuideRow[];
 
   if (!guideRow) {
     return null;
   }
 
-  const [profileRow, sourceRows, htmlMap] = await Promise.all([
-    db.query.guideProfiles.findFirst({
-      where: (table, operators) => operators.eq(table.guideId, guideRow.id),
-    }),
-    db.query.sourceItems.findMany({
-      where: (table, operators) => operators.eq(table.guideId, guideRow.id),
-      orderBy: (table, operators) => [operators.asc(table.createdAt)],
-    }),
+  const [profileRowsResult, sourceRowsResult, htmlMap] = await Promise.all([
+    sql`
+      SELECT
+        guide_id::text AS "guideId",
+        target_audience AS "targetAudience",
+        goal,
+        depth,
+        tone,
+        structure_style AS "structureStyle",
+        reader_level AS "readerLevel"
+      FROM guide_profiles
+      WHERE guide_id::text = ${guideRow.id}
+      LIMIT 1
+    `,
+    sql`
+      SELECT
+        id::text AS id,
+        guide_id::text AS "guideId",
+        source_type AS "sourceType",
+        original_filename AS "originalFilename",
+        raw_text AS "rawText",
+        normalized_text AS "normalizedText",
+        created_at AS "createdAt"
+      FROM source_items
+      WHERE guide_id::text = ${guideRow.id}
+      ORDER BY created_at ASC
+    `,
     getCurrentHtmlMap([guideRow.id]),
   ]);
+  const profileRows = profileRowsResult as ProfileRow[];
+  const sourceRows = sourceRowsResult as SourceRow[];
+
+  const profileRow = profileRows[0];
 
   return normalizeGuideRecord({
     id: guideRow.id,
@@ -156,14 +253,17 @@ export async function getGuideRecordForUser(userId: string, guideId: string) {
     status: guideRow.status,
     createdAt: toIsoString(guideRow.createdAt),
     updatedAt: toIsoString(guideRow.updatedAt),
-    profile: {
-      targetAudience: profileRow?.targetAudience ?? "",
-      goal: profileRow?.goal ?? "",
-      depth: profileRow?.depth ?? "",
-      tone: profileRow?.tone ?? "",
-      structureStyle: profileRow?.structureStyle ?? "",
-      readerLevel: profileRow?.readerLevel ?? "",
-    },
+    profile:
+      profileRow == null
+        ? emptyProfile()
+        : {
+            targetAudience: profileRow.targetAudience,
+            goal: profileRow.goal,
+            depth: profileRow.depth,
+            tone: profileRow.tone,
+            structureStyle: profileRow.structureStyle,
+            readerLevel: profileRow.readerLevel,
+          },
     sources: sourceRows.map((row) => ({
       id: row.id,
       kind: row.sourceType,
@@ -176,62 +276,84 @@ export async function getGuideRecordForUser(userId: string, guideId: string) {
 }
 
 export async function createGuideForUser(userId: string, input: GuideCreateInput) {
+  await ensureAppSchema();
+
   const draft = createGuideRecord(input);
+  const guideId = crypto.randomUUID();
+  const createdAt = new Date(draft.createdAt);
+  const updatedAt = new Date(draft.updatedAt);
 
-  const createdGuide = await db.transaction(async (tx) => {
-    const [guideRow] = await tx
-      .insert(guides)
-      .values({
-        userId,
-        title: draft.title,
-        status: draft.status,
-        createdAt: new Date(draft.createdAt),
-        updatedAt: new Date(draft.updatedAt),
-      })
-      .returning({ id: guides.id });
-
-    await tx.insert(guideProfiles).values({
-      guideId: guideRow.id,
-      targetAudience: draft.profile.targetAudience,
-      goal: draft.profile.goal,
-      depth: draft.profile.depth,
-      tone: draft.profile.tone,
-      structureStyle: draft.profile.structureStyle,
-      readerLevel: draft.profile.readerLevel,
-      createdAt: new Date(draft.createdAt),
-      updatedAt: new Date(draft.updatedAt),
-    });
-
-    if (draft.sources.length > 0) {
-      await tx.insert(sourceItems).values(
-        draft.sources.map((source) => ({
-          guideId: guideRow.id,
-          sourceType: source.kind,
-          originalFilename: source.name,
-          rawText: source.content,
-          normalizedText: source.excerpt || source.content.slice(0, 180),
-        })),
-      );
-    }
-
-    return guideRow;
+  const sourceQueries = draft.sources.map((source) => {
+    const sourceId = crypto.randomUUID();
+    return sql`
+      INSERT INTO source_items (
+        id,
+        guide_id,
+        source_type,
+        original_filename,
+        raw_text,
+        normalized_text,
+        created_at
+      )
+      VALUES (
+        ${sourceId},
+        ${guideId},
+        ${source.kind},
+        ${source.name},
+        ${source.content},
+        ${source.excerpt || source.content.slice(0, 180)},
+        ${createdAt}
+      )
+    `;
   });
 
-  return getGuideRecordForUser(userId, createdGuide.id);
-}
+  await sql.transaction([
+    sql`
+      INSERT INTO guides (
+        id,
+        user_id,
+        title,
+        status,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${guideId},
+        ${userId},
+        ${draft.title},
+        ${draft.status},
+        ${createdAt},
+        ${updatedAt}
+      )
+    `,
+    sql`
+      INSERT INTO guide_profiles (
+        guide_id,
+        target_audience,
+        goal,
+        depth,
+        tone,
+        structure_style,
+        reader_level,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        ${guideId},
+        ${draft.profile.targetAudience},
+        ${draft.profile.goal},
+        ${draft.profile.depth},
+        ${draft.profile.tone},
+        ${draft.profile.structureStyle},
+        ${draft.profile.readerLevel},
+        ${createdAt},
+        ${updatedAt}
+      )
+    `,
+    ...sourceQueries,
+  ]);
 
-async function getNextVersionNumber(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
-  guideId: string,
-) {
-  const [result] = await tx
-    .select({
-      count: sql<number>`coalesce(max(${htmlVersions.versionNumber}), 0)`,
-    })
-    .from(htmlVersions)
-    .where(eq(htmlVersions.guideId, guideId));
-
-  return (result?.count ?? 0) + 1;
+  return getGuideRecordForUser(userId, guideId);
 }
 
 export async function mutateGuideForUser(
@@ -247,16 +369,28 @@ export async function mutateGuideForUser(
       }
     | { action: "mark-exported" },
 ) {
-  const current = await getGuideRecordForUser(userId, guideId);
-  const guideRow = await db.query.guides.findFirst({
-    where: (table, operators) =>
-      operators.and(
-        operators.eq(table.id, guideId),
-        operators.eq(table.userId, userId),
-      ),
-  });
+  await ensureAppSchema();
 
-  if (!current || !guideRow) {
+  const current = await getGuideRecordForUser(userId, guideId);
+
+  if (!current) {
+    return null;
+  }
+
+  const [existingGuide] = (await sql`
+    SELECT
+      id::text AS id,
+      title,
+      status,
+      created_at AS "createdAt",
+      updated_at AS "updatedAt",
+      current_html_version_id::text AS "currentHtmlVersionId"
+    FROM guides
+    WHERE id::text = ${guideId} AND user_id = ${userId}
+    LIMIT 1
+  `) as GuideRow[];
+
+  if (!existingGuide) {
     return null;
   }
 
@@ -278,34 +412,51 @@ export async function mutateGuideForUser(
               updatedAt: new Date().toISOString(),
             };
 
-  await db.transaction(async (tx) => {
-    let currentHtmlVersionId: string | null = null;
+  const queries = [];
 
-    if (nextGuide.html !== current.html) {
-      const versionNumber = await getNextVersionNumber(tx, guideId);
-      const [version] = await tx
-        .insert(htmlVersions)
-        .values({
-          guideId,
-          html: nextGuide.html,
-          versionNumber,
-        })
-        .returning({ id: htmlVersions.id });
+  if (nextGuide.html !== current.html) {
+    const versionNumber = await getNextVersionNumber(guideId);
+    const versionId = crypto.randomUUID();
 
-      currentHtmlVersionId = version.id;
-    }
+    queries.push(sql`
+      INSERT INTO html_versions (
+        id,
+        guide_id,
+        html,
+        version_number,
+        created_at
+      )
+      VALUES (
+        ${versionId},
+        ${guideId},
+        ${nextGuide.html},
+        ${versionNumber},
+        ${new Date(nextGuide.updatedAt)}
+      )
+    `);
 
-    await tx
-      .update(guides)
-      .set({
-        title: nextGuide.title,
-        status: nextGuide.status,
-        updatedAt: new Date(nextGuide.updatedAt),
-        currentHtmlVersionId:
-          currentHtmlVersionId ?? guideRow.currentHtmlVersionId ?? null,
-      })
-      .where(and(eq(guides.id, guideId), eq(guides.userId, userId)));
-  });
+    queries.push(sql`
+      UPDATE guides
+      SET
+        title = ${nextGuide.title},
+        status = ${nextGuide.status},
+        updated_at = ${new Date(nextGuide.updatedAt)},
+        current_html_version_id = ${versionId}
+      WHERE id::text = ${guideId} AND user_id = ${userId}
+    `);
+  } else {
+    queries.push(sql`
+      UPDATE guides
+      SET
+        title = ${nextGuide.title},
+        status = ${nextGuide.status},
+        updated_at = ${new Date(nextGuide.updatedAt)},
+        current_html_version_id = ${existingGuide.currentHtmlVersionId}
+      WHERE id::text = ${guideId} AND user_id = ${userId}
+    `);
+  }
+
+  await sql.transaction(queries);
 
   return getGuideRecordForUser(userId, guideId);
 }

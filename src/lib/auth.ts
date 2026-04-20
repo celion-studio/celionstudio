@@ -1,35 +1,15 @@
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { nextCookies } from "better-auth/next-js";
-import { db } from "@/lib/db";
-import * as schema from "@/lib/db/schema";
+import { createNeonAuth } from "@neondatabase/auth/next/server";
 
-const authSecret =
-  process.env.BETTER_AUTH_SECRET ??
-  "dev-only-better-auth-secret-change-me-123456";
-const authBaseUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
-const googleClientId =
-  process.env.GOOGLE_CLIENT_ID ?? "google-client-id-placeholder";
-const googleClientSecret =
-  process.env.GOOGLE_CLIENT_SECRET ?? "google-client-secret-placeholder";
+const authBaseUrl = process.env.NEON_AUTH_BASE_URL;
+const cookieSecret = process.env.NEON_AUTH_COOKIE_SECRET;
 
-export const auth = betterAuth({
-  secret: authSecret,
-  baseURL: authBaseUrl,
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    usePlural: true,
-    schema,
-  }),
-  emailAndPassword: {
-    enabled: true,
-  },
-  socialProviders: {
-    google: {
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-      prompt: "select_account",
-    },
-  },
-  plugins: [nextCookies()],
-});
+export const auth =
+  authBaseUrl && cookieSecret && cookieSecret.length >= 32
+    ? createNeonAuth({
+        baseUrl: authBaseUrl,
+        cookies: {
+          secret: cookieSecret,
+          sessionDataTtl: 300,
+        },
+      })
+    : null;

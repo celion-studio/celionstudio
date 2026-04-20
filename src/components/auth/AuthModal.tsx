@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 type Props = {
-  onClose: () => void; // passed from a client component — not a server action
+  onClose: () => void;
 };
 
 function GoogleIcon() {
@@ -41,11 +41,15 @@ export function AuthModal({ onClose }: Props) {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
     };
+
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
@@ -62,20 +66,30 @@ export function AuthModal({ onClose }: Props) {
     setLoading("email");
     setMessage("");
     setIsSuccess(false);
+
     try {
       if (mode === "sign-up") {
-        await authClient.signUp.email({
+        const result = await authClient.signUp.email({
           name: name.trim() || "Celion User",
           email,
           password,
         });
-        setMessage("Account created — you can now open the workspace.");
-        setIsSuccess(true);
+        if (result?.error) {
+          setMessage(result.error.message ?? "Sign up failed.");
+          return;
+        }
+        setMessage("Account created. Redirecting...");
       } else {
-        await authClient.signIn.email({ email, password });
+        const result = await authClient.signIn.email({ email, password });
+        if (result?.error) {
+          setMessage(result.error.message ?? "Invalid email or password.");
+          return;
+        }
         setMessage("Signed in. Redirecting...");
-        setIsSuccess(true);
       }
+
+      setIsSuccess(true);
+      window.location.assign("/dashboard");
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Authentication failed.",
@@ -88,8 +102,12 @@ export function AuthModal({ onClose }: Props) {
   async function handleGoogle() {
     setLoading("google");
     setMessage("");
+
     try {
-      await authClient.signIn.social({ provider: "google" });
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: "/dashboard",
+      });
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Google sign-in failed.",
@@ -110,20 +128,21 @@ export function AuthModal({ onClose }: Props) {
       style={{ background: "rgba(20,19,17,0.55)" }}
       onClick={onClose}
     >
-      {/* Backdrop blur layer */}
       <div
         className="absolute inset-0"
-        style={{ backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}
+        style={{
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+        }}
       />
 
-      {/* Modal card */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label={mode === "sign-in" ? "Sign in" : "Create account"}
         className="relative w-full max-w-[400px] animate-in fade-in zoom-in-95 duration-200"
         style={{ perspective: 800 }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div
           className="rounded-[28px] p-8"
@@ -136,7 +155,6 @@ export function AuthModal({ onClose }: Props) {
               "0 40px 100px rgba(0,0,0,0.16), 0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9)",
           }}
         >
-          {/* Close */}
           <button
             type="button"
             onClick={onClose}
@@ -146,12 +164,10 @@ export function AuthModal({ onClose }: Props) {
             <X className="size-[15px]" />
           </button>
 
-          {/* Logo mark */}
           <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-xl bg-[#1F1F1F]">
             <span className="font-mono text-[12px] font-bold text-white">C</span>
           </div>
 
-          {/* Heading */}
           <h2 className="text-[22px] font-semibold leading-tight tracking-[-0.025em] text-[#1F1F1F]">
             {mode === "sign-in" ? "Welcome back" : "Create your account"}
           </h2>
@@ -161,25 +177,23 @@ export function AuthModal({ onClose }: Props) {
               : "Start turning your knowledge into ebooks."}
           </p>
 
-          {/* Mode toggle */}
           <div className="mt-6 flex rounded-full border border-black/[0.06] bg-[#FAF9F5] p-[3px]">
-            {(["sign-up", "sign-in"] as const).map((m) => (
+            {(["sign-up", "sign-in"] as const).map((value) => (
               <button
-                key={m}
+                key={value}
                 type="button"
-                onClick={() => switchMode(m)}
+                onClick={() => switchMode(value)}
                 className={`flex-1 rounded-full py-[7px] text-[12px] font-medium transition-all duration-150 ${
-                  mode === m
+                  mode === value
                     ? "bg-[#1F1F1F] text-white shadow-sm"
                     : "text-[#71717a] hover:text-[#1F1F1F]"
                 }`}
               >
-                {m === "sign-up" ? "Sign up" : "Sign in"}
+                {value === "sign-up" ? "Sign up" : "Sign in"}
               </button>
             ))}
           </div>
 
-          {/* Google */}
           <button
             type="button"
             onClick={handleGoogle}
@@ -187,10 +201,9 @@ export function AuthModal({ onClose }: Props) {
             className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-black/[0.08] bg-white py-[11px] text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <GoogleIcon />
-            {loading === "google" ? "Redirecting…" : "Continue with Google"}
+            {loading === "google" ? "Redirecting..." : "Continue with Google"}
           </button>
 
-          {/* Divider */}
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-black/[0.06]" />
             <span className="text-[11px] font-medium uppercase tracking-[0.1em] text-[#a1a1aa]">
@@ -199,36 +212,36 @@ export function AuthModal({ onClose }: Props) {
             <div className="h-px flex-1 bg-black/[0.06]" />
           </div>
 
-          {/* Fields */}
           <div className="space-y-2.5">
-            {mode === "sign-up" && (
+            {mode === "sign-up" ? (
               <input
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(event) => setName(event.target.value)}
                 placeholder="Full name"
                 autoComplete="name"
                 className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
               />
-            )}
+            ) : null}
+
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="Email address"
               autoComplete="email"
               className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
             />
+
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
               autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
               className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
             />
           </div>
 
-          {/* Submit */}
           <button
             type="button"
             onClick={handleEmailAuth}
@@ -236,13 +249,12 @@ export function AuthModal({ onClose }: Props) {
             className="mt-4 w-full rounded-2xl bg-[#1F1F1F] py-[11px] text-[14px] font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading === "email"
-              ? "Working…"
+              ? "Working..."
               : mode === "sign-up"
                 ? "Create account"
                 : "Sign in"}
           </button>
 
-          {/* Message */}
           {message ? (
             <p
               className={`mt-3 rounded-2xl px-4 py-3 text-[13px] leading-[1.6] ${

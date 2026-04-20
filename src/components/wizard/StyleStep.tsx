@@ -26,8 +26,8 @@ export function StyleStep({
     options: string[],
     field: "tone" | "structureStyle" | "readerLevel",
   ) => (
-    <div className="rounded-[28px] border border-line bg-white/80 p-5">
-      <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
+    <div className="rounded-[20px] border border-line bg-[#fdfcf8] p-6">
+      <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
         {label}
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
@@ -39,7 +39,7 @@ export function StyleStep({
             className={`rounded-full border px-4 py-2 text-sm transition ${
               value === option
                 ? "border-text bg-text text-white"
-                : "border-line bg-[#fcfaf4] text-text hover:border-text"
+                : "border-line bg-white text-text hover:border-text"
             }`}
           >
             {option}

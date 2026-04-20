@@ -1,264 +1,311 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState } from "react";
-import {
-  ArrowRight,
-  FileStack,
-  FileText,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
-import { AuthModal } from "@/components/auth/AuthModal";
+import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { authClient } from '@/lib/auth-client';
 
 export function Hero() {
-  const [authOpen, setAuthOpen] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const { data: session, isPending } = authClient.useSession();
+  const resolvedSession = hydrated ? session : null;
+  const isResolvedSignedIn = hydrated && !isPending && Boolean(session);
+
+  // Handle Neon Auth redirect if it lands on the homepage
+  useEffect(() => {
+    setHydrated(true);
+
+    const searchParams = new URLSearchParams(window.location.search);
+    if (!searchParams.has("neon_auth_session_verifier")) return;
+
+    let active = true;
+    async function finalizeSignIn() {
+      try {
+        const result = await authClient.getSession();
+        if (!result?.error && active) {
+          window.location.replace("/dashboard");
+        }
+      } catch (err) {
+        console.error("Session verification failed", err);
+      }
+    }
+    
+    finalizeSignIn();
+    return () => { active = false; };
+  }, []);
+
+  // Carousel orbit animation
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const cards = Array.from(stage.querySelectorAll(".carousel-item")) as HTMLElement[];
+    if (cards.length === 0) return;
+
+    const speed = 0.08; 
+    let start = performance.now();
+    let animationFrameId: number;
+
+    function render(now: number) {
+      const time = (now - start) / 1000;
+      const radius = window.innerWidth > 900 ? 800 : 500; 
+
+      cards.forEach((card, index) => {
+        let progress = ((time * speed) + (index / cards.length)) % 1.0;
+        const angle = -Math.PI / 3 + progress * (Math.PI * 2 / 3);
+        const x = Math.sin(angle) * (radius * 1.5);
+        const y = radius - Math.cos(angle) * radius;
+        
+        let opacity = 1;
+        if (progress < 0.1) opacity = progress / 0.1;
+        else if (progress > 0.9) opacity = (1 - progress) / 0.1;
+        
+        const tilt = angle * (180 / Math.PI);
+
+        card.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg)`;
+        card.style.opacity = opacity.toFixed(3);
+        card.style.zIndex = "10";
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    }
+
+    animationFrameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, []);
 
   return (
-    <main className="relative min-h-screen bg-[#FAF9F5]">
-      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
-      <nav className="absolute inset-x-0 top-0 z-30 flex justify-center px-4 pt-5 sm:px-6 sm:pt-6">
-        <div className="w-full max-w-[760px]">
-          <div className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-white py-1.5 pl-3 pr-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-[#1F1F1F]">
-                <span className="font-mono text-[10px] font-bold text-white">
-                  C
-                </span>
-              </div>
-              <span className="text-[14px] font-medium tracking-tight text-[#1F1F1F]">
-                Celion
-              </span>
-            </div>
-            <div className="hidden items-center md:flex">
-              {["How it works", "Pricing", "Docs"].map((item) => (
-                <a
-                  key={item}
-                  href="#"
-                  className="px-3.5 py-2 text-[13px] font-medium text-[#71717a] transition hover:text-[#1F1F1F]"
-                >
-                  {item}
-                </a>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setAuthOpen(true)}
-              className="rounded-xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-2 text-[13px] font-medium text-[#1F1F1F] transition hover:bg-[#F0EDE6]"
-            >
-              Sign in
-            </button>
+    <div className="editorial-landing-page">
+      {/* Background grain */}
+      <div className="grain-overlay"></div>
+
+      <nav className="nav">
+        <div className="nav-inner">
+          <div className="brand">
+            <svg className="brand-spark" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/>
+            </svg>
+            <span>celion</span>
+          </div>
+          <div className="nav-actions">
+            {isResolvedSignedIn && resolvedSession ? (
+              <>
+                <Link href="/dashboard" className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecoration: 'none' }}>Dashboard</Link>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#333] text-[11px] text-white">
+                  {resolvedSession.user.name?.charAt(0).toUpperCase() || 'U'}
+                </div>
+              </>
+            ) : (
+              <>
+                <button className="nav-link bg-transparent border-none cursor-pointer" onClick={() => setShowAuth(true)}>Log in</button>
+                <button className="btn btn-light" onClick={() => setShowAuth(true)}>Get started</button>
+              </>
+            )}
           </div>
         </div>
       </nav>
 
-      <section className="relative px-6 pb-[130px] pt-28 sm:pb-[160px] sm:pt-32 lg:pb-[200px]">
-        <div className="mx-auto max-w-[900px] text-center">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3.5 py-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C4622D]" />
-            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#71717a]">
-              Knowledge in, polished output out
-            </span>
+      <main>
+        <section className="hero">
+          <div className="container">
+            <div className="hero-copy">
+              <div className="hero-icon fade-up">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/>
+                </svg>
+              </div>
+              <h1 className="font-geist">Your publishing OS.</h1>
+              <p className="font-geist">
+                Celion is domain-specific AI for brand builders, agencies, and publishers.
+              </p>
+            </div>
+
+            <div className="hero-carousel-stage" id="bookCarousel" ref={stageRef}>
+              <div className="hero-btn-center">
+                {isResolvedSignedIn ? (
+                  <Link href="/dashboard" className="btn btn-dark" style={{ padding: '0 24px', textDecoration: 'none', minHeight: '48px', borderRadius: 'var(--radius-sm)', fontSize: '15px', boxShadow: '0 10px 24px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center' }}>
+                    Go to workspace
+                  </Link>
+                ) : (
+                  <button className="btn btn-dark" onClick={() => setShowAuth(true)} style={{ padding: '0 24px', minHeight: '48px', borderRadius: 'var(--radius-sm)', fontSize: '15px', boxShadow: '0 10px 24px rgba(0,0,0,0.2)' }}>
+                    Start a draft
+                  </button>
+                )}
+              </div>
+
+              <article className="carousel-item">
+                 <div className="cover cover-1">
+                    <div className="cover-title">Operator<br/>Essays</div>
+                    <div className="cover-sub">Notes from the field</div>
+                 </div>
+              </article>
+              
+              <article className="carousel-item">
+                 <div className="cover cover-2">
+                    <div className="cover-title" style={{ letterSpacing: '-0.05em', fontSize: '32px' }}>AESTHETIC<br/>FORM</div>
+                    <div className="cover-sub" style={{ opacity: 1 }}>VOL. 01</div>
+                 </div>
+              </article>
+
+              <article className="carousel-item">
+                 <div className="cover cover-3">
+                    <div className="cover-sub" style={{ marginTop: 0, marginBottom: 'auto' }}>Manual</div>
+                    <div className="cover-title">Release<br/>Notes 2.0</div>
+                 </div>
+              </article>
+
+              <article className="carousel-item">
+                 <div className="cover cover-4">
+                    <div className="cover-sub" style={{ marginTop: 0, marginBottom: '20px' }}>04</div>
+                    <div className="cover-title" style={{ fontSize: '40px' }}>Taste</div>
+                 </div>
+              </article>
+
+              <article className="carousel-item">
+                 <div className="cover cover-5">
+                    <div className="cover-title" style={{ marginTop: '40px' }}>Deep<br/>Learning</div>
+                    <div className="cover-sub">Systems</div>
+                 </div>
+              </article>
+            </div>
           </div>
+        </section>
 
-          <h1 className="mx-auto mb-6 max-w-[700px] text-[clamp(40px,5.2vw,62px)] font-semibold leading-[1.08] tracking-[-0.03em] text-[#1F1F1F]">
-            You know it.
-            <br />
-            Now package it.
-          </h1>
+        <section className="section">
+          <div className="container">
+            <div className="section-head fade-up">
+              <div className="section-kicker">How it works</div>
+              <h2 className="section-h">From source to shelf without the usual mess.</h2>
+              <p className="section-aside">No rigid template galleries. Celion analyzes the tone and audience you set, building an opinionated draft directly from your rough materials.</p>
+            </div>
 
-          <p className="mx-auto mb-9 max-w-[540px] text-[16px] leading-[1.8] tracking-[-0.01em] text-[#71717a]">
-            Paste your notes, upload a transcript, or drop in a draft. Celion
-            turns what you know into a polished HTML draft ready to revise,
-            export, and hand off.
-          </p>
-
-          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#1F1F1F] px-6 py-3.5 text-[14px] font-medium text-white transition hover:opacity-80"
-            >
-              Open the workspace
-              <ArrowRight className="size-4" />
-            </Link>
-            <a
-              href="#how"
-              className="inline-flex items-center gap-2 rounded-xl border border-black/[0.08] bg-white px-6 py-3.5 text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#FAF9F5]"
-            >
-              See how it works
-            </a>
-          </div>
-
-        </div>
-      </section>
-
-      <section className="relative" id="how">
-        <div className="h-[380px] w-full bg-[#1F1F1F] sm:h-[480px] lg:h-[560px]" />
-
-        <div className="pointer-events-none absolute inset-x-0 top-0 -translate-y-[80px] px-4 sm:-translate-y-[110px] sm:px-6 lg:-translate-y-[150px]">
-          <div className="pointer-events-auto mx-auto max-w-[980px]">
-            <div className="overflow-hidden rounded-2xl border border-white/[0.08] shadow-[0_48px_120px_-24px_rgba(0,0,0,0.5),0_24px_60px_-12px_rgba(0,0,0,0.3)]">
-              <div className="flex items-center justify-between border-b border-white/[0.06] bg-[#161616] px-5 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-[#ff5f57]" />
-                    <div className="h-3 w-3 rounded-full bg-[#febc2e]" />
-                    <div className="h-3 w-3 rounded-full bg-[#28c840]" />
-                  </div>
-                  <div className="ml-2">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">
-                      Builder
-                    </p>
-                    <p className="text-[15px] font-medium leading-tight text-white/90">
-                      Launch Content Playbook
-                    </p>
-                  </div>
+            <div className="process-grid">
+              <div className="process-card fade-up">
+                <div className="process-num-bg">01</div>
+                <div className="process-content">
+                  <h3 className="process-title">Bring your material</h3>
+                  <p className="process-body">Paste a doc, drop a transcript, upload markdown. Celion doesn't care where the knowledge lives.</p>
                 </div>
-                <div className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-white/40">
-                  Dashboard
+                <div className="process-visual"></div>
+              </div>
+              <div className="process-card fade-up">
+                <div className="process-num-bg">02</div>
+                <div className="process-content">
+                  <h3 className="process-title">AI drafts the shape</h3>
+                  <p className="process-body">Tell it who's reading. Celion picks structure, pacing, and opens a first draft with your voice at the helm.</p>
+                </div>
+                <div className="process-visual"></div>
+              </div>
+              <div className="process-card fade-up">
+                <div className="process-num-bg">03</div>
+                <div className="process-content">
+                  <h3 className="process-title">Revise and ship</h3>
+                  <p className="process-body">Argue with paragraphs, not outlines. Export as HTML, PDF, or EPUB when it's ready to read.</p>
+                </div>
+                <div className="process-visual"></div>
+              </div>
+            </div>
+
+            <div className="preview-band">
+              <div className="preview-features fade-up">
+                <div className="section-kicker">The editor</div>
+                <h3 className="section-h">An AI with taste, not just output.</h3>
+                <div className="preview-points">
+                  <div className="preview-point">
+                    <strong>Opinionated structure, not blank-page wizardry</strong>
+                    <span>Celion reads your brief and argues with your draft the way a good editor would. It asks what to cut, what to keep, and which voice the reader signed up for.</span>
+                  </div>
+                  <div className="preview-point">
+                    <strong>Voice-matched prose from your source material</strong>
+                    <span>The models are tuned to emulate your phrasing, preventing the generic AI tone.</span>
+                  </div>
                 </div>
               </div>
 
-              <div
-                className="grid grid-cols-[200px_1fr_240px] bg-[#FAF9F5]"
-                style={{ minHeight: 340 }}
-              >
-                <div className="flex flex-col gap-3 border-r border-[#E8E4DB] bg-[#F4F2EC] p-4">
-                  <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      Status
-                    </p>
-                    <p className="mt-1.5 text-base font-medium text-[#1F1F1F]">
-                      draft
-                    </p>
+              <div className="preview-doc fade-up">
+                <div className="layered-paper paper-back"></div>
+                <div className="layered-paper paper-front">
+                  <h4 style={{ margin:0, fontFamily:'Geist', fontSize:'11px', letterSpacing:'0.1em', textTransform:'uppercase', color:'var(--ink-soft)' }}>Chapter 01</h4>
+                  <h2 style={{ margin:'24px 0 16px', fontFamily:'Geist', fontSize:'32px', fontWeight:400, lineHeight:1.1 }}>Aesthetic Form</h2>
+                  <p style={{ color:'var(--ink)', fontSize:'16px', lineHeight:1.6, maxWidth: '90%' }}>The ultimate goal of publishing is not just to distribute text, but to frame ideas inside a medium that demands respect.</p>
+                  <div style={{ marginTop:'32px', display:'grid', gap:'12px' }}>
+                    <div style={{ height:'8px', background:'var(--line-soft)', borderRadius:'4px', width:'100%' }}></div>
+                    <div style={{ height:'8px', background:'var(--line-soft)', borderRadius:'4px', width:'100%' }}></div>
+                    <div style={{ height:'8px', background:'var(--line-soft)', borderRadius:'4px', width:'70%' }}></div>
                   </div>
-                  <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      Profile
-                    </p>
-                    <dl className="mt-2 space-y-2">
-                      <div>
-                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
-                          Audience
-                        </dt>
-                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">
-                          Founders, marketers
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
-                          Tone
-                        </dt>
-                        <dd className="mt-0.5 text-[11px] text-[#1F1F1F]">
-                          Practical
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                  <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      Sources
-                    </p>
-                    <div className="mt-2 space-y-1.5">
-                      {["notes.md", "transcript.txt"].map((fileName) => (
-                        <div
-                          key={fileName}
-                          className="flex items-center gap-1.5 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-2.5 py-1.5"
-                        >
-                          <FileText className="size-3 text-[#7A7670]" />
-                          <span className="font-mono text-[9px] text-[#1F1F1F]">
-                            {fileName}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col border-r border-[#E8E4DB] bg-white">
-                  <div className="flex items-center justify-between border-b border-[#E8E4DB] px-4 py-3">
-                    <div>
-                      <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                        Live preview
-                      </p>
-                      <p className="text-[15px] font-medium text-[#1F1F1F]">
-                        Launch Content Playbook
-                      </p>
-                    </div>
-                    <div className="rounded-full border border-[#E8E4DB] bg-[#F4F2EC] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-[#7A7670]">
-                      HTML
-                    </div>
-                  </div>
-                  <div className="flex-1 px-6 py-5">
-                    <div className="space-y-2.5">
-                      <div className="h-5 w-2/3 rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-full rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-5/6 rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-4/5 rounded-md bg-[#F4F2EC]" />
-                      <div className="mt-4 h-4 w-1/2 rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-full rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-3/4 rounded-md bg-[#F4F2EC]" />
-                      <div className="mt-4 rounded-xl border border-[#E8E4DB] bg-[#FBF0E8] p-3">
-                        <div className="h-2.5 w-1/2 rounded-md bg-[#C4622D]/25" />
-                        <div className="mt-2 h-2.5 w-full rounded-md bg-[#C4622D]/10" />
-                        <div className="mt-1.5 h-2.5 w-4/5 rounded-md bg-[#C4622D]/10" />
-                      </div>
-                      <div className="h-2.5 w-full rounded-md bg-[#F4F2EC]" />
-                      <div className="h-2.5 w-2/3 rounded-md bg-[#F4F2EC]" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 bg-white p-4">
-                  <div className="rounded-xl border border-[#E8E4DB] bg-[#F4F2EC] p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      AI actions
-                    </p>
-                    <div className="mt-2.5 grid gap-2">
-                      <div className="flex items-center gap-2 rounded-lg bg-[#1F1F1F] px-3 py-2">
-                        <Sparkles className="size-3 text-white/80" />
-                        <span className="text-[11px] font-medium text-white">
-                          Generate first draft
-                        </span>
-                      </div>
-                      <div className="rounded-lg border border-[#E8E4DB] bg-white px-3 py-2 text-[11px] text-[#7A7670]">
-                        Regenerate full draft
-                      </div>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      Revision prompt
-                    </p>
-                    <div className="mt-2 rounded-lg border border-[#E8E4DB] bg-[#F4F2EC] px-3 py-2 text-[10px] text-[#A1A1AA]">
-                      Make the intro sharper...
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#E8E4DB] bg-white p-3">
-                    <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[#7A7670]">
-                      Output
-                    </p>
-                    <div className="mt-2.5 grid gap-1.5">
-                      <div className="flex items-center gap-2 rounded-lg border border-[#E8E4DB] bg-white px-3 py-2">
-                        <FileStack className="size-3 text-[#7A7670]" />
-                        <span className="text-[10px] font-medium text-[#1F1F1F]">
-                          Export PDF
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 rounded-lg border border-[#E8E4DB] bg-white px-3 py-2">
-                        <Wand2 className="size-3 text-[#7A7670]" />
-                        <span className="text-[10px] font-medium text-[#1F1F1F]">
-                          Copy HTML for Figma
-                        </span>
-                      </div>
-                    </div>
+                  <div style={{ marginTop:'24px', display:'grid', gap:'12px' }}>
+                    <div style={{ height:'8px', background:'var(--line-soft)', borderRadius:'4px', width:'100%' }}></div>
+                    <div style={{ height:'8px', background:'var(--line-soft)', borderRadius:'4px', width:'40%' }}></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="section fade-up">
+          <div className="container">
+            <div className="cta-band">
+              <div className="cta-copy">
+                <div className="section-kicker">Start here</div>
+                <h3>Start with the draft you already have.</h3>
+                <p>Notes in, structure out, export when it reads like a real book.</p>
+              </div>
+              <div className="cta-buttons">
+                {isResolvedSignedIn ? (
+                  <Link href="/dashboard" className="btn btn-dark" style={{ textDecoration: 'none' }}>Go to workspace</Link>
+                ) : (
+                  <button className="btn btn-dark" onClick={() => setShowAuth(true)}>Start a draft</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+
+      <footer className="site-footer">
+        <div className="container">
+          <div className="footer-grid fade-up">
+            <div className="footer-brand">
+              <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f7f4ee', fontFamily: 'Geist', fontSize: '14px', fontWeight: 500 }}>
+                <svg className="brand-spark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/>
+                </svg>
+                <span>celion</span>
+              </div>
+              <p>Publishing software for founders, agencies, and operators turning raw notes into finished ebooks.</p>
+            </div>
+            <div className="footer-col">
+              <h4>Product</h4>
+              <Link href="#">How it works</Link>
+              <Link href="#">Preview</Link>
+              <Link href="#">Export</Link>
+              <Link href="#">Pricing</Link>
+            </div>
+            <div className="footer-col">
+              <h4>Company</h4>
+              <Link href="#">About</Link>
+              <Link href="#">Changelog</Link>
+              <Link href="#">Contact</Link>
+              <Link href="#">Careers</Link>
+            </div>
+            <div className="footer-col">
+              <h4>Resources</h4>
+              <Link href="#">Help center</Link>
+              <Link href="#">Writing guide</Link>
+              <Link href="#">Privacy</Link>
+              <Link href="#">Terms</Link>
+            </div>
+          </div>
+          <div className="footer-bottom">
+            <span>Celion 2026. All rights reserved.</span>
+            <span>Designed for clear drafts and better books.</span>
+          </div>
         </div>
-      </section>
-    </main>
+      </footer>
+    </div>
   );
 }

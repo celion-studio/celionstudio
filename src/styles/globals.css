@@ -6,14 +6,17 @@
   --color-bg: #faf9f5;
   --color-surface: #ffffff;
   --color-surface-subtle: #f4f2ec;
-  --color-muted: #7a7670;
+  --color-paper: #f2ede6;
+  --color-muted: #8a867e;
+  --color-muted-soft: #b8b4aa;
   --color-text: #1f1f1f;
+  --color-ink: #2b2723;
+  --color-ink-soft: #4a443d;
   --color-accent: #c4622d;
+  --color-accent-deep: #9a4a1f;
   --color-accent-soft: #fbf0e8;
-  --color-line: #e8e4db;
-  --font-display: "Instrument Serif", serif;
-  --font-body: "Geist", sans-serif;
-  --font-mono: "IBM Plex Mono", monospace;
+  --color-line: #ebe7dd;
+  --color-line-soft: #f0ece3;
 }
 
 * {
@@ -23,14 +26,18 @@
 html {
   min-height: 100%;
   background: var(--color-bg);
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  color: var(--color-text);
-  font-family: var(--font-body);
+  color: var(--color-ink);
+  font-family: var(--font-body), -apple-system, sans-serif;
   background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
 }
 
 a {
@@ -47,5 +54,104 @@ textarea {
 
 ::selection {
   background: rgba(196, 98, 45, 0.2);
-  color: #1f1f1f;
+  color: var(--color-ink);
+}
+
+.font-display {
+  font-family: var(--font-display), -apple-system, sans-serif;
+  font-feature-settings: "ss01";
+}
+
+/* Staggered reveals */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.reveal {
+  opacity: 0;
+  animation: rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.reveal-slow {
+  opacity: 0;
+  animation: fade 1.6s ease-out forwards;
+}
+
+.pulse-glow {
+  animation: glow 3.2s ease-in-out infinite;
+}
+
+/* Soft radial warmth overlay */
+.warm-glow {
+  background: radial-gradient(
+    ellipse 60% 40% at 50% 0%,
+    rgba(196, 98, 45, 0.06) 0%,
+    transparent 60%
+  );
+}
+
+/* Hairline divider */
+.hairline {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-line) 30%,
+    var(--color-line) 70%,
+    transparent
+  );
+}
+
+/* Subtle dot grid texture */
+.dot-grid {
+  background-image: radial-gradient(
+    circle at 1px 1px,
+    rgba(31, 31, 31, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+
+/* Marquee */
+@keyframes scroll-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  animation: scroll-x 50s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-slow {
+    animation: none;
+    opacity: 1;
+  }
+  .marquee-track,
+  .pulse-glow {
+    animation: none;
+  }
 }

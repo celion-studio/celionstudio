@@ -1,0 +1,28 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link "C Celion" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e8]: C
+          - generic [ref=e9]: Celion
+        - generic [ref=e10]: /
+        - generic [ref=e11]: Workspace
+      - generic [ref=e12]:
+        - paragraph [ref=e13]: Sign in to start saving work
+        - button "New draft" [disabled] [ref=e14]:
+          - img [ref=e15]
+          - text: New draft
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - heading "Your workspace" [level=1] [ref=e18]
+        - paragraph [ref=e19]: Source material, HTML drafts, and exports now live behind your account.
+      - generic [ref=e20]:
+        - img [ref=e22]
+        - paragraph [ref=e24]: Sign in to start
+        - paragraph [ref=e25]: Local browser storage has been removed. Sign in first, then create and edit drafts from your account-backed workspace.
+        - link "Back to sign in" [ref=e26] [cursor=pointer]:
+          - /url: /
+  - button "Open Next.js Dev Tools" [ref=e32] [cursor=pointer]:
+    - img [ref=e33]
+  - alert [ref=e36]
