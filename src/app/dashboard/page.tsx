@@ -9,7 +9,8 @@ export default async function DashboardPage() {
   return (
     <DashboardShell
       isSignedIn={Boolean(session?.user)}
-      sessionLabel={session?.user ? `Signed in as ${session.user.name ?? session.user.email}` : null}
+      initialUserName={session?.user?.name ?? null}
+      initialUserEmail={session?.user?.email ?? null}
     />
   );
 }

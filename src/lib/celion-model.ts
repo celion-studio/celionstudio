@@ -12,15 +12,6 @@ function firstSentence(input: string) {
   return input.split(/[.!?\n]/)[0]?.trim() ?? "";
 }
 
-function titleFromSource(sources: GuideSource[], profile: GuideProfile) {
-  const raw = firstSentence(sources[0]?.content ?? "");
-  if (raw.length > 12) {
-    return raw.slice(0, 72);
-  }
-
-  return `${profile.goal} for ${profile.targetAudience}`;
-}
-
 function buildIntro(sources: GuideSource[], profile: GuideProfile) {
   const first = sources[0]?.content ?? "";
   const line = firstSentence(first) || "This guide was assembled from your own source material.";
@@ -51,6 +42,54 @@ function buildSourceSection(source: GuideSource, index: number) {
       ${paragraphs || "<p>No extractable text was available for this source yet.</p>"}
     </section>
   `;
+}
+
+function collectSourceParagraphs(sources: GuideSource[]) {
+  const paragraphs = sources.flatMap((source) =>
+    source.content
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+  );
+
+  return paragraphs.length > 0
+    ? paragraphs
+    : ["This chapter will be expanded from your source material in the next revision pass."];
+}
+
+function buildOutlineSections(sources: GuideSource[], profile: GuideProfile) {
+  const outline = profile.outline?.filter((chapter) => chapter.trim()) ?? [];
+  if (outline.length === 0) {
+    return sources.map((source, index) => buildSourceSection(source, index)).join("");
+  }
+
+  const paragraphs = collectSourceParagraphs(sources);
+  const slugCount = new Map<string, number>();
+
+  return outline
+    .map((chapter, index) => {
+      const baseId = toSlug(chapter) || `chapter-${index + 1}`;
+      const duplicateCount = (slugCount.get(baseId) ?? 0) + 1;
+      slugCount.set(baseId, duplicateCount);
+      const sectionId =
+        duplicateCount === 1 ? baseId : `${baseId}-${duplicateCount}`;
+      const primary = paragraphs[index % paragraphs.length];
+      const secondary = paragraphs[(index + 1) % paragraphs.length];
+      const supportingCopy =
+        secondary && secondary !== primary
+          ? `<p>${secondary}</p>`
+          : `<p>Frame this chapter for ${profile.targetAudience} and keep the payoff tied to ${profile.goal}.</p>`;
+
+      return `
+        <section data-section="${sectionId}" class="guide-section">
+          <p class="eyebrow">Chapter ${index + 1}</p>
+          <h2>${chapter}</h2>
+          <p>${primary}</p>
+          ${supportingCopy}
+        </section>
+      `;
+    })
+    .join("");
 }
 
 function buildActionSection(profile: GuideProfile) {
@@ -197,7 +236,7 @@ export function createGuideHtml(input: {
         </div>
       </section>
       ${buildIntro(input.sources, input.profile)}
-      ${input.sources.map((source, index) => buildSourceSection(source, index)).join("")}
+      ${buildOutlineSections(input.sources, input.profile)}
       ${buildActionSection(input.profile)}
     </main>
   </body>
@@ -205,10 +244,11 @@ export function createGuideHtml(input: {
 }
 
 export function createGuideRecord(args: {
+  title: string;
   profile: GuideProfile;
   sources: GuideSource[];
 }) {
-  const title = titleFromSource(args.sources, args.profile);
+  const title = args.title.trim();
   const now = new Date().toISOString();
   const id = `${toSlug(title)}-${crypto.randomUUID().slice(0, 8)}`;
 

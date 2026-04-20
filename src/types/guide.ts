@@ -23,6 +23,7 @@ export type GuideProfile = {
   tone: string;
   structureStyle: string;
   readerLevel: string;
+  outline?: string[];
 };
 
 export type GuideRecord = {

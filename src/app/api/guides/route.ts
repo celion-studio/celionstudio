@@ -4,6 +4,7 @@ import { createGuideForUser, listGuideRecordsForUser } from "@/lib/guides";
 import { getServerSession } from "@/lib/session";
 
 const createGuideSchema = z.object({
+  title: z.string().trim().min(1),
   profile: z.object({
     targetAudience: z.string().min(1),
     goal: z.string().min(1),
@@ -11,6 +12,7 @@ const createGuideSchema = z.object({
     tone: z.string().min(1),
     structureStyle: z.string().min(1),
     readerLevel: z.string().min(1),
+    outline: z.array(z.string()).optional(),
   }),
   sources: z
     .array(

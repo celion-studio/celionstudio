@@ -5,7 +5,6 @@ import { FileText, UploadCloud } from "lucide-react";
 type SourceStepProps = {
   pastedText: string;
   fileNames: string[];
-  error: string;
   onTextChange: (value: string) => void;
   onFilesChange: (files: File[]) => void;
 };
@@ -13,41 +12,37 @@ type SourceStepProps = {
 export function SourceStep({
   pastedText,
   fileNames,
-  error,
   onTextChange,
   onFilesChange,
 }: SourceStepProps) {
+  const hasPastedText = pastedText.trim().length > 0;
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-      <div className="rounded-[20px] border border-line bg-[#fdfcf8] p-6">
+    <div className="space-y-6">
+      <div>
         <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
           Paste source material
         </p>
-        <h3 className="mt-3 text-3xl leading-tight tracking-[-0.04em] text-text" style={{ fontFamily: "'Geist', sans-serif", fontWeight: 500 }}>
-          Start with the knowledge you already own.
-        </h3>
         <textarea
           value={pastedText}
           onChange={(event) => onTextChange(event.target.value)}
-          placeholder="Drop in rough notes, old drafts, transcripts, or any text you want to turn into an ebook."
-          className="mt-5 min-h-[280px] w-full rounded-[16px] border border-line bg-white px-5 py-4 text-sm leading-7 text-text outline-none transition focus:border-text"
+          placeholder="Paste notes or transcript."
+          className="mt-3 min-h-[280px] w-full rounded-[10px] border border-line bg-[#fdfcf8] px-5 py-4 text-sm leading-7 text-text outline-none transition focus:border-text"
         />
       </div>
 
       <div className="space-y-5">
-        <div className="rounded-[20px] border border-line bg-[#fdfcf8] p-6">
+        <div>
           <div className="flex items-start gap-3">
             <UploadCloud className="mt-1 size-5 text-text" />
             <div>
               <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
                 Upload files
               </p>
-              <p className="mt-2 text-sm leading-7 text-muted">
-                Support: PDF, MD, TXT, DOCX. HWP is intentionally blocked.
-              </p>
+              <p className="mt-1 text-sm leading-6 text-muted">PDF, MD, TXT, DOCX.</p>
             </div>
           </div>
-          <label className="mt-5 flex cursor-pointer items-center justify-center rounded-[16px] border border-dashed border-line bg-white px-5 py-8 text-center text-sm leading-7 text-muted transition hover:border-text">
+          <label className="mt-4 flex cursor-pointer items-center justify-center rounded-[10px] border border-dashed border-line bg-[#fdfcf8] px-5 py-8 text-center text-sm leading-7 text-muted transition hover:border-text">
             Choose files
             <input
               type="file"
@@ -61,32 +56,35 @@ export function SourceStep({
           </label>
         </div>
 
-        <div className="rounded-[20px] border border-line bg-[#fdfcf8] p-6">
+        <div>
           <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
             Current intake
           </p>
-          <div className="mt-4 space-y-3">
-            {fileNames.length === 0 ? (
-              <div className="rounded-[16px] border border-dashed border-line px-4 py-4 text-sm text-muted">
-                No files selected yet.
+          <div className="mt-4 space-y-2">
+            {!hasPastedText && fileNames.length === 0 ? (
+              <div className="rounded-[10px] border border-dashed border-line px-4 py-4 text-sm text-muted">
+                Nothing added yet.
               </div>
             ) : (
-              fileNames.map((name) => (
-                <div
-                  key={name}
-                  className="flex items-center gap-3 rounded-[16px] border border-line bg-white px-4 py-4 text-sm text-text"
-                >
-                  <FileText className="size-4" />
-                  {name}
-                </div>
-              ))
+              <>
+                {hasPastedText ? (
+                  <div className="flex items-center gap-3 rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text">
+                    <FileText className="size-4" />
+                    Pasted notes
+                  </div>
+                ) : null}
+                {fileNames.map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-3 rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text"
+                  >
+                    <FileText className="size-4" />
+                    {name}
+                  </div>
+                ))}
+              </>
             )}
           </div>
-          {error ? (
-            <p className="mt-4 rounded-[12px] bg-[#fff1e6] px-4 py-3 text-sm text-[#9b4c19]">
-              {error}
-            </p>
-          ) : null}
         </div>
       </div>
     </div>

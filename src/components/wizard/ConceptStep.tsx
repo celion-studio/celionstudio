@@ -1,60 +1,56 @@
 "use client";
 
-type ProfileStepProps = {
+type ConceptStepProps = {
+  title: string;
   targetAudience: string;
   goal: string;
-  depth: string;
-  onFieldChange: (field: "targetAudience" | "goal" | "depth", value: string) => void;
+  onTitleChange: (value: string) => void;
+  onFieldChange: (field: "targetAudience" | "goal", value: string) => void;
 };
 
-export function ProfileStep({
+export function ConceptStep({
+  title,
   targetAudience,
   goal,
-  depth,
+  onTitleChange,
   onFieldChange,
-}: ProfileStepProps) {
+}: ConceptStepProps) {
   return (
     <div className="space-y-5">
       <label>
         <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-          Target audience
+          Ebook title
+        </p>
+        <input
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="Name this draft."
+          className="mt-3 w-full rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text outline-none transition focus:border-text"
+        />
+      </label>
+
+      <label>
+        <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
+          Who is this for?
         </p>
         <input
           value={targetAudience}
-          onChange={(event) => onFieldChange("targetAudience", event.target.value)}
-          placeholder="Who is this for?"
+          onChange={(e) => onFieldChange("targetAudience", e.target.value)}
+          placeholder="e.g. Early-career developers learning system design"
           className="mt-3 w-full rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text outline-none transition focus:border-text"
         />
       </label>
 
       <label>
         <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-          Goal
+          What should they walk away with?
         </p>
         <input
           value={goal}
-          onChange={(event) => onFieldChange("goal", event.target.value)}
-          placeholder="What should they get?"
+          onChange={(e) => onFieldChange("goal", e.target.value)}
+          placeholder="e.g. Ability to design scalable APIs from scratch"
           className="mt-3 w-full rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text outline-none transition focus:border-text"
         />
-      </label>
-
-      <label>
-        <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-          Depth
-        </p>
-        <select
-          value={depth}
-          onChange={(event) => onFieldChange("depth", event.target.value)}
-          className="mt-3 w-full rounded-[10px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-text outline-none transition focus:border-text"
-        >
-          <option value="" disabled>
-            Select depth
-          </option>
-          <option value="Short and sharp">Short and sharp</option>
-          <option value="Standard">Standard</option>
-          <option value="Deep dive">Deep dive</option>
-        </select>
       </label>
     </div>
   );

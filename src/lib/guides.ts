@@ -1,8 +1,9 @@
 import { createGuideRecord, withGeneratedHtml } from "@/lib/celion-model";
-import { ensureAppSchema, sql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import type { GuideProfile, GuideRecord, GuideSource, GuideStatus } from "@/types/guide";
 
 type GuideCreateInput = {
+  title: string;
   profile: GuideProfile;
   sources: GuideSource[];
 };
@@ -24,6 +25,7 @@ type ProfileRow = {
   tone: string;
   structureStyle: string;
   readerLevel: string;
+  outline: string;
 };
 
 type SourceRow = {
@@ -61,7 +63,17 @@ function emptyProfile(): GuideProfile {
     tone: "",
     structureStyle: "",
     readerLevel: "",
+    outline: [],
   };
+}
+
+function parseOutline(raw: string | null): string[] {
+  try {
+    const parsed = JSON.parse(raw ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 async function getCurrentHtmlMap(guideIds: string[]) {
@@ -69,6 +81,7 @@ async function getCurrentHtmlMap(guideIds: string[]) {
     return new Map<string, string>();
   }
 
+  const sql = getSql();
   const rows = (await sql`
     SELECT
       guide_id::text AS "guideId",
@@ -91,6 +104,7 @@ async function getCurrentHtmlMap(guideIds: string[]) {
 }
 
 async function getNextVersionNumber(guideId: string) {
+  const sql = getSql();
   const [row] = (await sql`
     SELECT coalesce(max(version_number), 0) AS count
     FROM html_versions
@@ -101,8 +115,7 @@ async function getNextVersionNumber(guideId: string) {
 }
 
 export async function listGuideRecordsForUser(userId: string) {
-  await ensureAppSchema();
-
+  const sql = getSql();
   const guideRows = (await sql`
     SELECT
       id::text AS id,
@@ -130,7 +143,8 @@ export async function listGuideRecordsForUser(userId: string) {
         depth,
         tone,
         structure_style AS "structureStyle",
-        reader_level AS "readerLevel"
+        reader_level AS "readerLevel",
+        outline
       FROM guide_profiles
       WHERE guide_id::text = ANY(${guideIds})
     `,
@@ -161,6 +175,7 @@ export async function listGuideRecordsForUser(userId: string) {
         tone: row.tone,
         structureStyle: row.structureStyle,
         readerLevel: row.readerLevel,
+        outline: parseOutline(row.outline),
       },
     ]),
   );
@@ -194,8 +209,7 @@ export async function listGuideRecordsForUser(userId: string) {
 }
 
 export async function getGuideRecordForUser(userId: string, guideId: string) {
-  await ensureAppSchema();
-
+  const sql = getSql();
   const [guideRow] = (await sql`
     SELECT
       id::text AS id,
@@ -222,7 +236,8 @@ export async function getGuideRecordForUser(userId: string, guideId: string) {
         depth,
         tone,
         structure_style AS "structureStyle",
-        reader_level AS "readerLevel"
+        reader_level AS "readerLevel",
+        outline
       FROM guide_profiles
       WHERE guide_id::text = ${guideRow.id}
       LIMIT 1
@@ -263,6 +278,7 @@ export async function getGuideRecordForUser(userId: string, guideId: string) {
             tone: profileRow.tone,
             structureStyle: profileRow.structureStyle,
             readerLevel: profileRow.readerLevel,
+            outline: parseOutline(profileRow.outline),
           },
     sources: sourceRows.map((row) => ({
       id: row.id,
@@ -276,8 +292,7 @@ export async function getGuideRecordForUser(userId: string, guideId: string) {
 }
 
 export async function createGuideForUser(userId: string, input: GuideCreateInput) {
-  await ensureAppSchema();
-
+  const sql = getSql();
   const draft = createGuideRecord(input);
   const guideId = crypto.randomUUID();
   const createdAt = new Date(draft.createdAt);
@@ -335,6 +350,7 @@ export async function createGuideForUser(userId: string, input: GuideCreateInput
         tone,
         structure_style,
         reader_level,
+        outline,
         created_at,
         updated_at
       )
@@ -346,6 +362,7 @@ export async function createGuideForUser(userId: string, input: GuideCreateInput
         ${draft.profile.tone},
         ${draft.profile.structureStyle},
         ${draft.profile.readerLevel},
+        ${JSON.stringify(draft.profile.outline ?? [])},
         ${createdAt},
         ${updatedAt}
       )
@@ -369,8 +386,7 @@ export async function mutateGuideForUser(
       }
     | { action: "mark-exported" },
 ) {
-  await ensureAppSchema();
-
+  const sql = getSql();
   const current = await getGuideRecordForUser(userId, guideId);
 
   if (!current) {

@@ -1,5 +1,16 @@
 import { Hero } from "@/components/marketing/Hero";
+import { getServerSession } from "@/lib/session";
 
-export default function LandingPage() {
-  return <Hero />;
+export const dynamic = "force-dynamic";
+
+export default async function LandingPage() {
+  const session = await getServerSession();
+
+  return (
+    <Hero
+      initialSignedIn={Boolean(session?.user)}
+      initialUserName={session?.user?.name ?? null}
+      initialUserEmail={session?.user?.email ?? null}
+    />
+  );
 }

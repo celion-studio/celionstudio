@@ -6,18 +6,75 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { z } from "zod";
 import type { GuideRecord, GuideSource, SourceKind } from "@/types/guide";
 import { useGuideWizardStore } from "@/store/useGuideWizardStore";
+import { ConceptStep } from "@/components/wizard/ConceptStep";
 import { SourceStep } from "@/components/wizard/SourceStep";
-import { ProfileStep } from "@/components/wizard/ProfileStep";
 import { StyleStep } from "@/components/wizard/StyleStep";
+import { OutlineStep } from "@/components/wizard/OutlineStep";
 
-const profileSchema = z.object({
-  targetAudience: z.string().min(1, "Target audience is required."),
-  goal: z.string().min(1, "Goal is required."),
-  depth: z.string().min(1, "Depth is required."),
-  tone: z.string().min(1, "Tone is required."),
-  structureStyle: z.string().min(1, "Structure style is required."),
-  readerLevel: z.string().min(1, "Reader level is required."),
+type WizardStep = 1 | 2 | 3 | 4;
+
+const conceptSchema = z.object({
+  title: z.string().trim().min(1, "Add a title."),
+  targetAudience: z.string().trim().min(1, "Add the target audience."),
+  goal: z.string().trim().min(1, "Add the goal."),
 });
+
+const styleSchema = z.object({
+  tone: z.string().trim().min(1, "Select the tone."),
+  structureStyle: z.string().trim().min(1, "Select the structure."),
+  readerLevel: z.string().trim().min(1, "Select the reader level."),
+  depth: z.string().trim().min(1, "Select the depth."),
+});
+
+const STEP_LABELS = ["Concept", "Source", "Style", "Outline"] as const;
+const STEP_TITLES = [
+  "Define the concept",
+  "Add source material",
+  "Set the voice",
+  "Review the outline",
+] as const;
+const STEP_DESCRIPTIONS = [
+  "Name your ebook and set who it's for.",
+  "Paste text or upload your source files.",
+  "Choose tone, structure, and depth.",
+  "AI-generated chapters — edit freely.",
+] as const;
+
+function generateOutline(structureStyle: string): string[] {
+  if (structureStyle === "Checklist") {
+    return [
+      "Before you begin: requirements & mindset",
+      "The core checklist",
+      "Common mistakes to avoid",
+      "Quick-reference card",
+    ];
+  }
+  if (structureStyle === "Step-by-step") {
+    return [
+      "Getting started",
+      "The first step",
+      "Building momentum",
+      "Advanced moves",
+      "Putting it all together",
+    ];
+  }
+  if (structureStyle === "Concept-first") {
+    return [
+      "The big idea",
+      "Why it matters",
+      "How it works",
+      "Applying it in practice",
+      "What comes next",
+    ];
+  }
+  return [
+    "Introduction",
+    "Understanding the landscape",
+    "The core framework",
+    "Execution guide",
+    "Next steps & resources",
+  ];
+}
 
 function getFileKind(fileName: string): SourceKind | null {
   const ext = fileName.split(".").pop()?.toLowerCase();
@@ -35,12 +92,14 @@ async function buildSources(
   const sources: GuideSource[] = [];
 
   if (pastedText.trim()) {
+    const content = pastedText.trim();
+
     sources.push({
       id: crypto.randomUUID(),
       kind: "pasted_text",
       name: "Pasted source",
-      content: pastedText.trim(),
-      excerpt: pastedText.trim().slice(0, 180),
+      content,
+      excerpt: content.slice(0, 180),
     });
   }
 
@@ -70,17 +129,57 @@ async function buildSources(
   return sources;
 }
 
-const STEP_LABELS = ["Source intake", "Draft direction", "Style tuning"];
-const STEP_TITLES = [
-  "Add your source material",
-  "Set your target profile",
-  "Tune the writing style",
-];
-const STEP_DESCRIPTIONS = [
-  "Bring in notes, transcripts, markdown, or working files. The goal is signal, not perfection.",
-  "Tell Celion who this is for and what the draft should accomplish before we shape the structure.",
-  "Tune voice, structure, and reader level so the first draft already feels intentionally directed.",
-];
+function getStepIssue(input: {
+  step: WizardStep;
+  title: string;
+  pastedText: string;
+  files: File[];
+  targetAudience: string;
+  goal: string;
+  depth: string;
+  tone: string;
+  structureStyle: string;
+  readerLevel: string;
+  outline: string[];
+}) {
+  if (input.step === 1) {
+    const parsed = conceptSchema.safeParse({
+      title: input.title,
+      targetAudience: input.targetAudience,
+      goal: input.goal,
+    });
+    return parsed.success ? null : parsed.error.issues[0]?.message ?? "Complete this step.";
+  }
+
+  if (input.step === 2) {
+    if (!input.pastedText.trim() && input.files.length === 0) {
+      return "Add text or a file.";
+    }
+
+    if (input.files.some((file) => /\.(hwp|hwpx)$/i.test(file.name))) {
+      return "HWP and HWPX are not supported.";
+    }
+
+    return null;
+  }
+
+  if (input.step === 3) {
+    const parsed = styleSchema.safeParse({
+      tone: input.tone,
+      structureStyle: input.structureStyle,
+      readerLevel: input.readerLevel,
+      depth: input.depth,
+    });
+
+    return parsed.success
+      ? null
+      : parsed.error.issues[0]?.message ?? "Complete this step.";
+  }
+
+  if (input.outline.length === 0) return "Add at least one chapter.";
+  if (input.outline.some((ch) => !ch.trim())) return "Fill in all chapter titles.";
+  return null;
+}
 
 export function WizardContent({
   onCreated,
@@ -90,6 +189,7 @@ export function WizardContent({
   const router = useRouter();
   const {
     step,
+    title,
     pastedText,
     files,
     targetAudience,
@@ -98,63 +198,60 @@ export function WizardContent({
     tone,
     structureStyle,
     readerLevel,
+    outline,
+    outlineStyleKey,
     error,
     setStep,
+    setTitle,
     setPastedText,
     setFiles,
     setField,
+    setOutline,
+    setGeneratedOutline,
     setError,
     reset,
   } = useGuideWizardStore();
 
   const [submitting, setSubmitting] = useState(false);
   const currentStepIndex = step - 1;
-
-  const validateStep = () => {
-    if (step === 1) {
-      if (!pastedText.trim() && files.length === 0) {
-        setError("At least one pasted source or uploaded file is required.");
-        return false;
-      }
-
-      const hwpFile = files.find((file) => /\.(hwp|hwpx)$/i.test(file.name));
-      if (hwpFile) {
-        setError("HWP and HWPX files are not supported.");
-        return false;
-      }
-    }
-
-    if (step >= 2) {
-      const parsed = profileSchema.safeParse({
-        targetAudience,
-        goal,
-        depth,
-        tone,
-        structureStyle,
-        readerLevel,
-      });
-
-      if (!parsed.success) {
-        setError(
-          parsed.error.issues[0]?.message ?? "Please complete the fields.",
-        );
-        return false;
-      }
-    }
-
-    return true;
-  };
+  const currentStepIssue = getStepIssue({
+    step,
+    title,
+    pastedText,
+    files,
+    targetAudience,
+    goal,
+    depth,
+    tone,
+    structureStyle,
+    readerLevel,
+    outline,
+  });
+  const canAdvance = currentStepIssue == null && !submitting;
+  const footerMessage = error;
 
   const handleNext = () => {
-    if (!validateStep()) {
+    if (currentStepIssue) {
       return;
     }
 
-    setStep((step + 1) as 1 | 2 | 3);
+    if (step === 3 && (outline.length === 0 || outlineStyleKey !== structureStyle)) {
+      setGeneratedOutline(generateOutline(structureStyle), structureStyle);
+    }
+
+    setStep((step + 1) as WizardStep);
+  };
+
+  const handlePrevious = () => {
+    if (step === 1 || submitting) {
+      return;
+    }
+
+    setStep((step - 1) as WizardStep);
   };
 
   const handleCreate = async () => {
-    if (!validateStep()) {
+    if (currentStepIssue) {
       return;
     }
 
@@ -171,6 +268,7 @@ export function WizardContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          title: title.trim(),
           sources,
           profile: {
             targetAudience,
@@ -179,6 +277,7 @@ export function WizardContent({
             tone,
             structureStyle,
             readerLevel,
+            outline,
           },
         }),
       });
@@ -206,245 +305,146 @@ export function WizardContent({
   };
 
   return (
-    <div className="grid gap-10 xl:grid-cols-[320px_minmax(0,1fr)]">
-      <aside className="space-y-5 xl:sticky xl:top-10 xl:self-start">
-        <div className="rounded-[24px] border border-line bg-white/80 px-7 py-8">
-          <p
+    <div className="space-y-6">
+      <section>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "11px",
+            textTransform: "uppercase",
+            letterSpacing: "0.16em",
+            color: "#8a867e",
+            fontFamily: "'Geist', sans-serif",
+            fontWeight: 500,
+          }}
+        >
+          Step {step} of {STEP_LABELS.length}
+        </p>
+        <h1
+          style={{
+            margin: "10px 0 0",
+            fontFamily: "'Geist', sans-serif",
+            fontSize: "clamp(28px, 3.5vw, 38px)",
+            lineHeight: 1.08,
+            letterSpacing: "-0.04em",
+            fontWeight: 500,
+            color: "#111",
+          }}
+        >
+          {STEP_TITLES[currentStepIndex]}
+        </h1>
+        <p className="mt-4 text-[14px] leading-7 text-muted">
+          {STEP_DESCRIPTIONS[currentStepIndex]}
+        </p>
+
+        <div className="mt-5 h-[2px] w-full overflow-hidden rounded-full bg-[#ebe7dd]">
+          <div
             style={{
-              margin: 0,
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: "0.16em",
-              color: "#8a867e",
-              fontFamily: "'Geist', sans-serif",
-              fontWeight: 500,
+              width: `${(step / STEP_LABELS.length) * 100}%`,
+              height: "100%",
+              background: "#111",
+              transition: "width 0.2s ease",
             }}
-          >
-            Step {step} of 3
-          </p>
-          <h1
-            style={{
-              margin: "12px 0 0",
-              fontFamily: "'Geist', sans-serif",
-              fontSize: "clamp(30px, 4vw, 42px)",
-              lineHeight: 1.04,
-              letterSpacing: "-0.05em",
-              fontWeight: 500,
-              color: "#111",
-            }}
-          >
-            {STEP_TITLES[currentStepIndex]}
-          </h1>
-          <p className="mt-4 text-[15px] leading-7 text-muted">
-            {STEP_DESCRIPTIONS[currentStepIndex]}
-          </p>
+          />
         </div>
 
-        <div className="rounded-[24px] border border-line bg-[#fcfaf4] px-5 py-5">
-          <div className="mb-4 h-[3px] w-full overflow-hidden rounded-full bg-[#ebe7dd]">
-            <div
-              style={{
-                width: `${(step / STEP_LABELS.length) * 100}%`,
-                height: "100%",
-                background: "#111",
-                transition: "width 0.2s ease",
-              }}
-            />
-          </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {STEP_LABELS.map((label, index) => {
+            const stepNumber = (index + 1) as WizardStep;
+            const isActive = step === stepNumber;
+            const isDone = step > stepNumber;
 
-          <div className="space-y-3">
-            {STEP_LABELS.map((label, index) => {
-              const stepNumber = index + 1;
-              const isActive = step === stepNumber;
-              const isDone = step > stepNumber;
-
-              return (
-                <div
-                  key={label}
-                  className="rounded-[18px] border px-4 py-4"
-                  style={{
-                    borderColor: isActive ? "#11110f" : "#ebe7dd",
-                    background: isActive ? "#ffffff" : "transparent",
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "11px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.14em",
-                      color: isDone ? "#1f7a4f" : isActive ? "#111" : "#8a867e",
-                      fontFamily: "'Geist', sans-serif",
-                      fontWeight: 500,
-                    }}
-                  >
-                    Step {stepNumber}
-                  </p>
-                  <p
-                    style={{
-                      margin: "6px 0 0",
-                      fontSize: "14px",
-                      color: isActive ? "#111" : "#4a443d",
-                      fontWeight: isActive ? 500 : 400,
-                    }}
-                  >
-                    {label}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-[24px] border border-dashed border-line bg-transparent px-5 py-5">
-          <p
-            style={{
-              margin: 0,
-              fontSize: "11px",
-              textTransform: "uppercase",
-              letterSpacing: "0.16em",
-              color: "#8a867e",
-              fontFamily: "'Geist', sans-serif",
-              fontWeight: 500,
-            }}
-          >
-            What happens next
-          </p>
-          <p className="mt-3 text-[14px] leading-7 text-muted">
-            When you finish this wizard, Celion opens the builder with your
-            first structured draft ready for revision.
-          </p>
-        </div>
-      </aside>
-
-      <section className="rounded-[28px] border border-line bg-white/90 px-6 py-6 md:px-8 md:py-8">
-        <div className="flex flex-col gap-4 border-b border-line pb-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: "11px",
-                color: "#8a867e",
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontFamily: "'Geist', sans-serif",
-                fontWeight: 500,
-              }}
-            >
-              New ebook
-            </p>
-            <h2
-              style={{
-                margin: "8px 0 0",
-                fontSize: "22px",
-                color: "#111",
-                fontFamily: "'Geist', sans-serif",
-                fontWeight: 500,
-                letterSpacing: "-0.03em",
-              }}
-            >
-              {STEP_LABELS[currentStepIndex]}
-            </h2>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {STEP_LABELS.map((label, index) => (
+            return (
               <div
                 key={label}
-                className="rounded-full border px-3 py-1.5 text-[12px]"
+                className="rounded-[8px] border px-3 py-1.5 text-[12px]"
                 style={{
-                  borderColor: step === index + 1 ? "#11110f" : "#ebe7dd",
-                  background: step === index + 1 ? "#11110f" : "#ffffff",
-                  color: step === index + 1 ? "#fff" : "#4a443d",
+                  borderColor: isActive || isDone ? "#11110f" : "#ebe7dd",
+                  background: isActive ? "#11110f" : "#ffffff",
+                  color: isActive ? "#fff" : "#4a443d",
                   fontFamily: "'Geist', sans-serif",
                   fontWeight: 500,
                 }}
               >
-                {index + 1}. {label}
+                {stepNumber}. {label}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
+      </section>
 
-        <div className="py-8">
-          {step === 1 && (
+      <section className="rounded-[14px] border border-line bg-white px-6 py-6 md:px-8 md:py-8">
+        <div className="py-1">
+          {step === 1 ? (
+            <ConceptStep
+              title={title}
+              targetAudience={targetAudience}
+              goal={goal}
+              onTitleChange={setTitle}
+              onFieldChange={setField}
+            />
+          ) : null}
+          {step === 2 ? (
             <SourceStep
               pastedText={pastedText}
               fileNames={files.map((file) => file.name)}
-              error={error}
               onTextChange={setPastedText}
               onFilesChange={setFiles}
             />
-          )}
-          {step === 2 && (
-            <ProfileStep
-              targetAudience={targetAudience}
-              goal={goal}
-              depth={depth}
-              onFieldChange={setField}
-            />
-          )}
-          {step === 3 && (
+          ) : null}
+          {step === 3 ? (
             <StyleStep
               tone={tone}
               structureStyle={structureStyle}
               readerLevel={readerLevel}
+              depth={depth}
               onFieldChange={setField}
             />
-          )}
+          ) : null}
+          {step === 4 ? (
+            <OutlineStep outline={outline} onOutlineChange={setOutline} />
+          ) : null}
         </div>
 
-        <div className="flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
+        <div className="mt-8 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
           <div>
-            {error ? (
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "13px",
-                  color: "#9b4c19",
-                  background: "#FFF5F2",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                }}
-              >
-                {error}
+            {footerMessage ? (
+              <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19" }}>
+                {footerMessage}
               </p>
-            ) : (
-              <p style={{ margin: 0, fontSize: "13px", color: "#8a867e" }}>
-                {step < 3
-                  ? "Refine the inputs now so the builder opens with stronger structure."
-                  : "Everything is ready. We will move straight into the builder."}
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {step > 1 && (
+            {step > 1 ? (
               <button
                 type="button"
-                onClick={() => setStep((step - 1) as 1 | 2 | 3)}
+                disabled={submitting}
+                onClick={handlePrevious}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "6px",
                   padding: "10px 16px",
                   border: "1px solid #ECEAE5",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   background: "#fff",
                   fontSize: "13px",
                   fontWeight: 500,
                   fontFamily: "'Geist', sans-serif",
                   color: "#111",
-                  cursor: "pointer",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  opacity: submitting ? 0.6 : 1,
                 }}
               >
                 <ArrowLeft size={13} />
-                Back
+                Previous
               </button>
-            )}
-            {step < 3 ? (
+            ) : null}
+            {step < STEP_LABELS.length ? (
               <button
                 type="button"
+                disabled={!canAdvance}
                 onClick={handleNext}
                 style={{
                   display: "inline-flex",
@@ -452,13 +452,14 @@ export function WizardContent({
                   gap: "6px",
                   padding: "10px 18px",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   background: "#111",
                   fontSize: "13px",
                   fontWeight: 500,
                   fontFamily: "'Geist', sans-serif",
                   color: "#fff",
-                  cursor: "pointer",
+                  cursor: canAdvance ? "pointer" : "not-allowed",
+                  opacity: canAdvance ? 1 : 0.35,
                 }}
               >
                 Continue
@@ -467,7 +468,7 @@ export function WizardContent({
             ) : (
               <button
                 type="button"
-                disabled={submitting}
+                disabled={!canAdvance}
                 onClick={handleCreate}
                 style={{
                   display: "inline-flex",
@@ -475,17 +476,17 @@ export function WizardContent({
                   gap: "6px",
                   padding: "10px 22px",
                   border: "none",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   background: "#111",
                   fontSize: "13px",
                   fontWeight: 500,
                   fontFamily: "'Geist', sans-serif",
                   color: "#fff",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.6 : 1,
+                  cursor: canAdvance ? "pointer" : "not-allowed",
+                  opacity: canAdvance ? 1 : 0.35,
                 }}
               >
-                {submitting ? "Creating..." : "Open builder"}
+                {submitting ? "Creating..." : "Create draft"}
                 <ArrowRight size={13} />
               </button>
             )}

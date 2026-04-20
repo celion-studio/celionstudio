@@ -5,13 +5,33 @@ import Link from 'next/link';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { authClient } from '@/lib/auth-client';
 
-export function Hero() {
+type HeroProps = {
+  initialSignedIn: boolean;
+  initialUserName: string | null;
+  initialUserEmail: string | null;
+};
+
+export function Hero({
+  initialSignedIn,
+  initialUserName,
+  initialUserEmail,
+}: HeroProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const { data: session, isPending } = authClient.useSession();
-  const resolvedSession = hydrated ? session : null;
-  const isResolvedSignedIn = hydrated && !isPending && Boolean(session);
+  const liveSignedIn = Boolean(session?.user);
+  const isResolvedSignedIn = hydrated
+    ? (isPending ? initialSignedIn : liveSignedIn)
+    : initialSignedIn;
+  const displayUserName =
+    hydrated && !isPending ? session?.user?.name ?? null : initialUserName;
+  const displayUserEmail =
+    hydrated && !isPending ? session?.user?.email ?? null : initialUserEmail;
+  const userInitial =
+    displayUserName?.charAt(0).toUpperCase() ??
+    displayUserEmail?.charAt(0).toUpperCase() ??
+    "U";
 
   // Handle Neon Auth redirect if it lands on the homepage
   useEffect(() => {
@@ -89,11 +109,11 @@ export function Hero() {
             <span>celion</span>
           </div>
           <div className="nav-actions">
-            {isResolvedSignedIn && resolvedSession ? (
+            {isResolvedSignedIn ? (
               <>
                 <Link href="/dashboard" className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecoration: 'none' }}>Dashboard</Link>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#333] text-[11px] text-white">
-                  {resolvedSession.user.name?.charAt(0).toUpperCase() || 'U'}
+                  {userInitial}
                 </div>
               </>
             ) : (
