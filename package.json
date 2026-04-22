@@ -5,11 +5,19 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:deploy": "npm run db:init && npm run build",
     "start": "next start",
     "db:init": "tsx scripts/init-db.ts",
+    "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@blocknote/core": "^0.48.1",
+    "@blocknote/mantine": "^0.48.1",
+    "@blocknote/react": "^0.48.1",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@mantine/utils": "^6.0.22",
     "@neondatabase/auth": "^0.2.0-beta.1",
     "@neondatabase/serverless": "^1.1.0",
     "dotenv": "^17.4.2",
@@ -19,6 +27,9 @@
     "react-dom": "^19.2.5",
     "zod": "^4.1.5",
     "zustand": "^5.0.8"
+  },
+  "overrides": {
+    "better-auth": "1.6.5"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

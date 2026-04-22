@@ -1,0 +1,92 @@
+﻿import { NextResponse } from "next/server";
+import { z } from "zod";
+import { normalizeBlockNoteDocument } from "@/lib/blocknote-document";
+import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
+import { getRouteSession } from "@/lib/session";
+import type { ProjectDocumentBlock } from "@/types/project";
+
+const createProjectSchema = z.object({
+  title: z.string().trim().min(1),
+  profile: z.object({
+    author: z.string().default(""),
+    targetAudience: z.string().default(""),
+    coreMessage: z.string().default(""),
+    designMode: z.enum(["text", "balanced", "visual"]).default("balanced"),
+    pageFormat: z
+      .enum(["ebook", "kindle", "tablet", "mobile", "a5", "a4", "a3", "a2", "custom"])
+      .default("ebook"),
+    customPageSize: z
+      .object({
+        widthMm: z.number().min(50).max(800),
+        heightMm: z.number().min(50).max(800),
+      })
+      .default({ widthMm: 152, heightMm: 229 }),
+    goal: z.string().default(""),
+    depth: z.string().default(""),
+    tone: z.string().default(""),
+    structureStyle: z.string().default(""),
+    readerLevel: z.string().default(""),
+    plan: z.any().optional().nullable(),
+    blocks: z.unknown().optional().default([]),
+  }),
+  sources: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        kind: z.enum(["pasted_text", "pdf", "md", "txt", "docx"]),
+        name: z.string().min(1),
+        content: z.string().min(1),
+        excerpt: z.string(),
+      }),
+    )
+    .min(1),
+});
+
+export async function GET() {
+  const session = await getRouteSession();
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const projects = await listProjectRecordsForUser(session.user.id);
+  return NextResponse.json({ projects });
+}
+
+export async function POST(request: Request) {
+  const session = await getRouteSession();
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const json = await request.json();
+  const parsed = createProjectSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { message: parsed.error.issues[0]?.message ?? "Invalid request body" },
+      { status: 400 },
+    );
+  }
+
+  const p = parsed.data.profile;
+  const project = await createProjectForUser(session.user.id, {
+    title: parsed.data.title,
+    profile: {
+      author: p.author,
+      targetAudience: p.targetAudience,
+      coreMessage: p.coreMessage,
+      designMode: p.designMode,
+      pageFormat: p.pageFormat,
+      customPageSize: p.customPageSize,
+      goal: p.goal,
+      depth: p.depth,
+      tone: p.tone,
+      structureStyle: p.structureStyle,
+      readerLevel: p.readerLevel,
+      plan: p.plan ?? null,
+      blocks: normalizeBlockNoteDocument(p.blocks) as ProjectDocumentBlock[],
+    },
+    sources: parsed.data.sources,
+  });
+
+  return NextResponse.json({ project }, { status: 201 });
+}
+

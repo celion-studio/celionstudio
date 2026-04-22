@@ -1,11 +1,11 @@
 import { WorkspaceSidebar } from "@/components/dashboard/WorkspaceSidebar";
 import { WizardContent } from "@/components/wizard/WizardContent";
-import { getServerSession } from "@/lib/session";
+import { getPageSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewEbookPage() {
-  const session = await getServerSession();
+  const session = await getPageSession();
 
   return (
     <div

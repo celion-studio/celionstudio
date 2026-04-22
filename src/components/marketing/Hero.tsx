@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -111,7 +111,7 @@ export function Hero({
           <div className="nav-actions">
             {isResolvedSignedIn ? (
               <>
-                <Link href="/dashboard" className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecoration: 'none' }}>Dashboard</Link>
+                <Link href="/dashboard" className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecorationLine: 'none' }}>Dashboard</Link>
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#333] text-[11px] text-white">
                   {userInitial}
                 </div>
@@ -144,7 +144,7 @@ export function Hero({
             <div className="hero-carousel-stage" id="bookCarousel" ref={stageRef}>
               <div className="hero-btn-center">
                 {isResolvedSignedIn ? (
-                  <Link href="/dashboard" className="btn btn-dark" style={{ padding: '0 24px', textDecoration: 'none', minHeight: '48px', borderRadius: 'var(--radius-sm)', fontSize: '15px', boxShadow: '0 10px 24px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center' }}>
+                  <Link href="/dashboard" className="btn btn-dark" style={{ padding: '0 24px', textDecorationLine: 'none', minHeight: '48px', borderRadius: 'var(--radius-sm)', fontSize: '15px', boxShadow: '0 10px 24px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center' }}>
                     Go to workspace
                   </Link>
                 ) : (
@@ -274,7 +274,7 @@ export function Hero({
               </div>
               <div className="cta-buttons">
                 {isResolvedSignedIn ? (
-                  <Link href="/dashboard" className="btn btn-dark" style={{ textDecoration: 'none' }}>Go to workspace</Link>
+                  <Link href="/dashboard" className="btn btn-dark" style={{ textDecorationLine: 'none' }}>Go to workspace</Link>
                 ) : (
                   <button className="btn btn-dark" onClick={() => setShowAuth(true)}>Start a draft</button>
                 )}
@@ -315,7 +315,7 @@ export function Hero({
             <div className="footer-col">
               <h4>Resources</h4>
               <Link href="#">Help center</Link>
-              <Link href="#">Writing guide</Link>
+              <Link href="#">Writing project</Link>
               <Link href="#">Privacy</Link>
               <Link href="#">Terms</Link>
             </div>

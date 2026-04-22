@@ -1,0 +1,79 @@
+﻿export type ProjectStatus =
+  | "draft"
+  | "processing_sources"
+  | "planning"
+  | "plan_ready"
+  | "generating"
+  | "ready"
+  | "revising"
+  | "exported";
+
+export type SourceKind = "pasted_text" | "pdf" | "md" | "txt" | "docx";
+
+export type DesignMode = "text" | "balanced" | "visual";
+export type PageFormat =
+  | "ebook"
+  | "kindle"
+  | "tablet"
+  | "mobile"
+  | "a5"
+  | "a4"
+  | "a3"
+  | "a2"
+  | "custom";
+
+export type PageSize = {
+  widthMm: number;
+  heightMm: number;
+};
+
+export type ProjectSource = {
+  id: string;
+  kind: SourceKind;
+  name: string;
+  content: string;
+  excerpt: string;
+};
+
+export type PlanChapter = {
+  id: string;
+  title: string;
+  summary: string;
+  keyPoints: string[];
+};
+
+export type ProjectPlan = {
+  hook: string;
+  chapters: PlanChapter[];
+};
+
+export type ProjectDocumentBlock = Record<string, unknown>;
+
+export type ProjectProfile = {
+  author: string;
+  targetAudience: string;
+  coreMessage: string;
+  designMode: DesignMode;
+  goal: string;
+  depth: string;
+  tone: string;
+  structureStyle: string;
+  readerLevel: string;
+  pageFormat: PageFormat;
+  customPageSize: PageSize;
+  plan: ProjectPlan | null;
+  blocks: ProjectDocumentBlock[];
+};
+
+export type ProjectRecord = {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  createdAt: string;
+  updatedAt: string;
+  sources: ProjectSource[];
+  profile: ProjectProfile;
+  html: string;
+  revisionPrompt?: string;
+};
+

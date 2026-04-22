@@ -2,130 +2,256 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
-import { SourcePanel } from "@/components/builder/SourcePanel";
-import { PreviewPanel } from "@/components/builder/PreviewPanel";
+import type { PartialBlock } from "@blocknote/core";
+import { ArrowLeft, Download } from "lucide-react";
+import { BuilderLeftPanel } from "@/components/builder/BuilderLeftPanel";
+import { DocumentEditorPanel } from "@/components/builder/DocumentEditorPanel";
+import { PageFormatControl } from "@/components/builder/PageFormatControl";
 import { ActionPanel } from "@/components/builder/ActionPanel";
-import type { GuideRecord } from "@/types/guide";
+import { blockNoteDocumentToHtml, normalizeBlockNoteDocument } from "@/lib/blocknote-document";
+import {
+  normalizePageFormat,
+  normalizePageSize,
+  type PageFormat,
+  type PageSize,
+} from "@/lib/page-format";
+import type { ProjectRecord } from "@/types/project";
 
-function readSectionIds(html: string) {
-  return Array.from(html.matchAll(/data-section="([^"]+)"/g)).map(
-    (match) => match[1] ?? "",
-  );
+function cloneDocument(blocks: unknown): PartialBlock[] {
+  return JSON.parse(JSON.stringify(normalizeBlockNoteDocument(blocks))) as PartialBlock[];
 }
 
-export function BuilderShell({ guideId }: { guideId: string }) {
-  const [guide, setGuide] = useState<GuideRecord | null>(null);
+function saveBlocksPayload(blocks: unknown) {
+  return { action: "save-blocks", blocks } as const;
+}
+
+export function BuilderShell({ projectId }: { projectId: string }) {
+  const [project, setProject] = useState<ProjectRecord | null>(null);
+  const [hasLocalDocumentEdits, setHasLocalDocumentEdits] = useState(false);
+  const [undoStack, setUndoStack] = useState<PartialBlock[][]>([]);
+  const [redoStack, setRedoStack] = useState<PartialBlock[][]>([]);
   const [revisionPrompt, setRevisionPrompt] = useState("");
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setFeedback("");
 
-    async function loadGuide() {
-      setLoading(true);
-      setFeedback("");
-
-      try {
-        const response = await fetch(`/api/guides/${guideId}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const payload = (await response.json().catch(() => null)) as
-          | { guide?: GuideRecord; message?: string }
-          | null;
-
-        if (!response.ok || !payload?.guide) {
-          throw new Error(payload?.message ?? "Could not load this draft.");
+    fetch(`/api/projects/${projectId}`, { method: "GET", cache: "no-store" })
+      .then((r) => r.json())
+      .then((payload: { project?: ProjectRecord; message?: string }) => {
+        if (!active) return;
+        if (payload.project) {
+          setProject(payload.project);
         }
-
-        if (active) {
-          setGuide(payload.guide);
-        }
-      } catch (caught) {
-        if (active) {
-          setGuide(null);
-          setFeedback(
-            caught instanceof Error
-              ? caught.message
-              : "Could not load this draft.",
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadGuide();
+        else setFeedback(payload.message ?? "Could not load this draft.");
+      })
+      .catch(() => {
+        if (active) setFeedback("Could not load this draft.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     return () => {
       active = false;
     };
-  }, [guideId]);
+  }, [projectId]);
 
-  const sectionIds = useMemo(
-    () => (guide?.html ? readSectionIds(guide.html) : []),
-    [guide?.html],
+  const documentBlocks = useMemo(
+    () => normalizeBlockNoteDocument(project?.profile.blocks ?? []),
+    [project?.profile.blocks],
   );
+
+  const exportHtml = useMemo(() => {
+    if (!project) return "";
+
+    return blockNoteDocumentToHtml({
+      title: project.title,
+      blocks: documentBlocks,
+      pageFormat: project.profile.pageFormat,
+      customPageSize: project.profile.customPageSize,
+    });
+  }, [documentBlocks, project]);
+  const hasDraft = documentBlocks.length > 0;
+  const pageFormat = normalizePageFormat(project?.profile.pageFormat);
+  const customPageSize = normalizePageSize(project?.profile.customPageSize);
 
   async function applyMutation(
     body:
       | { action: "generate" | "regenerate" | "mark-exported" }
-      | { action: "revise"; revisionPrompt: string }
-      | {
-          action: "regenerate-section";
-          targetSection: string;
-          revisionPrompt?: string;
-        },
+      | { action: "revise"; revisionPrompt: string },
     successMessage: string,
   ) {
-    const response = await fetch(`/api/guides/${guideId}`, {
+    const res = await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string } | null;
+    if (!res.ok || !payload?.project) throw new Error(payload?.message ?? "Could not update this draft.");
+    setProject(payload.project);
+    setHasLocalDocumentEdits(false);
+    setUndoStack([]);
+    setRedoStack([]);
+    setFeedback(successMessage);
+  }
 
-    const payload = (await response.json().catch(() => null)) as
-      | { guide?: GuideRecord; message?: string }
-      | null;
+  function setProjectDocument(nextBlocks: PartialBlock[]) {
+    setProject((current) =>
+      current
+        ? {
+            ...current,
+            profile: {
+              ...current.profile,
+              blocks: nextBlocks as ProjectRecord["profile"]["blocks"],
+            },
+          }
+        : current,
+    );
+  }
 
-    if (!response.ok || !payload?.guide) {
-      throw new Error(payload?.message ?? "Could not update this draft.");
+  function updateLocalDocument(nextBlocks: PartialBlock[]) {
+    setUndoStack((history) => [...history, cloneDocument(documentBlocks)]);
+    setRedoStack([]);
+    setProjectDocument(nextBlocks);
+    setHasLocalDocumentEdits(true);
+    setFeedback("Document edits are staged locally.");
+  }
+
+  function undoDocumentEdit() {
+    const previousBlocks = undoStack[undoStack.length - 1];
+    if (!previousBlocks) return;
+
+    setUndoStack((history) => history.slice(0, -1));
+    setRedoStack((history) => [...history, cloneDocument(documentBlocks)]);
+    setProjectDocument(previousBlocks);
+    setHasLocalDocumentEdits(true);
+    setFeedback("Document edit undone.");
+  }
+
+  function redoDocumentEdit() {
+    const nextBlocks = redoStack[redoStack.length - 1];
+    if (!nextBlocks) return;
+
+    setRedoStack((history) => history.slice(0, -1));
+    setUndoStack((history) => [...history, cloneDocument(documentBlocks)]);
+    setProjectDocument(nextBlocks);
+    setHasLocalDocumentEdits(true);
+    setFeedback("Document edit redone.");
+  }
+
+  async function requestSaveDocument() {
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(saveBlocksPayload(documentBlocks)),
+    });
+    const payload = (await res.json().catch(() => null)) as {
+      project?: ProjectRecord;
+      message?: string;
+    } | null;
+
+    if (!res.ok || !payload?.project) {
+      throw new Error(payload?.message ?? "Could not save document edits.");
     }
 
-    setGuide(payload.guide);
-    setFeedback(successMessage);
+    setProject(payload.project);
+    setHasLocalDocumentEdits(false);
+    setUndoStack([]);
+    setRedoStack([]);
+    setFeedback("Document edits saved.");
+  }
+
+  async function updatePageFormat(nextFormat: PageFormat, nextPageSize: PageSize) {
+    if (!project) return;
+    const normalizedPageSize = normalizePageSize(nextPageSize);
+
+    const previousProject = project;
+    setProject({
+      ...project,
+      profile: {
+        ...project.profile,
+        pageFormat: nextFormat,
+        customPageSize: normalizedPageSize,
+      },
+    });
+    setFeedback(`Page format set to ${nextFormat}.`);
+
+    const res = await fetch(`/api/projects/${projectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "save-page-format",
+        pageFormat: nextFormat,
+        customPageSize: normalizedPageSize,
+      }),
+    });
+    const payload = (await res.json().catch(() => null)) as {
+      project?: ProjectRecord;
+      message?: string;
+    } | null;
+
+    if (!res.ok || !payload?.project) {
+      setProject(previousProject);
+      throw new Error(payload?.message ?? "Could not save page format.");
+    }
+
+    setProject(payload.project);
+  }
+
+  async function exportPdf() {
+    if (!hasDraft) {
+      setFeedback("No document to export.");
+      return;
+    }
+    const popup = window.open("", "_blank", "noopener,noreferrer");
+    if (!popup) {
+      setFeedback("Print window was blocked.");
+      return;
+    }
+    popup.document.open();
+    popup.document.write(exportHtml);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+    try {
+      await applyMutation({ action: "mark-exported" }, "Print dialog opened. Save as PDF.");
+    } catch {
+      setFeedback("Print opened, but export status could not be saved.");
+    }
   }
 
   if (loading) {
     return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#F7F6F3", padding: "24px", fontFamily: "'Inter', sans-serif" }}>
-        <div style={{ textAlign: "center" }}>
-          <p style={{ margin: 0, fontSize: "13px", color: "#A1A1AA", fontFamily: "'Geist', sans-serif" }}>Loading draft…</p>
-        </div>
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#faf9f5" }}>
+        <p style={{ margin: 0, fontSize: "13px", color: "#b8b4aa", fontFamily: "'Geist', sans-serif" }}>
+          Loading...
+        </p>
       </main>
     );
   }
 
-  if (!guide) {
+  if (!project) {
     return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#F7F6F3", padding: "24px", fontFamily: "'Inter', sans-serif" }}>
-        <div style={{ maxWidth: "480px", textAlign: "center", background: "#fff", border: "1px solid #ECEAE5", borderRadius: "12px", padding: "40px 32px" }}>
-          <p style={{ margin: 0, fontSize: "11px", fontWeight: 500, fontFamily: "'Geist', sans-serif", textTransform: "uppercase", letterSpacing: "0.1em", color: "#A1A1AA" }}>Draft unavailable</p>
-          <h1 style={{ margin: "12px 0 0", fontFamily: "'Geist', sans-serif", fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em", color: "#111" }}>Could not load this draft.</h1>
-          <p style={{ margin: "12px 0 0", fontSize: "13.5px", lineHeight: 1.6, color: "#71717A" }}>
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#faf9f5", padding: "24px" }}>
+        <div style={{ maxWidth: "440px", textAlign: "center", background: "#fff", border: "1px solid #ebe7dd", borderRadius: "6px", padding: "40px 32px" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#b8b4aa", fontFamily: "'Geist', sans-serif" }}>
+            Not found
+          </p>
+          <h1 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: 600, color: "#1a1714", fontFamily: "'Geist', sans-serif", letterSpacing: "-0.02em" }}>
+            Draft unavailable
+          </h1>
+          <p style={{ margin: "0 0 20px", fontSize: "13.5px", lineHeight: 1.6, color: "#8a867e", fontFamily: "'Geist', sans-serif" }}>
             {feedback || "Sign in and try again from your dashboard."}
           </p>
           <Link
             href="/dashboard"
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "20px", padding: "8px 18px", background: "#111", color: "#fff", borderRadius: "8px", textDecoration: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", background: "#1a1714", color: "#fff", borderRadius: "6px", textDecorationLine: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
           >
+            <ArrowLeft size={13} />
             Back to dashboard
           </Link>
         </div>
@@ -134,144 +260,135 @@ export function BuilderShell({ guideId }: { guideId: string }) {
   }
 
   return (
-    <main style={{ minHeight: "100vh", background: "#F7F6F3", fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column" }}>
-      {/* Builder top bar */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #ECEAE5", background: "#fff", padding: "0 24px", height: "57px", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", textDecoration: "none", color: "#71717A", fontSize: "13px" }}>
+    <main style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#faf9f5" }}>
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: "52px",
+          padding: "0 20px",
+          borderBottom: "1px solid #e8e4dd",
+          background: "#fff",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+          <Link
+            href="/dashboard"
+            style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#8a867e", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
+          >
             <ArrowLeft size={14} />
             Dashboard
           </Link>
-          <span style={{ color: "#D4D2CC", fontSize: "13px" }}>/</span>
-          <span style={{ fontSize: "13px", fontWeight: 500, color: "#111", fontFamily: "'Geist', sans-serif", maxWidth: "280px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{guide.title}</span>
+          <span style={{ color: "#d8d4cc", fontSize: "13px" }}>/</span>
+          <span style={{ fontSize: "13px", fontWeight: 500, color: "#1a1714", fontFamily: "'Geist', sans-serif", maxWidth: "360px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {project.title}
+          </span>
         </div>
-      </div>
 
-      <section className="grid min-h-[calc(100vh-57px)] grid-cols-1 xl:grid-cols-[300px_1fr_340px]">
-        <SourcePanel guide={guide} />
-        <PreviewPanel html={guide.html} title={guide.title} />
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <PageFormatControl
+            value={pageFormat}
+            customPageSize={customPageSize}
+            onChange={(nextFormat, nextPageSize) => {
+              updatePageFormat(nextFormat, nextPageSize).catch((e) => {
+                setFeedback(e instanceof Error ? e.message : "Could not save page format.");
+              });
+            }}
+          />
+          <button
+            type="button"
+            disabled={!hasDraft}
+            onClick={exportPdf}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              height: "30px",
+              border: "1px solid #e2ded5",
+              borderRadius: "4px",
+              background: hasDraft ? "#1a1714" : "#f7f4ee",
+              color: hasDraft ? "#fffdf8" : "#b8b0a5",
+              padding: "0 12px",
+              fontFamily: "'Geist', sans-serif",
+              fontSize: "12px",
+              fontWeight: 550,
+              cursor: hasDraft ? "pointer" : "not-allowed",
+            }}
+          >
+            <Download size={13} strokeWidth={1.9} />
+            Export
+          </button>
+        </div>
+      </header>
+
+      <div
+        style={{
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "220px minmax(0, 1fr) 300px",
+          height: "calc(100vh - 52px)",
+          minHeight: "calc(100vh - 52px)",
+        }}
+      >
+        <BuilderLeftPanel blocks={documentBlocks} />
+        <DocumentEditorPanel
+          key={`${project.id}:${project.updatedAt}`}
+          title={project.title}
+          blocks={documentBlocks}
+          pageFormat={pageFormat}
+          customPageSize={customPageSize}
+          onChange={updateLocalDocument}
+        />
         <ActionPanel
-          hasHtml={Boolean(guide.html)}
-          sectionIds={sectionIds}
+          hasDraft={hasDraft}
+          hasLocalDocumentEdits={hasLocalDocumentEdits}
           revisionPrompt={revisionPrompt}
           feedback={feedback}
+          canUndoDocumentEdit={undoStack.length > 0}
+          canRedoDocumentEdit={redoStack.length > 0}
+          onUndoDocumentEdit={undoDocumentEdit}
+          onRedoDocumentEdit={redoDocumentEdit}
           onRevisionPromptChange={setRevisionPrompt}
+          onRequestSaveDocument={async () => {
+            try {
+              await requestSaveDocument();
+            } catch (e) {
+              setFeedback(e instanceof Error ? e.message : "Could not save document edits.");
+            }
+          }}
           onGenerateFirstDraft={async () => {
             try {
-              await applyMutation(
-                { action: "generate" },
-                "First HTML draft generated and saved to the database.",
-              );
-            } catch (caught) {
-              setFeedback(
-                caught instanceof Error
-                  ? caught.message
-                  : "Could not generate the first draft.",
-              );
+              await applyMutation({ action: "generate" }, "Draft generated.");
+            } catch (e) {
+              setFeedback(e instanceof Error ? e.message : "Could not generate.");
             }
           }}
           onRegenerateDraft={async () => {
             try {
-              await applyMutation(
-                { action: "regenerate" },
-                "Draft regenerated from the stored source bundle.",
-              );
-            } catch (caught) {
-              setFeedback(
-                caught instanceof Error
-                  ? caught.message
-                  : "Could not regenerate the draft.",
-              );
+              await applyMutation({ action: "regenerate" }, "Draft regenerated.");
+            } catch (e) {
+              setFeedback(e instanceof Error ? e.message : "Could not regenerate.");
             }
           }}
           onReviseDraft={async () => {
-            if (!guide.html) {
-              setFeedback("Generate a first draft before asking for revisions.");
+            if (!hasDraft) {
+              setFeedback("Generate or write a draft first.");
               return;
             }
-
             try {
-              await applyMutation(
-                { action: "revise", revisionPrompt },
-                "Whole-draft revision saved.",
-              );
-            } catch (caught) {
-              setFeedback(
-                caught instanceof Error
-                  ? caught.message
-                  : "Could not revise the draft.",
-              );
+              if (hasLocalDocumentEdits) {
+                await requestSaveDocument();
+              }
+              await applyMutation({ action: "revise", revisionPrompt }, "Revision applied.");
+              setRevisionPrompt("");
+            } catch (e) {
+              setFeedback(e instanceof Error ? e.message : "Revision failed.");
             }
-          }}
-          onRegenerateSection={async (sectionId) => {
-            if (!guide.html) {
-              setFeedback("Generate a first draft before regenerating a section.");
-              return;
-            }
-
-            try {
-              await applyMutation(
-                {
-                  action: "regenerate-section",
-                  targetSection: sectionId,
-                  revisionPrompt:
-                    revisionPrompt ||
-                    `Refresh ${sectionId} for stronger clarity.`,
-                },
-                `${sectionId} was regenerated and stored as a new revision.`,
-              );
-            } catch (caught) {
-              setFeedback(
-                caught instanceof Error
-                  ? caught.message
-                  : "Could not regenerate that section.",
-              );
-            }
-          }}
-          onExportPdf={async () => {
-            if (!guide.html) {
-              setFeedback("PDF export is unavailable before the first draft exists.");
-              return;
-            }
-
-            const popup = window.open("", "_blank", "noopener,noreferrer");
-            if (!popup) {
-              setFeedback("The print window was blocked by the browser.");
-              return;
-            }
-
-            popup.document.open();
-            popup.document.write(guide.html);
-            popup.document.close();
-            popup.focus();
-            popup.print();
-
-            try {
-              await applyMutation(
-                { action: "mark-exported" },
-                "Browser print opened. Save it as PDF from the print dialog.",
-              );
-            } catch (caught) {
-              setFeedback(
-                caught instanceof Error
-                  ? caught.message
-                  : "Print opened, but export status could not be saved.",
-              );
-            }
-          }}
-          onFigmaHandoff={async () => {
-            if (!guide.html) {
-              setFeedback("Copy-to-Figma is unavailable before the first draft exists.");
-              return;
-            }
-
-            await navigator.clipboard.writeText(guide.html);
-            setFeedback(
-              "HTML copied. You can paste it into your Figma handoff flow from here.",
-            );
           }}
         />
-      </section>
+      </div>
     </main>
   );
 }

@@ -2,120 +2,87 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Zap } from "lucide-react";
 import { z } from "zod";
-import type { GuideRecord, GuideSource, SourceKind } from "@/types/guide";
-import { useGuideWizardStore } from "@/store/useGuideWizardStore";
-import { ConceptStep } from "@/components/wizard/ConceptStep";
+import type { ProjectRecord, ProjectSource, SourceKind } from "@/types/project";
+import { useProjectWizardStore } from "@/store/useProjectWizardStore";
+import type { WizardStep } from "@/store/useProjectWizardStore";
+import { BasicsStep } from "@/components/wizard/BasicsStep";
 import { SourceStep } from "@/components/wizard/SourceStep";
-import { StyleStep } from "@/components/wizard/StyleStep";
-import { OutlineStep } from "@/components/wizard/OutlineStep";
+import { FormatStep } from "@/components/wizard/FormatStep";
+import { GenerateStep } from "@/components/wizard/GenerateStep";
 
-type WizardStep = 1 | 2 | 3 | 4;
+const TOTAL_STEPS = 4;
 
-const conceptSchema = z.object({
-  title: z.string().trim().min(1, "Add a title."),
-  targetAudience: z.string().trim().min(1, "Add the target audience."),
-  goal: z.string().trim().min(1, "Add the goal."),
-});
-
-const styleSchema = z.object({
-  tone: z.string().trim().min(1, "Select the tone."),
-  structureStyle: z.string().trim().min(1, "Select the structure."),
-  readerLevel: z.string().trim().min(1, "Select the reader level."),
-  depth: z.string().trim().min(1, "Select the depth."),
-});
-
-const STEP_LABELS = ["Concept", "Source", "Style", "Outline"] as const;
+const STEP_LABELS = ["Setup", "Source", "Format", "Generate"] as const;
 const STEP_TITLES = [
-  "Define the concept",
-  "Add source material",
-  "Set the voice",
-  "Review the outline",
+  "Set up your ebook",
+  "Upload your source",
+  "Choose the page format",
+  "Generate your editable draft",
 ] as const;
 const STEP_DESCRIPTIONS = [
-  "Name your ebook and set who it's for.",
-  "Paste text or upload your source files.",
-  "Choose tone, structure, and depth.",
-  "AI-generated chapters — edit freely.",
+  "Title, author, target reader, core message, and tone.",
+  "Add the document material Celion should turn into an ebook.",
+  "Use the ebook default or switch to a print/custom size.",
+  "Celion will create a BlockNote document you can edit directly.",
 ] as const;
 
-function generateOutline(structureStyle: string): string[] {
-  if (structureStyle === "Checklist") {
-    return [
-      "Before you begin: requirements & mindset",
-      "The core checklist",
-      "Common mistakes to avoid",
-      "Quick-reference card",
-    ];
+const basicsSchema = z.object({
+  title: z.string().trim().min(1, "Add a title."),
+  targetAudience: z.string().trim().min(1, "Add the target reader."),
+  coreMessage: z.string().trim().min(1, "Add the core message."),
+});
+
+function getStepIssue(
+  step: WizardStep,
+  state: {
+    title: string;
+    targetAudience: string;
+    coreMessage: string;
+    files: File[];
+  },
+): string | null {
+  if (step === 1) {
+    const result = basicsSchema.safeParse({
+      title: state.title,
+      targetAudience: state.targetAudience,
+      coreMessage: state.coreMessage,
+    });
+    return result.success ? null : (result.error.issues[0]?.message ?? "Complete this step.");
   }
-  if (structureStyle === "Step-by-step") {
-    return [
-      "Getting started",
-      "The first step",
-      "Building momentum",
-      "Advanced moves",
-      "Putting it all together",
-    ];
+  if (step === 2) {
+    if (state.files.length === 0) return "Upload at least one source document.";
+    if (state.files.some((file) => /\.(hwp|hwpx)$/i.test(file.name))) {
+      return "HWP files are not supported.";
+    }
+    if (state.files.some((file) => /\.(pdf|docx)$/i.test(file.name))) {
+      return "PDF/DOCX extraction is not connected yet. Use MD or TXT for now.";
+    }
+    return null;
   }
-  if (structureStyle === "Concept-first") {
-    return [
-      "The big idea",
-      "Why it matters",
-      "How it works",
-      "Applying it in practice",
-      "What comes next",
-    ];
-  }
-  return [
-    "Introduction",
-    "Understanding the landscape",
-    "The core framework",
-    "Execution guide",
-    "Next steps & resources",
-  ];
+  return null;
 }
 
 function getFileKind(fileName: string): SourceKind | null {
   const ext = fileName.split(".").pop()?.toLowerCase();
-  if (ext === "md" || ext === "txt" || ext === "pdf" || ext === "docx") {
-    return ext;
+  if (ext === "md" || ext === "txt") return ext;
+  if (ext === "pdf" || ext === "docx") {
+    throw new Error("PDF/DOCX extraction is not connected yet. Use MD or TXT for now.");
   }
-
   return null;
 }
 
-async function buildSources(
-  pastedText: string,
-  files: File[],
-): Promise<GuideSource[]> {
-  const sources: GuideSource[] = [];
-
-  if (pastedText.trim()) {
-    const content = pastedText.trim();
-
-    sources.push({
-      id: crypto.randomUUID(),
-      kind: "pasted_text",
-      name: "Pasted source",
-      content,
-      excerpt: content.slice(0, 180),
-    });
-  }
+async function buildSources(files: File[]): Promise<ProjectSource[]> {
+  const sources: ProjectSource[] = [];
 
   for (const file of files) {
     const kind = getFileKind(file.name);
-    if (!kind) {
-      throw new Error(`${file.name} is not a supported file type.`);
-    }
+    if (!kind) throw new Error(`${file.name} is not a supported file type.`);
 
-    let content = "";
+    const content = (await file.text()).trim();
 
-    if (kind === "md" || kind === "txt") {
-      content = (await file.text()).trim();
-    } else {
-      content = `${file.name} was uploaded successfully. Deep extraction for ${kind.toUpperCase()} files will be connected in the next backend slice.`;
-    }
+    if (!content) throw new Error(`${file.name} is empty.`);
 
     sources.push({
       id: crypto.randomUUID(),
@@ -129,367 +96,254 @@ async function buildSources(
   return sources;
 }
 
-function getStepIssue(input: {
-  step: WizardStep;
-  title: string;
-  pastedText: string;
-  files: File[];
-  targetAudience: string;
-  goal: string;
-  depth: string;
-  tone: string;
-  structureStyle: string;
-  readerLevel: string;
-  outline: string[];
-}) {
-  if (input.step === 1) {
-    const parsed = conceptSchema.safeParse({
-      title: input.title,
-      targetAudience: input.targetAudience,
-      goal: input.goal,
-    });
-    return parsed.success ? null : parsed.error.issues[0]?.message ?? "Complete this step.";
-  }
-
-  if (input.step === 2) {
-    if (!input.pastedText.trim() && input.files.length === 0) {
-      return "Add text or a file.";
-    }
-
-    if (input.files.some((file) => /\.(hwp|hwpx)$/i.test(file.name))) {
-      return "HWP and HWPX are not supported.";
-    }
-
-    return null;
-  }
-
-  if (input.step === 3) {
-    const parsed = styleSchema.safeParse({
-      tone: input.tone,
-      structureStyle: input.structureStyle,
-      readerLevel: input.readerLevel,
-      depth: input.depth,
-    });
-
-    return parsed.success
-      ? null
-      : parsed.error.issues[0]?.message ?? "Complete this step.";
-  }
-
-  if (input.outline.length === 0) return "Add at least one chapter.";
-  if (input.outline.some((ch) => !ch.trim())) return "Fill in all chapter titles.";
-  return null;
-}
-
-export function WizardContent({
-  onCreated,
-}: {
-  onCreated?: (guide: GuideRecord) => void;
-}) {
+export function WizardContent({ onCreated }: { onCreated?: (project: ProjectRecord) => void }) {
   const router = useRouter();
   const {
     step,
     title,
-    pastedText,
-    files,
+    author,
     targetAudience,
-    goal,
-    depth,
+    coreMessage,
     tone,
-    structureStyle,
-    readerLevel,
-    outline,
-    outlineStyleKey,
+    files,
+    pageFormat,
+    customPageSize,
+    generating,
     error,
     setStep,
-    setTitle,
-    setPastedText,
-    setFiles,
     setField,
-    setOutline,
-    setGeneratedOutline,
+    setTone,
+    setFiles,
+    setPageFormat,
+    setGenerating,
     setError,
     reset,
-  } = useGuideWizardStore();
+  } = useProjectWizardStore();
 
   const [submitting, setSubmitting] = useState(false);
-  const currentStepIndex = step - 1;
-  const currentStepIssue = getStepIssue({
-    step,
+
+  const currentIssue = getStepIssue(step, {
     title,
-    pastedText,
-    files,
     targetAudience,
-    goal,
-    depth,
-    tone,
-    structureStyle,
-    readerLevel,
-    outline,
+    coreMessage,
+    files,
   });
-  const canAdvance = currentStepIssue == null && !submitting;
-  const footerMessage = error;
-
-  const handleNext = () => {
-    if (currentStepIssue) {
-      return;
-    }
-
-    if (step === 3 && (outline.length === 0 || outlineStyleKey !== structureStyle)) {
-      setGeneratedOutline(generateOutline(structureStyle), structureStyle);
-    }
-
-    setStep((step + 1) as WizardStep);
-  };
+  const busy = submitting || generating;
+  const canAdvance = currentIssue == null && !busy;
+  const currentStepIndex = step - 1;
 
   const handlePrevious = () => {
-    if (step === 1 || submitting) {
-      return;
-    }
-
+    if (step === 1 || busy) return;
     setStep((step - 1) as WizardStep);
   };
 
-  const handleCreate = async () => {
-    if (currentStepIssue) {
+  const handleNext = async () => {
+    if (busy || currentIssue) return;
+
+    if (step < TOTAL_STEPS) {
+      setStep((step + 1) as WizardStep);
       return;
     }
 
     setSubmitting(true);
-
+    setGenerating(true);
     try {
-      const sources = await buildSources(pastedText, files);
-      if (sources.length === 0) {
-        setError("No usable source content was found.");
-        return;
-      }
+      const sources = await buildSources(files);
+      if (sources.length === 0) throw new Error("No usable source files.");
 
-      const response = await fetch("/api/guides", {
+      const createRes = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
           sources,
           profile: {
+            author,
             targetAudience,
-            goal,
-            depth,
+            coreMessage,
+            designMode: "text",
+            pageFormat,
+            customPageSize,
+            goal: "",
+            depth: "",
             tone,
-            structureStyle,
-            readerLevel,
-            outline,
+            structureStyle: "",
+            readerLevel: "",
+            plan: null,
+            blocks: [],
           },
         }),
       });
+      const created = (await createRes.json().catch(() => null)) as {
+        project?: ProjectRecord;
+        message?: string;
+      } | null;
+      if (!createRes.ok || !created?.project) {
+        throw new Error(created?.message ?? "Could not create draft.");
+      }
 
-      const payload = (await response.json().catch(() => null)) as
-        | { guide?: GuideRecord; message?: string }
-        | null;
-
-      if (!response.ok || !payload?.guide) {
-        throw new Error(payload?.message ?? "Celion could not create the draft.");
+      const generateRes = await fetch(`/api/projects/${created.project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate" }),
+      });
+      const generated = (await generateRes.json().catch(() => null)) as {
+        project?: ProjectRecord;
+        message?: string;
+      } | null;
+      if (!generateRes.ok || !generated?.project) {
+        throw new Error(generated?.message ?? "Could not generate the ebook.");
       }
 
       reset();
-      onCreated?.(payload.guide);
-      router.push(`/builder/${payload.guide.id}`);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Celion could not create the guide draft.",
-      );
+      onCreated?.(generated.project);
+      router.push(`/builder/${generated.project.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setSubmitting(false);
+      setGenerating(false);
     }
   };
 
+  const ctaLabel = generating || submitting
+    ? "Generating..."
+    : step === TOTAL_STEPS
+      ? "Generate ebook"
+      : "Continue";
+
+  const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <section>
-        <p
-          style={{
-            margin: 0,
-            fontSize: "11px",
-            textTransform: "uppercase",
-            letterSpacing: "0.16em",
-            color: "#8a867e",
-            fontFamily: "'Geist', sans-serif",
-            fontWeight: 500,
-          }}
-        >
-          Step {step} of {STEP_LABELS.length}
-        </p>
-        <h1
-          style={{
-            margin: "10px 0 0",
-            fontFamily: "'Geist', sans-serif",
-            fontSize: "clamp(28px, 3.5vw, 38px)",
-            lineHeight: 1.08,
-            letterSpacing: "-0.04em",
-            fontWeight: 500,
-            color: "#111",
-          }}
-        >
+        <div className="flex items-center justify-between">
+          <span style={{ fontSize: "11px", fontFamily: "'Geist', sans-serif", fontWeight: 500, letterSpacing: "0.1em", color: "#b8b4aa" }}>
+            {String(step).padStart(2, "0")} / {String(TOTAL_STEPS).padStart(2, "0")}
+          </span>
+          <div className="flex items-center gap-4">
+            {STEP_LABELS.map((label, index) => {
+              const isActive = step === index + 1;
+              const isDone = step > index + 1;
+              return (
+                <span
+                  key={label}
+                  style={{
+                    fontSize: "11px",
+                    fontFamily: "'Geist', sans-serif",
+                    fontWeight: 500,
+                    letterSpacing: "0.06em",
+                    color: isActive ? "#1f1f1f" : isDone ? "#c8c4bb" : "#d8d4cc",
+                    textDecorationLine: isActive ? "underline" : "none",
+                    textUnderlineOffset: "4px",
+                    textDecorationColor: "#1a1714",
+                    textDecorationThickness: "1.5px",
+                    transition: "color 0.2s ease",
+                  }}
+                >
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
+        <h1 style={{ margin: "18px 0 0", fontFamily: "'Geist', sans-serif", fontSize: "clamp(24px, 3vw, 34px)", lineHeight: 1.08, letterSpacing: "-0.04em", fontWeight: 500, color: "#1a1714" }}>
           {STEP_TITLES[currentStepIndex]}
         </h1>
-        <p className="mt-4 text-[14px] leading-7 text-muted">
+        <p style={{ margin: "9px 0 0", fontSize: "13.5px", lineHeight: 1.55, color: "#8a867e", fontFamily: "'Geist', sans-serif" }}>
           {STEP_DESCRIPTIONS[currentStepIndex]}
         </p>
 
-        <div className="mt-5 h-[2px] w-full overflow-hidden rounded-full bg-[#ebe7dd]">
-          <div
-            style={{
-              width: `${(step / STEP_LABELS.length) * 100}%`,
-              height: "100%",
-              background: "#111",
-              transition: "width 0.2s ease",
-            }}
-          />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {STEP_LABELS.map((label, index) => {
-            const stepNumber = (index + 1) as WizardStep;
-            const isActive = step === stepNumber;
-            const isDone = step > stepNumber;
-
-            return (
-              <div
-                key={label}
-                className="rounded-[8px] border px-3 py-1.5 text-[12px]"
-                style={{
-                  borderColor: isActive || isDone ? "#11110f" : "#ebe7dd",
-                  background: isActive ? "#11110f" : "#ffffff",
-                  color: isActive ? "#fff" : "#4a443d",
-                  fontFamily: "'Geist', sans-serif",
-                  fontWeight: 500,
-                }}
-              >
-                {stepNumber}. {label}
-              </div>
-            );
-          })}
+        <div className="mt-6 flex gap-1">
+          {STEP_LABELS.map((_, index) => (
+            <div
+              key={index}
+              style={{
+                height: "2px",
+                flex: 1,
+                borderRadius: "2px",
+                background: step > index ? "#1a1714" : "#ebe7dd",
+                transition: "background 0.3s ease",
+              }}
+            />
+          ))}
         </div>
       </section>
 
-      <section className="rounded-[14px] border border-line bg-white px-6 py-6 md:px-8 md:py-8">
-        <div className="py-1">
-          {step === 1 ? (
-            <ConceptStep
+      <section style={{ borderRadius: "10px", border: "1px solid #ebe7dd", background: "linear-gradient(180deg, #ffffff 0%, #fefcf9 100%)", boxShadow: "0 4px 32px rgba(31,22,14,0.06), 0 1px 2px rgba(0,0,0,0.03)", overflow: "hidden" }}>
+        <div key={step} className="step-in px-6 pt-7 pb-2 md:px-8 md:pt-8">
+          {step === 1 && (
+            <BasicsStep
               title={title}
+              author={author}
               targetAudience={targetAudience}
-              goal={goal}
-              onTitleChange={setTitle}
+              coreMessage={coreMessage}
+              tone={tone}
               onFieldChange={setField}
+              onToneChange={setTone}
             />
-          ) : null}
-          {step === 2 ? (
+          )}
+          {step === 2 && (
             <SourceStep
-              pastedText={pastedText}
               fileNames={files.map((file) => file.name)}
-              onTextChange={setPastedText}
               onFilesChange={setFiles}
             />
-          ) : null}
-          {step === 3 ? (
-            <StyleStep
-              tone={tone}
-              structureStyle={structureStyle}
-              readerLevel={readerLevel}
-              depth={depth}
-              onFieldChange={setField}
+          )}
+          {step === 3 && (
+            <FormatStep
+              pageFormat={pageFormat}
+              customPageSize={customPageSize}
+              onPageFormatChange={setPageFormat}
             />
-          ) : null}
-          {step === 4 ? (
-            <OutlineStep outline={outline} onOutlineChange={setOutline} />
-          ) : null}
+          )}
+          {step === 4 && (
+            <GenerateStep
+              title={title}
+              author={author}
+              targetAudience={targetAudience}
+              tone={tone}
+              fileCount={files.length}
+              pageFormat={pageFormat}
+              customPageSize={customPageSize}
+              generating={generating}
+            />
+          )}
         </div>
 
-        <div className="mt-8 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
+        <div style={{ margin: "28px 0 0", padding: "20px 32px 24px", borderTop: "1px solid #f0ece3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
           <div>
-            {footerMessage ? (
-              <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19" }}>
-                {footerMessage}
-              </p>
+            {error ? (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#7a3b1a", fontFamily: "'Geist', sans-serif", background: "rgba(180,80,30,0.07)", border: "1px solid rgba(180,80,30,0.18)", borderRadius: "6px", padding: "5px 10px" }}>
+                {error}
+              </span>
             ) : null}
           </div>
 
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {step > 1 ? (
+          <div className="flex items-center gap-2.5">
+            {step > 1 && (
               <button
                 type="button"
-                disabled={submitting}
+                disabled={busy}
                 onClick={handlePrevious}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "10px 16px",
-                  border: "1px solid #ECEAE5",
-                  borderRadius: "8px",
-                  background: "#fff",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  fontFamily: "'Geist', sans-serif",
-                  color: "#111",
-                  cursor: submitting ? "not-allowed" : "pointer",
-                  opacity: submitting ? 0.6 : 1,
-                }}
+                className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#e8e4dd] bg-white px-4 py-2.5 text-[13px] font-medium text-[#4a443d] transition-all duration-150 hover:border-[#c8c4bb] hover:text-[#1a1714] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ fontFamily: "'Geist', sans-serif" }}
               >
-                <ArrowLeft size={13} />
+                <ArrowLeft size={12} />
                 Previous
               </button>
-            ) : null}
-            {step < STEP_LABELS.length ? (
-              <button
-                type="button"
-                disabled={!canAdvance}
-                onClick={handleNext}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "10px 18px",
-                  border: "none",
-                  borderRadius: "8px",
-                  background: "#111",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  fontFamily: "'Geist', sans-serif",
-                  color: "#fff",
-                  cursor: canAdvance ? "pointer" : "not-allowed",
-                  opacity: canAdvance ? 1 : 0.35,
-                }}
-              >
-                Continue
-                <ArrowRight size={13} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={!canAdvance}
-                onClick={handleCreate}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "10px 22px",
-                  border: "none",
-                  borderRadius: "8px",
-                  background: "#111",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  fontFamily: "'Geist', sans-serif",
-                  color: "#fff",
-                  cursor: canAdvance ? "pointer" : "not-allowed",
-                  opacity: canAdvance ? 1 : 0.35,
-                }}
-              >
-                {submitting ? "Creating..." : "Create draft"}
-                <ArrowRight size={13} />
-              </button>
             )}
+
+            <button
+              type="button"
+              disabled={!canAdvance}
+              onClick={handleNext}
+              className={`inline-flex items-center gap-1.5 rounded-[6px] px-5 py-2.5 text-[13px] font-medium text-white transition-all duration-150 ${canAdvance ? "cursor-pointer bg-[#1a1714] hover:-translate-y-px hover:bg-[#2d2925] hover:shadow-[0_4px_16px_rgba(0,0,0,0.16)]" : "cursor-not-allowed bg-[#1a1714] opacity-30"}`}
+              style={{ fontFamily: "'Geist', sans-serif" }}
+            >
+              {ctaLabel}
+              {ctaIcon}
+            </button>
           </div>
         </div>
       </section>

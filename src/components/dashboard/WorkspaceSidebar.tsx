@@ -69,7 +69,7 @@ export function WorkspaceSidebar({
       <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #ECEAE5" }}>
         <Link
           href="/"
-          style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}
+          style={{ display: "flex", alignItems: "center", gap: "10px", textDecorationLine: "none" }}
         >
           <div
             style={{
@@ -123,7 +123,7 @@ export function WorkspaceSidebar({
                 gap: "10px",
                 padding: "8px 10px",
                 borderRadius: "8px",
-                textDecoration: "none",
+                textDecorationLine: "none",
                 fontSize: "13.5px",
                 fontWeight: active ? 500 : 400,
                 color: active ? "#111" : "#71717A",

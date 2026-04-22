@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { Route } from "next";
 import Link from "next/link";
@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, Clock, FileText, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { GuideList } from "@/components/dashboard/GuideList";
+import { ProjectList } from "@/components/dashboard/ProjectList";
 import { WorkspaceSidebar } from "@/components/dashboard/WorkspaceSidebar";
-import type { GuideRecord } from "@/types/guide";
+import type { ProjectRecord } from "@/types/project";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
@@ -23,10 +23,39 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const searchParams = useSearchParams();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
+  const { data: clientSession, isPending: authPending } = authClient.useSession();
+  const resolvedSignedIn = authPending
+    ? isSignedIn
+    : Boolean(clientSession?.user);
+  const resolvedUserName = authPending
+    ? initialUserName
+    : clientSession?.user?.name ?? null;
+  const resolvedUserEmail = authPending
+    ? initialUserEmail
+    : clientSession?.user?.email ?? null;
 
-  const [guides, setGuides] = useState<GuideRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
+  const showLoading = loading || (authPending && !hasVerifier);
+
+  async function fetchProjects() {
+    const response = await fetch("/api/projects", {
+      method: "GET",
+      cache: "no-store",
+    });
+
+    if (response.status !== 401) {
+      return response;
+    }
+
+    await authClient.getSession();
+
+    return fetch("/api/projects", {
+      method: "GET",
+      cache: "no-store",
+    });
+  }
 
   useEffect(() => {
     if (!hasVerifier) return;
@@ -59,23 +88,24 @@ export function DashboardShell({
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn) {
-      setGuides([]);
+    if (hasVerifier || authPending) {
+      return;
+    }
+
+    if (!resolvedSignedIn) {
+      setProjects([]);
       setLoading(false);
       return;
     }
 
     let active = true;
 
-    async function loadGuides() {
+    async function loadProjects() {
       setLoading(true);
       setError("");
 
       try {
-        const response = await fetch("/api/guides", {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetchProjects();
 
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as
@@ -84,10 +114,10 @@ export function DashboardShell({
           throw new Error(payload?.message ?? "Could not load your workspace.");
         }
 
-        const payload = (await response.json()) as { guides: GuideRecord[] };
+        const payload = (await response.json()) as { projects: ProjectRecord[] };
 
         if (active) {
-          setGuides(payload.guides);
+          setProjects(payload.projects);
         }
       } catch (caught) {
         if (active) {
@@ -104,16 +134,16 @@ export function DashboardShell({
       }
     }
 
-    void loadGuides();
+    void loadProjects();
 
     return () => {
       active = false;
     };
-  }, [isSignedIn]);
+  }, [authPending, hasVerifier, resolvedSignedIn]);
 
-  const exported = guides.filter((guide) => guide.status === "exported").length;
-  const inProgress = guides.filter(
-    (guide) => !["draft", "exported"].includes(guide.status),
+  const exported = projects.filter((project) => project.status === "exported").length;
+  const inProgress = projects.filter(
+    (project) => !["draft", "exported"].includes(project.status),
   ).length;
 
   return (
@@ -128,9 +158,9 @@ export function DashboardShell({
     >
       <WorkspaceSidebar
         activeItem="workspace"
-        isSignedIn={isSignedIn}
-        initialUserName={initialUserName}
-        initialUserEmail={initialUserEmail}
+        isSignedIn={resolvedSignedIn}
+        initialUserName={resolvedUserName}
+        initialUserEmail={resolvedUserEmail}
         primaryAction={{ href: "/new", label: "New ebook" }}
       />
 
@@ -195,10 +225,10 @@ export function DashboardShell({
               </p>
             </div>
 
-            {isSignedIn && guides.length > 0 ? (
+            {resolvedSignedIn && projects.length > 0 ? (
               <div style={{ display: "flex", gap: "12px", marginBottom: "28px" }}>
                 {[
-                  { label: "Total drafts", value: guides.length, icon: FileText },
+                  { label: "Total drafts", value: projects.length, icon: FileText },
                   { label: "In progress", value: inProgress, icon: Clock },
                   { label: "Exported", value: exported, icon: BookOpen },
                 ].map(({ label, value, icon: Icon }) => (
@@ -264,7 +294,7 @@ export function DashboardShell({
               </div>
             ) : null}
 
-            {loading ? (
+            {showLoading ? (
               <div style={{ padding: "60px 0", textAlign: "center" }}>
                 <p
                   style={{
@@ -279,9 +309,9 @@ export function DashboardShell({
               </div>
             ) : null}
 
-            {!loading && isSignedIn ? <GuideList guides={guides} /> : null}
+            {!showLoading && resolvedSignedIn ? <ProjectList projects={projects} /> : null}
 
-            {!loading && !isSignedIn ? (
+            {!showLoading && !resolvedSignedIn ? (
               <div
                 style={{
                   marginTop: "24px",
@@ -339,7 +369,7 @@ export function DashboardShell({
                     background: "#111",
                     color: "#fff",
                     borderRadius: "8px",
-                    textDecoration: "none",
+                    textDecorationLine: "none",
                     fontSize: "13px",
                     fontWeight: 500,
                     fontFamily: "'Geist', sans-serif",
@@ -350,7 +380,7 @@ export function DashboardShell({
               </div>
             ) : null}
 
-            {!loading && isSignedIn && guides.length === 0 ? (
+            {!showLoading && resolvedSignedIn && projects.length === 0 ? (
               <div
                 style={{
                   marginTop: "24px",
@@ -408,7 +438,7 @@ export function DashboardShell({
                     background: "#111",
                     color: "#fff",
                     borderRadius: "8px",
-                    textDecoration: "none",
+                    textDecorationLine: "none",
                     fontSize: "13px",
                     fontWeight: 500,
                     fontFamily: "'Geist', sans-serif",

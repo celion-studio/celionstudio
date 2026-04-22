@@ -1,129 +1,219 @@
 "use client";
 
+import {
+  Zap,
+  RefreshCw,
+  MessageSquare,
+  Save,
+  Redo2,
+  Undo2,
+} from "lucide-react";
+
 type ActionPanelProps = {
-  hasHtml: boolean;
-  sectionIds: string[];
+  hasDraft: boolean;
+  hasLocalDocumentEdits: boolean;
   revisionPrompt: string;
   feedback: string;
+  canUndoDocumentEdit: boolean;
+  canRedoDocumentEdit: boolean;
+  onUndoDocumentEdit: () => void;
+  onRedoDocumentEdit: () => void;
   onRevisionPromptChange: (value: string) => void;
+  onRequestSaveDocument: () => void;
   onGenerateFirstDraft: () => void;
   onRegenerateDraft: () => void;
   onReviseDraft: () => void;
-  onRegenerateSection: (sectionId: string) => void;
-  onExportPdf: () => void;
-  onFigmaHandoff: () => void;
 };
 
+const btnBase: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "7px",
+  width: "100%",
+  padding: "9px 14px",
+  border: "1px solid #ebe7dd",
+  borderRadius: "6px",
+  background: "#fff",
+  fontSize: "13px",
+  color: "#1a1714",
+  fontFamily: "'Geist', sans-serif",
+  cursor: "pointer",
+  transition: "border-color 0.12s ease, background 0.12s ease",
+  textAlign: "left",
+};
+
+const btnPrimary: React.CSSProperties = {
+  ...btnBase,
+  background: "#1a1714",
+  color: "#fff",
+  border: "1px solid #1a1714",
+  fontWeight: 600,
+};
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <p
+    style={{
+      margin: "0 0 10px",
+      fontSize: "10px",
+      fontWeight: 600,
+      letterSpacing: "0.16em",
+      textTransform: "uppercase",
+      color: "#b8b4aa",
+      fontFamily: "'Geist', sans-serif",
+    }}
+  >
+    {children}
+  </p>
+);
+
 export function ActionPanel({
-  hasHtml,
-  sectionIds,
+  hasDraft,
+  hasLocalDocumentEdits,
   revisionPrompt,
   feedback,
+  canUndoDocumentEdit,
+  canRedoDocumentEdit,
+  onUndoDocumentEdit,
+  onRedoDocumentEdit,
   onRevisionPromptChange,
+  onRequestSaveDocument,
   onGenerateFirstDraft,
   onRegenerateDraft,
   onReviseDraft,
-  onRegenerateSection,
-  onExportPdf,
-  onFigmaHandoff,
 }: ActionPanelProps) {
   return (
-    <aside className="flex h-full flex-col gap-4 border-l border-line bg-white/60 p-5">
-      <div className="rounded-[24px] border border-line bg-[#fcfaf4] p-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          AI actions
-        </p>
-        <div className="mt-4 grid gap-3">
-          <button
-            type="button"
-            onClick={onGenerateFirstDraft}
-            className="rounded-[18px] bg-text px-4 py-3 text-sm font-medium text-white transition hover:-translate-y-0.5"
-          >
-            Generate first draft
+    <aside
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        borderLeft: "1px solid #e8e4dd",
+        background: "#ffffff",
+        overflowY: "auto",
+      }}
+    >
+      {hasLocalDocumentEdits && (
+        <div style={{ padding: "20px 18px", borderBottom: "1px solid #ebe7dd" }}>
+          <SectionLabel>Edits</SectionLabel>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={onUndoDocumentEdit}
+              disabled={!canUndoDocumentEdit}
+              style={{
+                ...btnBase,
+                justifyContent: "center",
+                opacity: canUndoDocumentEdit ? 1 : 0.4,
+                cursor: canUndoDocumentEdit ? "pointer" : "not-allowed",
+              }}
+            >
+              <Undo2 size={14} style={{ color: "#8a867e" }} />
+              Undo
+            </button>
+            <button
+              type="button"
+              onClick={onRedoDocumentEdit}
+              disabled={!canRedoDocumentEdit}
+              style={{
+                ...btnBase,
+                justifyContent: "center",
+                opacity: canRedoDocumentEdit ? 1 : 0.4,
+                cursor: canRedoDocumentEdit ? "pointer" : "not-allowed",
+              }}
+            >
+              <Redo2 size={14} style={{ color: "#8a867e" }} />
+              Redo
+            </button>
+          </div>
+          <button type="button" onClick={onRequestSaveDocument} style={btnBase}>
+            <Save size={14} style={{ color: "#8a867e" }} />
+            Save edits
+          </button>
+        </div>
+      )}
+
+      {/* Generate */}
+      <div style={{ padding: "20px 18px", borderBottom: "1px solid #ebe7dd" }}>
+        <SectionLabel>Generate</SectionLabel>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <button type="button" onClick={onGenerateFirstDraft} style={btnPrimary}>
+            <Zap size={14} />
+            Generate draft
           </button>
           <button
             type="button"
             onClick={onRegenerateDraft}
-            disabled={!hasHtml}
-            className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-text transition hover:border-text disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!hasDraft}
+            style={{ ...btnBase, opacity: hasDraft ? 1 : 0.4, cursor: hasDraft ? "pointer" : "not-allowed" }}
           >
+            <RefreshCw size={14} style={{ color: "#8a867e" }} />
             Regenerate full draft
           </button>
         </div>
       </div>
 
-      <div className="rounded-[24px] border border-line bg-white p-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          Revision prompt
-        </p>
+      {/* Revise */}
+      <div style={{ padding: "20px 18px", borderBottom: "1px solid #ebe7dd" }}>
+        <SectionLabel>Revise with AI</SectionLabel>
         <textarea
           value={revisionPrompt}
-          onChange={(event) => onRevisionPromptChange(event.target.value)}
-          placeholder="Make the tone sharper, shorten the intro, make it feel more practical..."
-          className="mt-4 min-h-[144px] w-full rounded-[20px] border border-line bg-[#fcfaf4] px-4 py-4 text-sm leading-7 text-text outline-none transition focus:border-text"
+          onChange={(e) => onRevisionPromptChange(e.target.value)}
+          placeholder="Make the tone sharper, shorten the intro, add more examples..."
+          rows={4}
+          style={{
+            width: "100%",
+            borderRadius: "4px",
+            border: "1px solid #ebe7dd",
+            background: "#faf9f5",
+            padding: "10px 12px",
+            fontSize: "13px",
+            lineHeight: 1.6,
+            color: "#1a1714",
+            fontFamily: "'Geist', sans-serif",
+            outline: "none",
+            resize: "none",
+            boxSizing: "border-box",
+            transition: "border-color 0.12s ease",
+          }}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "#1a1714")}
+          onBlur={(e) => (e.currentTarget.style.borderColor = "#ebe7dd")}
         />
         <button
           type="button"
           onClick={onReviseDraft}
-          disabled={!hasHtml || !revisionPrompt.trim()}
-          className="mt-4 w-full rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-text transition hover:border-text disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!hasDraft || !revisionPrompt.trim()}
+          style={{
+            ...btnBase,
+            marginTop: "8px",
+            opacity: hasDraft && revisionPrompt.trim() ? 1 : 0.4,
+            cursor: hasDraft && revisionPrompt.trim() ? "pointer" : "not-allowed",
+          }}
         >
-          Revise whole draft
+          <MessageSquare size={14} style={{ color: "#8a867e" }} />
+          Apply revision
         </button>
       </div>
 
-      <div className="rounded-[24px] border border-line bg-white p-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          Section regeneration
-        </p>
-        <div className="mt-4 grid gap-2">
-          {sectionIds.length === 0 ? (
-            <p className="rounded-[18px] border border-dashed border-line px-4 py-4 text-sm text-muted">
-              No `data-section` markers are available yet.
-            </p>
-          ) : (
-            sectionIds.map((sectionId) => (
-              <button
-                key={sectionId}
-                type="button"
-                onClick={() => onRegenerateSection(sectionId)}
-                className="rounded-[18px] border border-line bg-[#fcfaf4] px-4 py-3 text-left text-sm text-text transition hover:border-text"
-              >
-                Regenerate {sectionId}
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-[24px] border border-line bg-white p-4">
-        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted">
-          Output
-        </p>
-        <div className="mt-4 grid gap-3">
-          <button
-            type="button"
-            onClick={onExportPdf}
-            disabled={!hasHtml}
-            className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-text transition hover:border-text disabled:cursor-not-allowed disabled:opacity-40"
+      {/* Feedback toast */}
+      {feedback && (
+        <div style={{ padding: "16px 18px" }}>
+          <p
+            style={{
+              margin: 0,
+              padding: "10px 14px",
+              background: "#faf9f5",
+              border: "1px solid #ebe7dd",
+              borderRadius: "4px",
+              fontSize: "12.5px",
+              lineHeight: 1.6,
+              color: "#4a443d",
+              fontFamily: "'Geist', sans-serif",
+            }}
           >
-            Export PDF
-          </button>
-          <button
-            type="button"
-            onClick={onFigmaHandoff}
-            disabled={!hasHtml}
-            className="rounded-[18px] border border-line bg-white px-4 py-3 text-sm text-text transition hover:border-text disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Copy HTML for Figma
-          </button>
-        </div>
-        {feedback ? (
-          <p className="mt-4 rounded-[18px] bg-accentSoft px-4 py-3 text-sm leading-6 text-text">
             {feedback}
           </p>
-        ) : null}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }
