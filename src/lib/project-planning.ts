@@ -44,7 +44,6 @@ export function createProjectRecord(args: {
     updatedAt: now,
     sources: args.sources,
     profile: args.profile,
-    html: "",
   } as ProjectRecord;
 }
 

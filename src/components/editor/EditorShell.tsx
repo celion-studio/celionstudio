@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import type { PartialBlock } from "@blocknote/core";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download } from "lucide-react";
-import { BuilderLeftPanel } from "@/components/builder/BuilderLeftPanel";
-import { DocumentEditorPanel } from "@/components/builder/DocumentEditorPanel";
-import { PageFormatControl } from "@/components/builder/PageFormatControl";
-import { ActionPanel } from "@/components/builder/ActionPanel";
-import { blockNoteDocumentToHtml, normalizeBlockNoteDocument } from "@/lib/blocknote-document";
+import { EditorLeftPanel } from "@/components/editor/EditorLeftPanel";
+import { DocumentEditorPanel } from "@/components/editor/DocumentEditorPanel";
+import { PageFormatControl } from "@/components/editor/PageFormatControl";
+import { ActionPanel } from "@/components/editor/ActionPanel";
+import {
+  docNodeCount,
+  normalizeTiptapBookDocument,
+  tiptapDocumentToHtml,
+  type TiptapBookDocument,
+} from "@/lib/tiptap-document";
 import {
   normalizePageFormat,
   normalizePageSize,
@@ -17,27 +21,34 @@ import {
 } from "@/lib/page-format";
 import type { ProjectRecord } from "@/types/project";
 
-function cloneDocument(blocks: unknown): PartialBlock[] {
-  return JSON.parse(JSON.stringify(normalizeBlockNoteDocument(blocks))) as PartialBlock[];
+function cloneBookDocument(document: unknown) {
+  return JSON.parse(
+    JSON.stringify(normalizeTiptapBookDocument(document)),
+  ) as TiptapBookDocument;
 }
 
-function saveBlocksPayload(blocks: unknown) {
-  return { action: "save-blocks", blocks } as const;
+function saveDocumentPayload(document: unknown) {
+  return { action: "save-document", document } as const;
 }
 
-export function BuilderShell({ projectId }: { projectId: string }) {
+export function EditorShell({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectRecord | null>(null);
   const [hasLocalDocumentEdits, setHasLocalDocumentEdits] = useState(false);
-  const [undoStack, setUndoStack] = useState<PartialBlock[][]>([]);
-  const [redoStack, setRedoStack] = useState<PartialBlock[][]>([]);
+  const hasLocalDocumentEditsRef = useRef(false);
+  const [undoStack, setUndoStack] = useState<TiptapBookDocument[]>([]);
+  const [redoStack, setRedoStack] = useState<TiptapBookDocument[]>([]);
   const [revisionPrompt, setRevisionPrompt] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [visualPageCount, setVisualPageCount] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setFeedback("");
+    setLocalDocumentEdits(false);
+    setUndoStack([]);
+    setRedoStack([]);
 
     fetch(`/api/projects/${projectId}`, { method: "GET", cache: "no-store" })
       .then((r) => r.json())
@@ -60,24 +71,32 @@ export function BuilderShell({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
-  const documentBlocks = useMemo(
-    () => normalizeBlockNoteDocument(project?.profile.blocks ?? []),
-    [project?.profile.blocks],
+  const pageFormat = normalizePageFormat(project?.profile.pageFormat);
+  const customPageSize = normalizePageSize(project?.profile.customPageSize);
+  const bookDocument = useMemo(
+    () => normalizeTiptapBookDocument(project?.profile.document ?? []),
+    [project?.profile.document],
   );
 
   const exportHtml = useMemo(() => {
     if (!project) return "";
 
-    return blockNoteDocumentToHtml({
+    return tiptapDocumentToHtml({
       title: project.title,
-      blocks: documentBlocks,
+      document: bookDocument,
       pageFormat: project.profile.pageFormat,
       customPageSize: project.profile.customPageSize,
     });
-  }, [documentBlocks, project]);
-  const hasDraft = documentBlocks.length > 0;
-  const pageFormat = normalizePageFormat(project?.profile.pageFormat);
-  const customPageSize = normalizePageSize(project?.profile.customPageSize);
+  }, [bookDocument, project]);
+  const hasDraft = bookDocument.pages.some((page) => docNodeCount(page.doc) > 0);
+  useEffect(() => {
+    setVisualPageCount(undefined);
+  }, [projectId, pageFormat, customPageSize.widthMm, customPageSize.heightMm]);
+
+  function setLocalDocumentEdits(value: boolean) {
+    hasLocalDocumentEditsRef.current = value;
+    setHasLocalDocumentEdits(value);
+  }
 
   async function applyMutation(
     body:
@@ -93,53 +112,55 @@ export function BuilderShell({ projectId }: { projectId: string }) {
     const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string } | null;
     if (!res.ok || !payload?.project) throw new Error(payload?.message ?? "Could not update this draft.");
     setProject(payload.project);
-    setHasLocalDocumentEdits(false);
+    setLocalDocumentEdits(false);
     setUndoStack([]);
     setRedoStack([]);
     setFeedback(successMessage);
   }
 
-  function setProjectDocument(nextBlocks: PartialBlock[]) {
+  function setProjectDocument(nextDocument: TiptapBookDocument) {
     setProject((current) =>
       current
         ? {
             ...current,
             profile: {
               ...current.profile,
-              blocks: nextBlocks as ProjectRecord["profile"]["blocks"],
+              document: nextDocument,
             },
           }
         : current,
     );
   }
 
-  function updateLocalDocument(nextBlocks: PartialBlock[]) {
-    setUndoStack((history) => [...history, cloneDocument(documentBlocks)]);
+  function updateLocalDocument(nextDocument: TiptapBookDocument) {
+    if (!hasLocalDocumentEditsRef.current) {
+      setUndoStack((history) => [...history, cloneBookDocument(bookDocument)]);
+    }
     setRedoStack([]);
-    setProjectDocument(nextBlocks);
-    setHasLocalDocumentEdits(true);
+    setProjectDocument(nextDocument);
+    setLocalDocumentEdits(true);
     setFeedback("Document edits are staged locally.");
   }
 
   function undoDocumentEdit() {
-    const previousBlocks = undoStack[undoStack.length - 1];
-    if (!previousBlocks) return;
+    const previousDocument = undoStack[undoStack.length - 1];
+    if (!previousDocument) return;
 
     setUndoStack((history) => history.slice(0, -1));
-    setRedoStack((history) => [...history, cloneDocument(documentBlocks)]);
-    setProjectDocument(previousBlocks);
-    setHasLocalDocumentEdits(true);
+    setRedoStack((history) => [...history, cloneBookDocument(bookDocument)]);
+    setProjectDocument(previousDocument);
+    setLocalDocumentEdits(true);
     setFeedback("Document edit undone.");
   }
 
   function redoDocumentEdit() {
-    const nextBlocks = redoStack[redoStack.length - 1];
-    if (!nextBlocks) return;
+    const nextDocument = redoStack[redoStack.length - 1];
+    if (!nextDocument) return;
 
     setRedoStack((history) => history.slice(0, -1));
-    setUndoStack((history) => [...history, cloneDocument(documentBlocks)]);
-    setProjectDocument(nextBlocks);
-    setHasLocalDocumentEdits(true);
+    setUndoStack((history) => [...history, cloneBookDocument(bookDocument)]);
+    setProjectDocument(nextDocument);
+    setLocalDocumentEdits(true);
     setFeedback("Document edit redone.");
   }
 
@@ -147,7 +168,7 @@ export function BuilderShell({ projectId }: { projectId: string }) {
     const res = await fetch(`/api/projects/${projectId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(saveBlocksPayload(documentBlocks)),
+      body: JSON.stringify(saveDocumentPayload(bookDocument)),
     });
     const payload = (await res.json().catch(() => null)) as {
       project?: ProjectRecord;
@@ -159,7 +180,7 @@ export function BuilderShell({ projectId }: { projectId: string }) {
     }
 
     setProject(payload.project);
-    setHasLocalDocumentEdits(false);
+    setLocalDocumentEdits(false);
     setUndoStack([]);
     setRedoStack([]);
     setFeedback("Document edits saved.");
@@ -322,25 +343,47 @@ export function BuilderShell({ projectId }: { projectId: string }) {
           </button>
         </div>
       </header>
-
       <div
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "220px minmax(0, 1fr) 300px",
+          gridTemplateColumns: "260px minmax(0, 1fr) 300px",
           height: "calc(100vh - 52px)",
           minHeight: "calc(100vh - 52px)",
         }}
       >
-        <BuilderLeftPanel blocks={documentBlocks} />
-        <DocumentEditorPanel
-          key={`${project.id}:${project.updatedAt}`}
-          title={project.title}
-          blocks={documentBlocks}
+        <EditorLeftPanel
+          document={bookDocument}
           pageFormat={pageFormat}
           customPageSize={customPageSize}
-          onChange={updateLocalDocument}
+          visualPageCount={visualPageCount}
         />
+        <div style={{ display: "flex", minWidth: 0, minHeight: 0, flexDirection: "column" }}>
+          <div
+            id="editor-toolbar"
+            style={{
+              height: "42px",
+              borderBottom: "1px solid #e8e4dd",
+              background: "#fff",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              minWidth: 0,
+            }}
+          />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <DocumentEditorPanel
+              key={`${project.id}:${project.updatedAt}`}
+              title={project.title}
+              document={bookDocument}
+              pageFormat={pageFormat}
+              customPageSize={customPageSize}
+              toolbarHostId="editor-toolbar"
+              onChange={updateLocalDocument}
+              onPageCountChange={setVisualPageCount}
+            />
+          </div>
+        </div>
         <ActionPanel
           hasDraft={hasDraft}
           hasLocalDocumentEdits={hasLocalDocumentEdits}

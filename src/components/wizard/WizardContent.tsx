@@ -25,7 +25,7 @@ const STEP_DESCRIPTIONS = [
   "Title, author, target reader, core message, and tone.",
   "Add the document material Celion should turn into an ebook.",
   "Use the ebook default or switch to a print/custom size.",
-  "Celion will create a BlockNote document you can edit directly.",
+  "Celion will create an editable document you can refine directly.",
 ] as const;
 
 const basicsSchema = z.object({
@@ -164,13 +164,13 @@ export function WizardContent({ onCreated }: { onCreated?: (project: ProjectReco
             designMode: "text",
             pageFormat,
             customPageSize,
-            goal: "",
-            depth: "",
             tone,
-            structureStyle: "",
-            readerLevel: "",
             plan: null,
-            blocks: [],
+            document: {
+              type: "tiptap-book",
+              version: 1,
+              pages: [{ id: "page-1", doc: { type: "doc", content: [{ type: "paragraph" }] } }],
+            },
           },
         }),
       });
@@ -197,7 +197,7 @@ export function WizardContent({ onCreated }: { onCreated?: (project: ProjectReco
 
       reset();
       onCreated?.(generated.project);
-      router.push(`/builder/${generated.project.id}`);
+      router.push(`/editor/${generated.project.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {

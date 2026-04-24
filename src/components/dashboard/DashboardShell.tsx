@@ -3,8 +3,8 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { BookOpen, ChevronRight, Clock, FileText, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { BookOpen, ChevronRight, Clock, FileText, PenLine, Sparkles, Wand2, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import { WorkspaceSidebar } from "@/components/dashboard/WorkspaceSidebar";
@@ -21,6 +21,7 @@ export function DashboardShell({
   initialUserName,
   initialUserEmail,
 }: DashboardShellProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
   const { data: clientSession, isPending: authPending } = authClient.useSession();
@@ -37,6 +38,9 @@ export function DashboardShell({
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
+  const [deletingProjectId, setDeletingProjectId] = useState("");
+  const [showCreateChoices, setShowCreateChoices] = useState(false);
+  const [creatingBlank, setCreatingBlank] = useState(false);
   const showLoading = loading || (authPending && !hasVerifier);
 
   async function fetchProjects() {
@@ -146,6 +150,88 @@ export function DashboardShell({
     (project) => !["draft", "exported"].includes(project.status),
   ).length;
 
+  async function deleteProject(project: ProjectRecord) {
+    const label = project.title || "Untitled Draft";
+    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
+
+    const previousProjects = projects;
+    setDeletingProjectId(project.id);
+    setError("");
+    setProjects((current) => current.filter((item) => item.id !== project.id));
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "DELETE",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { message?: string }
+          | null;
+        throw new Error(payload?.message ?? "Could not delete this project.");
+      }
+    } catch (caught) {
+      setProjects(previousProjects);
+      setError(caught instanceof Error ? caught.message : "Could not delete this project.");
+    } finally {
+      setDeletingProjectId("");
+    }
+  }
+
+  async function createBlankProject() {
+    if (creatingBlank) return;
+
+    setCreatingBlank(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({
+          title: "Untitled Draft",
+          sources: [],
+          profile: {
+            author: "",
+            targetAudience: "",
+            coreMessage: "",
+            designMode: "text",
+            pageFormat: "ebook",
+            customPageSize: { widthMm: 152, heightMm: 229 },
+            tone: "",
+            plan: null,
+            document: {
+              type: "tiptap-book",
+              version: 1,
+              pages: [{ id: "page-1", doc: { type: "doc", content: [{ type: "paragraph" }] } }],
+            },
+          },
+        }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { project?: ProjectRecord; message?: string }
+        | null;
+      if (!response.ok || !payload?.project) {
+        throw new Error(payload?.message ?? "Could not create a blank draft.");
+      }
+
+      setShowCreateChoices(false);
+      router.push(`/editor/${payload.project.id}`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not create a blank draft.");
+    } finally {
+      setCreatingBlank(false);
+    }
+  }
+
+  function openCreateChoices() {
+    if (!resolvedSignedIn) return;
+    setShowCreateChoices(true);
+  }
+
   return (
     <div
       style={{
@@ -161,7 +247,7 @@ export function DashboardShell({
         isSignedIn={resolvedSignedIn}
         initialUserName={resolvedUserName}
         initialUserEmail={resolvedUserEmail}
-        primaryAction={{ href: "/new", label: "New ebook" }}
+        primaryAction={{ href: "/new", label: "New ebook", onClick: openCreateChoices }}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -309,7 +395,13 @@ export function DashboardShell({
               </div>
             ) : null}
 
-            {!showLoading && resolvedSignedIn ? <ProjectList projects={projects} /> : null}
+            {!showLoading && resolvedSignedIn ? (
+              <ProjectList
+                projects={projects}
+                deletingProjectId={deletingProjectId}
+                onDeleteProject={deleteProject}
+              />
+            ) : null}
 
             {!showLoading && !resolvedSignedIn ? (
               <div
@@ -428,8 +520,9 @@ export function DashboardShell({
                 >
                   Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.
                 </p>
-                <Link
-                  href={"/new" as Route}
+                <button
+                  type="button"
+                  onClick={openCreateChoices}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -442,16 +535,171 @@ export function DashboardShell({
                     fontSize: "13px",
                     fontWeight: 500,
                     fontFamily: "'Geist', sans-serif",
+                    border: "none",
+                    cursor: "pointer",
                   }}
                 >
                   <FileText size={13} strokeWidth={2.2} />
                   Create first ebook
-                </Link>
+                </button>
               </div>
             ) : null}
           </div>
         </main>
       </div>
+      {showCreateChoices ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create new ebook"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(22, 18, 14, 0.28)",
+            padding: "24px",
+          }}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !creatingBlank) {
+              setShowCreateChoices(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              width: "min(520px, 100%)",
+              background: "#fff",
+              border: "1px solid #E7E1D8",
+              borderRadius: "10px",
+              boxShadow: "0 24px 80px rgba(31, 22, 14, 0.18)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "54px",
+                padding: "0 18px 0 20px",
+                borderBottom: "1px solid #ECEAE5",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <span style={{ fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600, color: "#111" }}>
+                New ebook
+              </span>
+              <button
+                type="button"
+                disabled={creatingBlank}
+                aria-label="Close"
+                onClick={() => setShowCreateChoices(false)}
+                style={{
+                  width: "30px",
+                  height: "30px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #ECEAE5",
+                  borderRadius: "6px",
+                  background: "#fff",
+                  color: "#8E877D",
+                  cursor: creatingBlank ? "not-allowed" : "pointer",
+                }}
+              >
+                <X size={14} strokeWidth={1.8} />
+              </button>
+            </div>
+
+            <div style={{ padding: "18px", display: "grid", gap: "10px" }}>
+              <Link
+                href={"/new" as Route}
+                onClick={() => setShowCreateChoices(false)}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "36px 1fr 18px",
+                  gap: "14px",
+                  alignItems: "center",
+                  padding: "16px",
+                  border: "1px solid #ECEAE5",
+                  borderRadius: "8px",
+                  textDecorationLine: "none",
+                  color: "#111",
+                  background: "#fff",
+                }}
+              >
+                <span
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "#F0EEE9",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Wand2 size={16} strokeWidth={1.8} />
+                </span>
+                <span>
+                  <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
+                    Start with wizard
+                  </span>
+                  <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
+                    Add source material and generate a draft.
+                  </span>
+                </span>
+                <ChevronRight size={16} color="#B9B2A8" />
+              </Link>
+
+              <button
+                type="button"
+                disabled={creatingBlank}
+                onClick={createBlankProject}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "36px 1fr 18px",
+                  gap: "14px",
+                  alignItems: "center",
+                  padding: "16px",
+                  border: "1px solid #ECEAE5",
+                  borderRadius: "8px",
+                  textAlign: "left",
+                  background: creatingBlank ? "#F7F6F3" : "#fff",
+                  color: "#111",
+                  cursor: creatingBlank ? "wait" : "pointer",
+                }}
+              >
+                <span
+                  style={{
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "8px",
+                    background: "#111",
+                    color: "#fff",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <PenLine size={16} strokeWidth={1.8} />
+                </span>
+                <span>
+                  <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
+                    Start blank
+                  </span>
+                  <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
+                    Open the editor with an empty document.
+                  </span>
+                </span>
+                <ChevronRight size={16} color="#B9B2A8" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

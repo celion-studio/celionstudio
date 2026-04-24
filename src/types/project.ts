@@ -47,22 +47,18 @@ export type ProjectPlan = {
   chapters: PlanChapter[];
 };
 
-export type ProjectDocumentBlock = Record<string, unknown>;
+export type ProjectDocumentPayload = unknown;
 
 export type ProjectProfile = {
   author: string;
   targetAudience: string;
   coreMessage: string;
   designMode: DesignMode;
-  goal: string;
-  depth: string;
   tone: string;
-  structureStyle: string;
-  readerLevel: string;
   pageFormat: PageFormat;
   customPageSize: PageSize;
   plan: ProjectPlan | null;
-  blocks: ProjectDocumentBlock[];
+  document: ProjectDocumentPayload;
 };
 
 export type ProjectRecord = {
@@ -73,7 +69,6 @@ export type ProjectRecord = {
   updatedAt: string;
   sources: ProjectSource[];
   profile: ProjectProfile;
-  html: string;
   revisionPrompt?: string;
 };
 

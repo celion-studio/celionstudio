@@ -1,9 +1,8 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
-import { normalizeBlockNoteDocument } from "@/lib/blocknote-document";
+import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
 import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
-import type { ProjectDocumentBlock } from "@/types/project";
 
 const createProjectSchema = z.object({
   title: z.string().trim().min(1),
@@ -21,13 +20,9 @@ const createProjectSchema = z.object({
         heightMm: z.number().min(50).max(800),
       })
       .default({ widthMm: 152, heightMm: 229 }),
-    goal: z.string().default(""),
-    depth: z.string().default(""),
     tone: z.string().default(""),
-    structureStyle: z.string().default(""),
-    readerLevel: z.string().default(""),
     plan: z.any().optional().nullable(),
-    blocks: z.unknown().optional().default([]),
+    document: z.unknown().optional().default([]),
   }),
   sources: z
     .array(
@@ -39,7 +34,7 @@ const createProjectSchema = z.object({
         excerpt: z.string(),
       }),
     )
-    .min(1),
+    .default([]),
 });
 
 export async function GET() {
@@ -76,13 +71,9 @@ export async function POST(request: Request) {
       designMode: p.designMode,
       pageFormat: p.pageFormat,
       customPageSize: p.customPageSize,
-      goal: p.goal,
-      depth: p.depth,
       tone: p.tone,
-      structureStyle: p.structureStyle,
-      readerLevel: p.readerLevel,
       plan: p.plan ?? null,
-      blocks: normalizeBlockNoteDocument(p.blocks) as ProjectDocumentBlock[],
+      document: normalizeTiptapBookDocument(p.document),
     },
     sources: parsed.data.sources,
   });

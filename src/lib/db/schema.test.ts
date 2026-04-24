@@ -42,7 +42,32 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS goal"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS outline"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("ADD COLUMN IF NOT EXISTS page_format"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ALTER COLUMN plan TYPE jsonb"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ALTER COLUMN document TYPE jsonb"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ALTER TABLE project_profiles DROP COLUMN blocks"),
     ),
   );
   assert.ok(
@@ -62,7 +87,12 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("CREATE INDEX IF NOT EXISTS html_versions_project_id_version_number_idx"),
+      statement.includes("DROP COLUMN IF EXISTS current_html_version_id"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("DROP TABLE IF EXISTS html_versions"),
     ),
   );
 });
@@ -87,7 +117,7 @@ test("applyAppSchema grants app table privileges when an app role is provided", 
   );
   assert.ok(
     statements.includes(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, html_versions TO "app""user"',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items TO "app""user"',
     ),
   );
   assert.ok(

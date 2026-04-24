@@ -1,5 +1,5 @@
 ﻿import { createProjectRecord } from "@/lib/project-planning";
-import { blockNoteDocumentToHtml, normalizeBlockNoteDocument } from "@/lib/blocknote-document";
+import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
 import { ensureAppSchema, getSql } from "@/lib/db";
 import {
   normalizePageFormat,
@@ -29,18 +29,12 @@ type ProjectRow = {
   status: ProjectStatus;
   createdAt: Date | string;
   updatedAt: Date | string;
-  currentHtmlVersionId: string | null;
 };
 
 type ProfileRow = {
   projectId: string;
   targetAudience: string;
-  goal: string;
-  depth: string;
   tone: string;
-  structureStyle: string;
-  readerLevel: string;
-  outline: string;
   author: string;
   coreMessage: string;
   designMode: string;
@@ -48,7 +42,7 @@ type ProfileRow = {
   pageWidthMm: number | string | null;
   pageHeightMm: number | string | null;
   plan: unknown;
-  blocks: unknown;
+  document: unknown;
 };
 
 type SourceRow = {
@@ -59,12 +53,6 @@ type SourceRow = {
   rawText: string;
   normalizedText: string;
   createdAt: Date | string;
-};
-
-type HtmlRow = {
-  projectId: string;
-  html: string;
-  versionNumber: number;
 };
 
 function toIsoString(value: Date | string) {
@@ -78,7 +66,7 @@ function normalizeProjectRecord(input: ProjectRecord): ProjectRecord {
 function generationProfileState(project: ProjectRecord) {
   return JSON.stringify({
     plan: project.profile.plan,
-    blocks: project.profile.blocks,
+    document: project.profile.document,
   });
 }
 
@@ -102,18 +90,14 @@ function emptyProfile(): ProjectProfile {
     designMode: "balanced",
     pageFormat: "ebook",
     customPageSize: normalizePageSize(null),
-    goal: "",
-    depth: "",
     tone: "",
-    structureStyle: "",
-    readerLevel: "",
     plan: null,
-    blocks: [],
+    document: normalizeTiptapBookDocument([]),
   };
 }
 
 function profileFromRow(row: ProfileRow): ProjectProfile {
-  const rawBlocks = parseJson<unknown>(row.blocks, []);
+  const rawDocument = parseJson<unknown>(row.document, []);
   const customPageSize = normalizePageSize({
     widthMm: row.pageWidthMm,
     heightMm: row.pageHeightMm,
@@ -126,13 +110,9 @@ function profileFromRow(row: ProfileRow): ProjectProfile {
     designMode: (row.designMode as DesignMode) || "balanced",
     pageFormat: normalizePageFormat(row.pageFormat),
     customPageSize,
-    goal: row.goal,
-    depth: row.depth,
     tone: row.tone,
-    structureStyle: row.structureStyle,
-    readerLevel: row.readerLevel,
     plan: parseJson<ProjectPlan | null>(row.plan, null),
-    blocks: normalizeBlockNoteDocument(rawBlocks) as ProjectProfile["blocks"],
+    document: normalizeTiptapBookDocument(rawDocument),
   };
 }
 
@@ -148,39 +128,13 @@ function isMissingProjectProfileColumnError(caught: unknown) {
   );
 }
 
-async function getCurrentHtmlMap(projectIds: string[]) {
-  if (projectIds.length === 0) return new Map<string, string>();
-  const sql = getSql();
-  const rows = (await sql`
-    SELECT project_id::text AS "projectId", html, version_number AS "versionNumber"
-    FROM html_versions
-    WHERE project_id::text = ANY(${projectIds})
-    ORDER BY version_number DESC
-  `) as HtmlRow[];
-  const htmlMap = new Map<string, string>();
-  for (const row of rows) {
-    if (!htmlMap.has(row.projectId)) htmlMap.set(row.projectId, row.html);
-  }
-  return htmlMap;
-}
-
-async function getNextVersionNumber(projectId: string) {
-  const sql = getSql();
-  const [row] = (await sql`
-    SELECT coalesce(max(version_number), 0) AS count
-    FROM html_versions WHERE project_id::text = ${projectId}
-  `) as { count: number | string }[];
-  return Number(row?.count ?? 0) + 1;
-}
-
 export async function listProjectRecordsForUser(userId: string) {
   await ensureAppSchema();
 
   const sql = getSql();
   const projectRows = (await sql`
     SELECT id::text AS id, title, status,
-      created_at AS "createdAt", updated_at AS "updatedAt",
-      current_html_version_id::text AS "currentHtmlVersionId"
+      created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects WHERE user_id = ${userId} ORDER BY updated_at DESC
   `) as ProjectRow[];
 
@@ -190,16 +144,15 @@ export async function listProjectRecordsForUser(userId: string) {
   const [profileRowsResult, sourceRowsResult] = await Promise.all([
     sql`
       SELECT project_id::text AS "projectId",
-        target_audience AS "targetAudience", goal, depth, tone,
-        structure_style AS "structureStyle", reader_level AS "readerLevel", outline,
+        target_audience AS "targetAudience", tone,
         COALESCE(author, '') AS author,
         COALESCE(core_message, '') AS "coreMessage",
         COALESCE(design_mode, 'balanced') AS "designMode",
         COALESCE(page_format, 'ebook') AS "pageFormat",
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
         COALESCE(page_height_mm, 229) AS "pageHeightMm",
-        COALESCE(plan, '') AS plan,
-        COALESCE(blocks, '[]') AS blocks
+        plan AS plan,
+        COALESCE(document, '[]'::jsonb) AS document
       FROM project_profiles WHERE project_id::text = ANY(${projectIds})
     `,
     sql`
@@ -231,7 +184,6 @@ export async function listProjectRecordsForUser(userId: string) {
       createdAt: toIsoString(row.createdAt), updatedAt: toIsoString(row.updatedAt),
       sources: sourceMap.get(row.id) ?? [],
       profile: profileMap.get(row.id) ?? emptyProfile(),
-      html: "",
     }),
   );
 }
@@ -242,25 +194,23 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
   const sql = getSql();
   const [projectRow] = (await sql`
     SELECT id::text AS id, title, status,
-      created_at AS "createdAt", updated_at AS "updatedAt",
-      current_html_version_id::text AS "currentHtmlVersionId"
+      created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
   `) as ProjectRow[];
   if (!projectRow) return null;
 
-  const [profileRowsResult, sourceRowsResult, htmlMap] = await Promise.all([
+  const [profileRowsResult, sourceRowsResult] = await Promise.all([
     sql`
       SELECT project_id::text AS "projectId",
-        target_audience AS "targetAudience", goal, depth, tone,
-        structure_style AS "structureStyle", reader_level AS "readerLevel", outline,
+        target_audience AS "targetAudience", tone,
         COALESCE(author, '') AS author,
         COALESCE(core_message, '') AS "coreMessage",
         COALESCE(design_mode, 'balanced') AS "designMode",
         COALESCE(page_format, 'ebook') AS "pageFormat",
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
         COALESCE(page_height_mm, 229) AS "pageHeightMm",
-        COALESCE(plan, '') AS plan,
-        COALESCE(blocks, '[]') AS blocks
+        plan AS plan,
+        COALESCE(document, '[]'::jsonb) AS document
       FROM project_profiles WHERE project_id::text = ${projectRow.id} LIMIT 1
     `,
     sql`
@@ -269,7 +219,6 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
         raw_text AS "rawText", normalized_text AS "normalizedText", created_at AS "createdAt"
       FROM source_items WHERE project_id::text = ${projectRow.id} ORDER BY created_at ASC
     `,
-    getCurrentHtmlMap([projectRow.id]),
   ]);
   const profileRows = profileRowsResult as ProfileRow[];
   const sourceRows = sourceRowsResult as SourceRow[];
@@ -283,7 +232,6 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
       name: row.originalFilename ?? "Untitled source",
       content: row.rawText, excerpt: row.normalizedText.slice(0, 180),
     })),
-    html: htmlMap.get(projectRow.id) ?? "",
   });
 }
 
@@ -299,7 +247,7 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
     ...input.profile,
     pageFormat: normalizePageFormat(input.profile.pageFormat),
     customPageSize: normalizePageSize(input.profile.customPageSize),
-    blocks: normalizeBlockNoteDocument(input.profile.blocks) as ProjectProfile["blocks"],
+    document: normalizeTiptapBookDocument(input.profile.document),
   };
 
   const insertDraft = async () => {
@@ -318,16 +266,16 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
       `,
       sql`
         INSERT INTO project_profiles (
-          project_id, target_audience, goal, depth, tone, structure_style, reader_level, outline,
+          project_id, target_audience, tone,
           author, core_message, design_mode, page_format, page_width_mm, page_height_mm,
-          plan, blocks, created_at, updated_at
+          plan, document, created_at, updated_at
         ) VALUES (
           ${projectId},
-          ${p.targetAudience}, ${p.goal}, ${p.depth}, ${p.tone}, ${p.structureStyle}, ${p.readerLevel}, ${JSON.stringify([])},
+          ${p.targetAudience}, ${p.tone},
           ${p.author}, ${p.coreMessage}, ${p.designMode}, ${p.pageFormat},
           ${p.customPageSize.widthMm}, ${p.customPageSize.heightMm},
-          ${p.plan ? JSON.stringify(p.plan) : ""},
-          ${JSON.stringify(p.blocks ?? [])},
+          ${p.plan ? JSON.stringify(p.plan) : null}::jsonb,
+          ${JSON.stringify(p.document ?? [])}::jsonb,
           ${createdAt}, ${updatedAt}
         )
       `,
@@ -349,8 +297,8 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
   return getProjectRecordForUser(userId, projectId);
 }
 
-export function withSavedProjectBlocks(project: ProjectRecord, blocks: unknown): ProjectRecord {
-  const normalizedBlocks = normalizeBlockNoteDocument(blocks);
+export function withSavedProjectDocument(project: ProjectRecord, document: unknown): ProjectRecord {
+  const normalizedDocument = normalizeTiptapBookDocument(document);
   const updatedAt = new Date().toISOString();
 
   return {
@@ -359,14 +307,8 @@ export function withSavedProjectBlocks(project: ProjectRecord, blocks: unknown):
     updatedAt,
     profile: {
       ...project.profile,
-      blocks: normalizedBlocks as ProjectProfile["blocks"],
+      document: normalizedDocument,
     },
-    html: blockNoteDocumentToHtml({
-      title: project.title,
-      blocks: normalizedBlocks,
-      pageFormat: project.profile.pageFormat,
-      customPageSize: project.profile.customPageSize,
-    }),
   };
 }
 
@@ -405,55 +347,42 @@ export async function updateProjectPageFormat(
   return getProjectRecordForUser(userId, projectId);
 }
 
-export async function updateProjectBlocks(userId: string, projectId: string, blocks: unknown) {
+export async function updateProjectDocument(userId: string, projectId: string, document: unknown) {
   await ensureAppSchema();
 
   const sql = getSql();
   const current = await getProjectRecordForUser(userId, projectId);
   if (!current) return null;
 
-  const [existingProject] = (await sql`
-    SELECT id::text AS id, current_html_version_id::text AS "currentHtmlVersionId"
-    FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
-  `) as { id: string; currentHtmlVersionId: string | null }[];
-  if (!existingProject) return null;
-
-  const nextProject = withSavedProjectBlocks(current, blocks);
+  const nextProject = withSavedProjectDocument(current, document);
   const updatedAt = new Date(nextProject.updatedAt);
-  const queries = [
+  await sql.transaction([
     sql`
       UPDATE project_profiles
-      SET blocks = ${JSON.stringify(nextProject.profile.blocks)}, updated_at = ${updatedAt}
+      SET document = ${JSON.stringify(nextProject.profile.document)}::jsonb, updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
         AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
     `,
-  ];
-
-  if (nextProject.html !== current.html) {
-    const versionNumber = await getNextVersionNumber(projectId);
-    const versionId = crypto.randomUUID();
-    queries.push(sql`
-      INSERT INTO html_versions (id, project_id, html, version_number, created_at)
-      VALUES (${versionId}, ${projectId}, ${nextProject.html}, ${versionNumber}, ${updatedAt})
-    `);
-    queries.push(sql`
+    sql`
       UPDATE projects
-      SET title = ${nextProject.title}, status = ${nextProject.status},
-          updated_at = ${updatedAt}, current_html_version_id = ${versionId}
+      SET title = ${nextProject.title}, status = ${nextProject.status}, updated_at = ${updatedAt}
       WHERE id::text = ${projectId} AND user_id = ${userId}
-    `);
-  } else {
-    queries.push(sql`
-      UPDATE projects
-      SET title = ${nextProject.title}, status = ${nextProject.status},
-          updated_at = ${updatedAt},
-          current_html_version_id = ${existingProject.currentHtmlVersionId}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
-    `);
-  }
-
-  await sql.transaction(queries);
+    `,
+  ]);
   return getProjectRecordForUser(userId, projectId);
+}
+
+export async function deleteProjectForUser(userId: string, projectId: string) {
+  await ensureAppSchema();
+
+  const sql = getSql();
+  const deletedRows = (await sql`
+    DELETE FROM projects
+    WHERE id::text = ${projectId} AND user_id = ${userId}
+    RETURNING id::text AS id
+  `) as { id: string }[];
+
+  return deletedRows.length > 0;
 }
 
 export async function mutateProjectForUser(
@@ -468,12 +397,6 @@ export async function mutateProjectForUser(
   const sql = getSql();
   const current = await getProjectRecordForUser(userId, projectId);
   if (!current) return null;
-
-  const [existingProject] = (await sql`
-    SELECT id::text AS id, current_html_version_id::text AS "currentHtmlVersionId"
-    FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
-  `) as { id: string; currentHtmlVersionId: string | null }[];
-  if (!existingProject) return null;
 
   const generatedProjectResult =
     input.action === "generate" || input.action === "regenerate"
@@ -492,36 +415,20 @@ export async function mutateProjectForUser(
   if (profileChanged) {
     queries.push(sql`
       UPDATE project_profiles
-      SET plan = ${nextProject.profile.plan ? JSON.stringify(nextProject.profile.plan) : ""},
-          blocks = ${JSON.stringify(nextProject.profile.blocks)},
+      SET plan = ${nextProject.profile.plan ? JSON.stringify(nextProject.profile.plan) : null}::jsonb,
+          document = ${JSON.stringify(nextProject.profile.document)}::jsonb,
           updated_at = ${new Date(nextProject.updatedAt)}
       WHERE project_id::text = ${projectId}
         AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
     `);
   }
 
-  if (nextProject.html !== current.html) {
-    const versionNumber = await getNextVersionNumber(projectId);
-    const versionId = crypto.randomUUID();
-    queries.push(sql`
-      INSERT INTO html_versions (id, project_id, html, version_number, created_at)
-      VALUES (${versionId}, ${projectId}, ${nextProject.html}, ${versionNumber}, ${new Date(nextProject.updatedAt)})
-    `);
-    queries.push(sql`
-      UPDATE projects
-      SET title = ${nextProject.title}, status = ${nextProject.status},
-          updated_at = ${new Date(nextProject.updatedAt)}, current_html_version_id = ${versionId}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
-    `);
-  } else {
-    queries.push(sql`
-      UPDATE projects
-      SET title = ${nextProject.title}, status = ${nextProject.status},
-          updated_at = ${new Date(nextProject.updatedAt)},
-          current_html_version_id = ${existingProject.currentHtmlVersionId}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
-    `);
-  }
+  queries.push(sql`
+    UPDATE projects
+    SET title = ${nextProject.title}, status = ${nextProject.status},
+        updated_at = ${new Date(nextProject.updatedAt)}
+    WHERE id::text = ${projectId} AND user_id = ${userId}
+  `);
 
   await sql.transaction(queries);
   return getProjectRecordForUser(userId, projectId);

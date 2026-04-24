@@ -137,7 +137,7 @@ export function Hero({
               </div>
               <h1 className="font-geist">Your publishing OS.</h1>
               <p className="font-geist">
-                Celion is domain-specific AI for brand builders, agencies, and publishers.
+                Celion is domain-specific AI for brand teams, agencies, and publishers.
               </p>
             </div>
 

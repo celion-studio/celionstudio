@@ -1,9 +1,10 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  deleteProjectForUser,
   getProjectRecordForUser,
   mutateProjectForUser,
-  updateProjectBlocks,
+  updateProjectDocument,
   updateProjectPageFormat,
 } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
@@ -30,10 +31,8 @@ const mutationSchema = z.discriminatedUnion("action", [
     }),
   }),
   z.object({
-    action: z.literal("save-blocks"),
-    blocks: z.custom<unknown>((value) => value !== undefined, {
-      message: "blocks is required",
-    }),
+    action: z.literal("save-document"),
+    document: z.unknown().optional(),
   }),
 ]);
 
@@ -49,6 +48,22 @@ export async function GET(
   const project = await getProjectRecordForUser(session.user.id, projectId);
   if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
   return NextResponse.json({ project });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ projectId: string }> },
+) {
+  const session = await getRouteSession();
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+
+  const { projectId } = await context.params;
+  const deleted = await deleteProjectForUser(session.user.id, projectId);
+  if (!deleted) return NextResponse.json({ message: "Not found" }, { status: 404 });
+
+  return NextResponse.json({ ok: true });
 }
 
 export async function PATCH(
@@ -71,8 +86,16 @@ export async function PATCH(
     );
   }
 
-  if (parsed.data.action === "save-blocks") {
-    const project = await updateProjectBlocks(session.user.id, projectId, parsed.data.blocks);
+  if (parsed.data.action === "save-document") {
+    const document = parsed.data.document;
+    if (document === undefined) {
+      return NextResponse.json({ message: "document is required" }, { status: 400 });
+    }
+    const project = await updateProjectDocument(
+      session.user.id,
+      projectId,
+      document,
+    );
     if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
     return NextResponse.json({ project });
   }
@@ -86,6 +109,15 @@ export async function PATCH(
     );
     if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
     return NextResponse.json({ project });
+  }
+
+  if (
+    parsed.data.action !== "generate" &&
+    parsed.data.action !== "regenerate" &&
+    parsed.data.action !== "mark-exported" &&
+    parsed.data.action !== "revise"
+  ) {
+    return NextResponse.json({ message: "Unsupported action" }, { status: 400 });
   }
 
   let project;
@@ -103,4 +135,3 @@ export async function PATCH(
   if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
   return NextResponse.json({ project });
 }
-

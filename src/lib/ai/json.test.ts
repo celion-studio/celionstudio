@@ -14,16 +14,20 @@ test("extractJsonObjectFromText parses json fences with prose and trailing text"
 
 \`\`\`json
 {
-  "blocks": [
-    { "id": "b1", "content": { "body": "Brace in string: }" } }
-  ]
+  "document": {
+    "type": "doc",
+    "content": [{ "type": "text", "text": "Brace in string: }" }]
+  }
 }
 \`\`\`
 
 This is trailing explanation.`);
 
   assert.deepEqual(parsed, {
-    blocks: [{ id: "b1", content: { body: "Brace in string: }" } }],
+    document: {
+      type: "doc",
+      content: [{ type: "text", text: "Brace in string: }" }],
+    },
   });
 });
 

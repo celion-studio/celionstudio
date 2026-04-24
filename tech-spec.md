@@ -1,8 +1,8 @@
 # Tech Spec - Celion v1
 
 Created: 2026-04-19
-Updated: 2026-04-23
-Version: v0.6
+Updated: 2026-04-24
+Version: v0.7
 
 ## 1. Scope
 
@@ -13,7 +13,7 @@ It reflects the code that is actually running today, not an earlier migration pl
 Out of scope for this document:
 
 - Historical Better Auth + Drizzle migration ideas
-- Archived implementation plans under `docs/superpowers/plans`
+- Deleted early product-planning drafts from the pre-editor phase
 - Future payment, team, and analytics systems that are not implemented yet
 
 ## 2. Current Stack
@@ -49,21 +49,22 @@ Out of scope for this document:
 ### AI and document pipeline
 
 - Gemini API key based generation
-- BlockNote document JSON is the canonical editable document model
-- BlockNote renders and edits the document in the builder
-- Generated HTML remains a rendered artifact for export/PDF, not the editing model
+- The editor stores a paged Tiptap document JSON payload
+- Tiptap renders and edits each page in the editor
+- The editor supports image nodes with file insertion, selection menus, alignment, crop-frame display, and horizontal resizing
+- The editor supports a custom `mediaText` node for stable image-plus-text side-by-side layouts
+- Generated HTML is derived at export time from the saved document and is not persisted
 - PDF export path remains part of the intended architecture
 - Initial ebook generation should use one Gemini Flash call after project creation
 - Source files are converted to text before they are sent to the model
 
 Current product direction:
 
-- Celion is now a document-focused block editor, closer to Notion/BlockNote/TipTap-style editing than to a raw HTML/CSS builder.
-- BlockNote JSON is the editable source of truth.
+- Celion is now a document-focused editor, closer to Tiptap/Simple Editor document editing than to raw HTML/CSS page composition.
+- A paged Tiptap document is the editable source of truth.
 - HTML/CSS is only the renderer/export artifact.
-- The previous AI design-block direction is superseded.
+- The previous AI layout-token direction is superseded.
 - The wizard is an intake flow: setup, source upload, format, generate.
-- See `docs/superpowers/specs/2026-04-23-blocknote-document-editor.md`.
 
 ## 3. Canonical Neon Setup
 
@@ -97,7 +98,7 @@ References:
         +--> [Neon Auth client/session]
         +--> [Project API routes]
         +--> [Project generation/revision flow]
-        +--> [BlockNote document editor / export flow]
+        +--> [Tiptap paged document editor / export flow]
         |
         v
 [@neondatabase/serverless]
@@ -113,8 +114,9 @@ Key principles:
 
 - The app is a single Next.js application.
 - Authentication and application data both live on Neon.
-- BlockNote document JSON is the canonical editable document model.
-- HTML is the rendered export artifact.
+- Paged book document JSON is the canonical editable document model.
+- HTML is an export-only derived artifact.
+- Rich layout affordances should be represented as Tiptap JSON nodes, not as raw HTML stored in the database.
 - Project data is persisted in Postgres, not localStorage.
 
 ## 5. Authentication Design
@@ -158,8 +160,6 @@ The database layer lives in `src/lib/db/index.ts` and:
 - `projects`
 - `project_profiles`
 - `source_items`
-- `html_versions`
-
 These tables are created lazily by the app on first use. There is no active Drizzle schema or migration workflow in the current implementation.
 
 ## 7. Project and API Model
@@ -169,8 +169,31 @@ These tables are created lazily by the app on first use. There is no active Driz
 - A project belongs to a signed-in user via `user_id`
 - Profile metadata is stored separately in `project_profiles`
 - Uploaded sources are stored in `source_items`
-- Editable document blocks are stored in `project_profiles.blocks`
-- Each generated HTML snapshot is stored in `html_versions`
+- Editable paged Tiptap document JSON is stored in `project_profiles.document`
+- Export HTML is derived on demand from the saved document
+
+Current `project_profiles` metadata is intentionally small: author, target reader, core message, tone, design mode, page format, generation plan, and Tiptap document JSON. `plan` and `document` are stored as JSONB.
+
+### Current editor model
+
+The editor route is `/editor/[projectId]`.
+
+Primary editor files:
+
+- `src/components/editor/EditorShell.tsx`
+- `src/components/editor/TiptapBookEditor.tsx`
+- `src/components/editor/TiptapPageEditor.tsx`
+- `src/lib/tiptap-document.ts`
+
+Current document node policy:
+
+- Standard Tiptap document nodes remain the default for generated copy.
+- `image` nodes are supported for user-inserted images.
+- Image attrs currently include `src`, `alt`, `title`, `width`, `height`, `fit`, and `align`.
+- Image resize UX uses left/right handles and should primarily persist width. Height should only stay fixed when crop-frame behavior needs it.
+- `mediaText` is the stable side-by-side image/text layout node. It is preferred over CSS float text wrapping because page overflow currently moves top-level nodes as whole units.
+- `mediaText` stores image metadata on the node attrs and stores the adjacent editable text as child block content.
+- Export HTML must explicitly render custom nodes. If a new custom Tiptap node is added, `tiptapDocumentToHtml()` and its tests must be updated in the same change.
 
 ### Current API surface
 
@@ -189,7 +212,7 @@ Authorization rule:
 The new-project wizard should stay short and document-focused:
 
 ```text
-Setup -> Source -> Format -> Generate -> Builder
+Setup -> Source -> Format -> Generate -> Editor
 ```
 
 The default user-facing flow should not include separate plan, outline, or design-token steps.
@@ -199,8 +222,8 @@ Initial generation flow:
 
 1. `POST /api/projects` creates the project and stores source text.
 2. `PATCH /api/projects/[projectId]` with `action: "generate"` calls Gemini Flash once.
-3. The generated BlockNote JSON is saved to `project_profiles.blocks`.
-4. The user lands in the builder and edits the document directly.
+3. The generated document JSON is saved to `project_profiles.document`.
+4. The user lands in the editor and edits the document directly.
 
 ### Source ingestion
 
@@ -234,7 +257,7 @@ Important rule:
 
 - `GEMINI_API_KEY` is the server-side key for live Gemini generation.
 - Generation code should not expose this value to the browser.
-- Missing or blank `GEMINI_API_KEY` should be handled as a provider-unavailable case and fall back to deterministic local block generation rather than making a network call.
+- Missing or blank `GEMINI_API_KEY` should be handled as a provider-unavailable case and fall back to deterministic local Tiptap document generation rather than making a network call.
 
 ### Not part of the current app contract
 
@@ -268,11 +291,11 @@ The following ideas are no longer treated as active architecture:
 - Drizzle migrations as the source of truth
 - Self-managed Better Auth server configuration
 - Better Auth table ownership from within this repo
-- Raw HTML/CSS as the builder source of truth
+- Raw HTML/CSS as the editor source of truth
 - Iframe preview editing as the main editor model
-- Craft.js / React Page / Webflow-style nested page builder as the current phase
-- Custom `CelionBlock[]` design-token editor as the product core
-- Direct `dnd-kit` block editor implementation in the builder
+- Visual page-composition tooling as the current phase
+- Custom design-token arrays as the product core
+- Direct drag/drop page-composition editing in the editor
 
 If the team wants to reintroduce any of those later, that should be treated as a deliberate redesign, not as finishing the current setup.
 
@@ -282,16 +305,20 @@ If the team wants to reintroduce any of those later, that should be treated as a
 - Create new environments as branches, not as duplicate projects
 - Keep `DATABASE_URL` and `NEON_AUTH_BASE_URL` branch-aligned
 - Treat `tech-spec.md` and `.env.example` as the current runtime contract
-- Treat archived planning docs as historical context only
-- Treat BlockNote as the main builder surface
+- Treat deleted early planning docs as obsolete, not as implementation guidance
+- Treat Tiptap as the main editor surface
 - Keep HTML/CSS controls out of the main editing UI unless they are explicitly scoped to export/debug flows
+- Prefer structured Tiptap nodes for editor behavior. Avoid introducing freeform canvas positioning into the document editor.
+- Prefer `mediaText` for image-plus-text layouts. Avoid float-based text wrapping until pagination behavior is deliberately redesigned.
 
 ## 11. Near-Term Next Steps
 
 - Keep the app on the canonical Neon project and branch model
 - Update any remaining stale docs only when they are intended to be active references
-- Polish the BlockNote editor surface to match Celion's restrained UI
+- Polish the Tiptap editor surface to match Celion's restrained UI
+- Add storage-backed image uploads to replace base64 image persistence in document JSON
+- Add more polished media/text controls such as image-side toggle and caption support
 - Add DOCX/text-PDF extraction as a dedicated ingestion slice later
-- Replace temporary BlockNote JSON -> HTML export with a stronger export pipeline
+- Replace temporary document JSON -> HTML export with a stronger export pipeline
 - If schema management becomes painful, evaluate a move to explicit migrations later
 - If auth requirements outgrow Neon Auth, decide explicitly whether to stay on Neon Auth or move to a self-hosted Better Auth architecture

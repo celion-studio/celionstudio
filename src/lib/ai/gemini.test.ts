@@ -12,7 +12,7 @@ test("generateJsonWithGemini fails before fetch when GEMINI_API_KEY is missing",
   await assert.rejects(
     generateJsonWithGemini({
       system: "Return JSON only.",
-      user: "Build blocks.",
+      user: "Build a document.",
       env: { GEMINI_API_KEY: "" },
       fetchFn,
     }),
@@ -34,7 +34,7 @@ test("generateJsonWithGemini extracts JSON from a mocked Gemini response", async
             content: {
               parts: [
                 {
-                  text: '```json\n{"blocks":[{"id":"b1","type":"paragraph"}]}\n```',
+                  text: '```json\n{"type":"doc","content":[{"type":"paragraph"}]}\n```',
                 },
               ],
             },
@@ -47,7 +47,7 @@ test("generateJsonWithGemini extracts JSON from a mocked Gemini response", async
 
   const parsed = await generateJsonWithGemini({
     system: "Return JSON only.",
-    user: "Build blocks.",
+    user: "Build a document.",
     env: { GEMINI_API_KEY: "test-key" },
     fetchFn,
     baseUrl: "https://example.test/",
@@ -55,7 +55,8 @@ test("generateJsonWithGemini extracts JSON from a mocked Gemini response", async
   });
 
   assert.deepEqual(parsed, {
-    blocks: [{ id: "b1", type: "paragraph" }],
+    type: "doc",
+    content: [{ type: "paragraph" }],
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "https://example.test/v1beta/models/gemini-test:generateContent");

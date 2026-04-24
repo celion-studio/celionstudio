@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 
-export const DynamicBlockNoteEditor = dynamic(
-  () => import("./BlockNoteEditor").then((module) => module.BlockNoteEditor),
+export const DynamicTiptapBookEditor = dynamic(
+  () => import("./TiptapBookEditor").then((module) => module.TiptapBookEditor),
   {
     ssr: false,
     loading: () => (

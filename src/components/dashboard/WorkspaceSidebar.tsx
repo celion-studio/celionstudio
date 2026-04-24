@@ -22,6 +22,7 @@ type WorkspaceSidebarProps = {
   primaryAction?: {
     href: Route;
     label: string;
+    onClick?: () => void;
   } | null;
 };
 
@@ -142,7 +143,13 @@ export function WorkspaceSidebar({
       {primaryAction ? (
         <div style={{ padding: "12px 10px", borderTop: "1px solid #ECEAE5" }}>
           <button
-            onClick={() => router.push(primaryAction.href)}
+            onClick={() => {
+              if (primaryAction.onClick) {
+                primaryAction.onClick();
+                return;
+              }
+              router.push(primaryAction.href);
+            }}
             disabled={!isSignedIn}
             style={{
               width: "100%",

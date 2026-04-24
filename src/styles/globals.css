@@ -119,22 +119,6 @@ textarea {
   animation: glow 3.2s ease-in-out infinite;
 }
 
-.celion-page-frame .bn-container {
-  background: #ffffff;
-}
-
-.celion-page-frame .bn-editor {
-  width: 100%;
-  max-width: 100%;
-  padding-inline: 0;
-  background: #ffffff;
-  border-radius: 0;
-}
-
-.celion-page-frame .bn-block-content {
-  max-width: 100%;
-}
-
 /* Soft radial warmth overlay */
 .warm-glow {
   background: radial-gradient(

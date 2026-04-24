@@ -67,7 +67,7 @@ export function GenerateStep({
             fontFamily: "'Geist', sans-serif",
           }}
         >
-          Creating the editable BlockNote draft
+          Creating the editable draft
         </p>
       </div>
     );
