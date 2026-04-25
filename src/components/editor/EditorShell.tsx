@@ -281,7 +281,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
   }
 
   return (
-    <main style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#faf9f5" }}>
+    <main style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: "100vh", overflow: "hidden", background: "#faf9f5" }}>
       <header
         style={{
           display: "flex",
@@ -350,6 +350,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           gridTemplateColumns: "260px minmax(0, 1fr) 300px",
           height: "calc(100vh - 52px)",
           minHeight: "calc(100vh - 52px)",
+          overflow: "hidden",
         }}
       >
         <EditorLeftPanel
