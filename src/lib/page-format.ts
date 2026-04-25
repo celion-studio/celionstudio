@@ -138,9 +138,12 @@ export function normalizePageFormat(value: unknown): PageFormat {
 export function normalizePageSize(value: unknown): PageSize {
   if (typeof value !== "object" || value === null) return DEFAULT_CUSTOM_PAGE_SIZE;
   const raw = value as Partial<PageSize>;
+  const widthMm = clampMm(raw.widthMm, DEFAULT_CUSTOM_PAGE_SIZE.widthMm);
+  const heightMm = clampMm(raw.heightMm, DEFAULT_CUSTOM_PAGE_SIZE.heightMm);
+
   return {
-    widthMm: clampMm(raw.widthMm, DEFAULT_CUSTOM_PAGE_SIZE.widthMm),
-    heightMm: clampMm(raw.heightMm, DEFAULT_CUSTOM_PAGE_SIZE.heightMm),
+    widthMm: Math.min(widthMm, heightMm),
+    heightMm: Math.max(widthMm, heightMm),
   };
 }
 

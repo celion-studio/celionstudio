@@ -8,7 +8,7 @@
         "build:deploy": "npm run db:init && npm run build",
         "start": "next start",
         "db:init": "tsx scripts/init-db.ts",
-        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
+        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/page-format.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
