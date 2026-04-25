@@ -69,20 +69,16 @@ export function measurePaginationBreaks(
 
     const nextPageTop = pageTop + options.pageHeightPx + options.pageGapPx;
     const spacerHeight = Math.round(nextPageTop + bodyTop - visualTop);
-    const footerTop = Math.round(
-      pageTop + options.pageHeightPx - options.paddingBottomPx - 28 - visualTop,
-    );
     const headerTop = Math.round(nextPageTop + 14 - visualTop);
     const nextFooterTop = Math.round(
       nextPageTop + options.pageHeightPx - options.paddingBottomPx - 28 - visualTop,
     );
 
     breaks.push({
-      key: `celion-page-break-${pageNumber}-${block.pos}-${spacerHeight}-${footerTop}-${headerTop}-${nextFooterTop}`,
+      key: `celion-page-break-${pageNumber}-${block.pos}-${spacerHeight}-${headerTop}-${nextFooterTop}`,
       pos: block.pos,
       pageNumber,
       spacerHeight,
-      footerTop,
       headerTop,
       nextFooterTop,
     });
@@ -115,7 +111,6 @@ export function samePaginationState(
       item.pos === other.pos &&
       item.pageNumber === other.pageNumber &&
       item.spacerHeight === other.spacerHeight &&
-      item.footerTop === other.footerTop &&
       item.headerTop === other.headerTop &&
       item.nextFooterTop === other.nextFooterTop
     );

@@ -33,7 +33,6 @@ export type PaginationBreak = {
   pos: number;
   pageNumber: number;
   spacerHeight: number;
-  footerTop: number;
   headerTop: number;
   nextFooterTop: number;
 };

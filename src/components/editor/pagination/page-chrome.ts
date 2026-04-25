@@ -70,16 +70,10 @@ export function createPageBreakWidget(
   root.style.setProperty("--celion-page-gap", `${options.pageGapPx}px`);
   root.style.setProperty("--celion-page-pad-left", `${options.paddingLeftPx}px`);
   root.style.setProperty("--celion-page-pad-right", `${options.paddingRightPx}px`);
-  root.style.setProperty("--celion-break-footer-top", `${pageBreak.footerTop}px`);
   root.style.setProperty("--celion-break-header-top", `${pageBreak.headerTop}px`);
   root.style.setProperty("--celion-break-next-footer-top", `${pageBreak.nextFooterTop}px`);
 
   root.append(
-    createChromeButton(
-      "celion-pagination-footer celion-pagination-break-footer",
-      renderPaginationTemplate(options.footerText, pageBreak.pageNumber, pageCount),
-      options.onEditFooter,
-    ),
     createChromeButton(
       "celion-pagination-header celion-pagination-break-header",
       options.headerText,
