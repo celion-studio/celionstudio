@@ -77,6 +77,7 @@ export function createPageBreakWidget(
   root.style.setProperty("--celion-page-pad-right", `${options.paddingRightPx}px`);
   root.style.setProperty("--celion-break-header-top", `${pageBreak.headerTop}px`);
   root.style.setProperty("--celion-break-next-footer-top", `${pageBreak.nextFooterTop}px`);
+  root.style.setProperty("--celion-break-gap-top", `${pageBreak.gapTop}px`);
 
   root.append(
     createChromeButton(
@@ -108,11 +109,12 @@ export function buildPaginationDecorations(
 ) {
   if (!options.enabled) return DecorationSet.empty;
 
+  const chromeKey = `v${pagination.version}-p${pagination.pageCount}`;
   const widgets: Decoration[] = [
     Decoration.widget(
       0,
       () => createFirstPageWidget(options, pagination.pageCount),
-      { key: "celion-pagination-first-page", side: -1 },
+      { key: `celion-pagination-first-page-${chromeKey}`, side: -1 },
     ),
   ];
 
@@ -121,7 +123,7 @@ export function buildPaginationDecorations(
       Decoration.widget(
         pageBreak.pos,
         () => createPageBreakWidget(options, pageBreak, pagination.pageCount),
-        { key: pageBreak.key, side: -1 },
+        { key: `${pageBreak.key}-${chromeKey}`, side: -1 },
       ),
     );
   }

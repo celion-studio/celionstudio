@@ -8,6 +8,7 @@ import type {
 export const EMPTY_PAGINATION_STATE: PaginationState = {
   breaks: [],
   pageCount: 1,
+  version: 0,
 };
 
 export function getPaginationMetrics(
@@ -73,14 +74,16 @@ export function measurePaginationBreaks(
     const nextFooterTop = Math.round(
       nextPageTop + options.pageHeightPx - options.paddingBottomPx - 28 - visualTop,
     );
+    const gapTop = Math.round(pageTop + options.pageHeightPx - visualTop);
 
     breaks.push({
-      key: `celion-page-break-${pageNumber}-${block.pos}-${spacerHeight}-${headerTop}-${nextFooterTop}`,
+      key: `celion-page-break-${pageNumber}-${block.pos}-${spacerHeight}-${headerTop}-${nextFooterTop}-${gapTop}`,
       pos: block.pos,
       pageNumber,
       spacerHeight,
       headerTop,
       nextFooterTop,
+      gapTop,
     });
     insertedSpacerHeight += spacerHeight;
     contentBottom = Math.max(contentBottom, block.bottom + insertedSpacerHeight);
@@ -93,7 +96,7 @@ export function measurePaginationBreaks(
   );
   const pageCount = Math.max(pageNumber, measuredPages, breaks.length + 1);
 
-  return { breaks, pageCount };
+  return { breaks, pageCount, version: 0 };
 }
 
 export function samePaginationState(
@@ -112,7 +115,8 @@ export function samePaginationState(
       item.pageNumber === other.pageNumber &&
       item.spacerHeight === other.spacerHeight &&
       item.headerTop === other.headerTop &&
-      item.nextFooterTop === other.nextFooterTop
+      item.nextFooterTop === other.nextFooterTop &&
+      item.gapTop === other.gapTop
     );
   });
 }

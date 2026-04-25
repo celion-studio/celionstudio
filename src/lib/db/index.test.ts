@@ -1,6 +1,11 @@
 ﻿import assert from "node:assert/strict";
 import test from "node:test";
-import { ensureAppSchema, resolveSchemaInitConfig } from "./index";
+import {
+  ensureAppSchema,
+  isDatabaseUnavailableError,
+  isTransientDatabaseError,
+  resolveSchemaInitConfig,
+} from "./index";
 
 test("ensureAppSchema retries after failure and applies the app schema once per runtime", async () => {
   const failingSql = async () => {
@@ -34,6 +39,43 @@ test("ensureAppSchema retries after failure and applies the app schema once per 
       statement.includes("CREATE INDEX IF NOT EXISTS projects_user_id_updated_at_idx"),
     ),
   );
+});
+
+test("ensureAppSchema retries transient Neon fetch timeouts", async () => {
+  let calls = 0;
+  const appliedStatements: string[] = [];
+  const sql = async (strings: TemplateStringsArray) => {
+    calls += 1;
+    if (calls <= 2) {
+      throw Object.assign(new Error("Error connecting to database: TypeError: fetch failed"), {
+        sourceError: {
+          cause: {
+            code: "UND_ERR_CONNECT_TIMEOUT",
+          },
+        },
+      });
+    }
+    appliedStatements.push(strings.join("?"));
+    return [];
+  };
+
+  await ensureAppSchema(sql, { force: true });
+
+  assert.equal(calls, 2 + appliedStatements.length);
+  assert.ok(appliedStatements[0]?.includes("CREATE TABLE IF NOT EXISTS projects"));
+});
+
+test("database unavailable detection recognizes Neon fetch timeouts", () => {
+  const error = Object.assign(new Error("Error connecting to database: TypeError: fetch failed"), {
+    sourceError: {
+      cause: {
+        code: "UND_ERR_CONNECT_TIMEOUT",
+      },
+    },
+  });
+
+  assert.equal(isTransientDatabaseError(error), true);
+  assert.equal(isDatabaseUnavailableError(error), true);
 });
 
 test("resolveSchemaInitConfig uses the owner URL and infers the app role when available", () => {

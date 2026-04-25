@@ -7,6 +7,7 @@ import {
   updateProjectDocument,
   updateProjectPageFormat,
 } from "@/lib/projects";
+import { validateDocumentImageStorage } from "@/lib/image-storage";
 import { getRouteSession } from "@/lib/session";
 
 const mutationSchema = z.discriminatedUnion("action", [
@@ -90,6 +91,17 @@ export async function PATCH(
     const document = parsed.data.document;
     if (document === undefined) {
       return NextResponse.json({ message: "document is required" }, { status: 400 });
+    }
+    const imageStorage = validateDocumentImageStorage(document);
+    if (!imageStorage.ok) {
+      return NextResponse.json(
+        {
+          code: imageStorage.error.code,
+          message: imageStorage.error.message,
+          note: imageStorage.error.note,
+        },
+        { status: 400 },
+      );
     }
     const project = await updateProjectDocument(
       session.user.id,

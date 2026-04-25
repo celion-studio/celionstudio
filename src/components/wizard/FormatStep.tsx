@@ -83,7 +83,7 @@ export function FormatStep({
 
       <div>
         <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-          Print formats
+          PDF print sizes
         </p>
         <div className="mt-2 grid grid-cols-4 gap-2">
           {printFormats.map((format) => {

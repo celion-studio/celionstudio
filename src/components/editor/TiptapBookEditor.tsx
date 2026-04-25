@@ -1,19 +1,12 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   compactTiptapBookDocument,
   createEmptyTiptapDoc,
   normalizeTiptapBookDocument,
   type TiptapBookDocument,
-  type TiptapBookPage,
+  type TiptapBookLayout,
   type TiptapDocJson,
 } from "@/lib/tiptap-document";
 import { TiptapPageEditor } from "@/components/editor/TiptapPageEditor";
@@ -29,95 +22,42 @@ type TiptapBookEditorProps = {
   onPageCountChange?(pageCount: number): void;
 };
 
-function createLayoutPassKey(signature: string, pageFormat: PageFormat, customPageSize: PageSize) {
-  return `${signature}:${pageFormat}:${customPageSize.widthMm}x${customPageSize.heightMm}`;
+const PAGE_GAP_PX = 36;
+
+function bookSignature(book: TiptapBookDocument) {
+  return JSON.stringify(book);
 }
 
-function resetPageSurfaceScroll(surface: HTMLElement | null | undefined) {
-  if (!surface) return;
+function flattenBookDoc(book: TiptapBookDocument): TiptapDocJson {
+  const content = book.pages.flatMap((page) => page.doc.content ?? []);
+  return {
+    type: "doc",
+    content: content.length > 0 ? content : createEmptyTiptapDoc().content,
+  };
+}
 
-  surface.scrollTop = 0;
-  surface.scrollLeft = 0;
-  surface.querySelectorAll<HTMLElement>(".ProseMirror, [contenteditable='true']").forEach((node) => {
-    node.scrollTop = 0;
-    node.scrollLeft = 0;
+function createBookDocument(doc: TiptapDocJson, layout: TiptapBookLayout): TiptapBookDocument {
+  return compactTiptapBookDocument({
+    type: "tiptap-book",
+    version: 1,
+    layout,
+    pages: [{ id: "page-1", doc }],
   });
 }
 
-function pageContentBottom(surface: HTMLElement) {
-  const blockNodes = Array.from(
-    surface.querySelectorAll<HTMLElement>(
-      ".celion-tiptap-content > *, .celion-tiptap-content li",
-    ),
-  );
-  const proseMirror = surface.querySelector<HTMLElement>(".celion-tiptap-content");
-  const rangeBottoms: number[] = [];
-  if (proseMirror) {
-    const range = document.createRange();
-    range.selectNodeContents(proseMirror);
-    for (const rect of Array.from(range.getClientRects())) {
-      if (rect.height > 0) rangeBottoms.push(rect.bottom);
-    }
-    range.detach();
-  }
+function parsePadding(padding: string) {
+  const parts = padding
+    .trim()
+    .split(/\s+/)
+    .map((part) => Number.parseFloat(part))
+    .map((value) => (Number.isFinite(value) ? value : 0));
 
-  if (blockNodes.length > 0 || rangeBottoms.length > 0) {
-    return Math.max(
-      ...rangeBottoms,
-      ...blockNodes.map((node) => {
-        const rect = node.getBoundingClientRect();
-        const style = window.getComputedStyle(node);
-        const marginBottom = Number.parseFloat(style.marginBottom) || 0;
-        return rect.bottom + marginBottom;
-      }),
-    );
-  }
-
-  const content = surface.querySelector<HTMLElement>(".ProseMirror");
-  return content?.getBoundingClientRect().bottom ?? surface.getBoundingClientRect().top;
-}
-
-function pageOverflowAmount(surface: HTMLElement) {
-  return pageContentBottom(surface) - surface.getBoundingClientRect().bottom;
-}
-
-function replacePageDoc(pages: TiptapBookPage[], pageId: string, doc: TiptapDocJson) {
-  if (!pages.some((page) => page.id === pageId)) return null;
-  return pages.map((page) => (page.id === pageId ? { ...page, doc } : page));
-}
-
-function moveOverflowNodeForward(pages: TiptapBookPage[], pageId: string) {
-  const pageIndex = pages.findIndex((page) => page.id === pageId);
-  if (pageIndex < 0) return null;
-
-  const nextPages = pages.map((page) => ({
-    ...page,
-    doc: { ...page.doc, content: [...(page.doc.content ?? [])] },
-  }));
-  const page = nextPages[pageIndex];
-  if (!page) return null;
-
-  const movedNode = page.doc.content?.pop();
-  if (!movedNode) return null;
-
-  if (!page.doc.content || page.doc.content.length === 0) {
-    page.doc.content = createEmptyTiptapDoc().content ?? [];
-  }
-
-  if (nextPages[pageIndex + 1]) {
-    const nextDoc = nextPages[pageIndex + 1]!.doc;
-    nextDoc.content = [movedNode, ...(nextDoc.content ?? [])];
-  } else {
-    nextPages.push({
-      id: `page-${nextPages.length + 1}`,
-      doc: { type: "doc", content: [movedNode] },
-    });
-  }
-
-  return nextPages;
+  const [top = 0, right = top, bottom = top, left = right] = parts;
+  return { top, right, bottom, left };
 }
 
 export function TiptapBookEditor({
+  title,
   document,
   pageFormat,
   customPageSize,
@@ -129,266 +69,192 @@ export function TiptapBookEditor({
     () => normalizeTiptapBookDocument(document),
     [document],
   );
-  const externalSignature = useMemo(() => JSON.stringify(initialBook), [initialBook]);
+  const externalSignature = useMemo(() => bookSignature(initialBook), [initialBook]);
   const appliedExternalSignatureRef = useRef(externalSignature);
-  const pageBodyRefs = useRef(new Map<string, HTMLDivElement>());
-  const overflowFrameRefs = useRef(new Map<string, number>());
-  const pagesRef = useRef<TiptapBookPage[]>(initialBook.pages);
-  const layoutPassKeyRef = useRef("");
-  const internalLayoutPassKeyRef = useRef("");
-  const [book, setBook] = useState<TiptapBookDocument>(initialBook);
-  const [activeToolbarPageId, setActiveToolbarPageId] = useState<string | null>(
-    initialBook.pages[0]?.id ?? null,
-  );
-  const [oversizedPageIds, setOversizedPageIds] = useState(() => new Set<string>());
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const [editorDoc, setEditorDoc] = useState<TiptapDocJson>(() => flattenBookDoc(initialBook));
+  const editorDocRef = useRef<TiptapDocJson>(editorDoc);
+  const [layout, setLayout] = useState<TiptapBookLayout>(() => ({
+    headerText: initialBook.layout?.headerText ?? "",
+    footerText: initialBook.layout?.footerText ?? "{page}",
+  }));
+  const layoutRef = useRef<TiptapBookLayout>(layout);
+  const [pageCount, setPageCount] = useState(1);
 
   const page = getPageFormatSpec(pageFormat, customPageSize);
   const previewHeight = Math.round((page.previewWidth * page.heightMm) / page.widthMm);
-  const layoutPassKey = createLayoutPassKey(externalSignature, pageFormat, customPageSize);
+  const padding = parsePadding(page.pagePadding);
 
-  useEffect(() => {
-    pagesRef.current = book.pages;
-    onPageCountChange?.(book.pages.length);
-    setActiveToolbarPageId((current) => {
-      if (current && book.pages.some((bookPage) => bookPage.id === current)) return current;
-      return book.pages[0]?.id ?? null;
-    });
-  }, [book.pages, onPageCountChange]);
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+
+    shell.scrollLeft = Math.max(0, (shell.scrollWidth - shell.clientWidth) / 2);
+  }, [page.previewWidth, previewHeight]);
 
   useEffect(() => {
     if (appliedExternalSignatureRef.current === externalSignature) return;
 
     appliedExternalSignatureRef.current = externalSignature;
-    pagesRef.current = initialBook.pages;
-    setOversizedPageIds(new Set());
-    setBook(initialBook);
-  }, [externalSignature, initialBook]);
-
-  useLayoutEffect(() => {
-    for (const body of pageBodyRefs.current.values()) {
-      resetPageSurfaceScroll(body);
-    }
-  }, [book.pages]);
-
-  const commitPages = useCallback(
-    (pages: TiptapBookPage[]) => {
-      const nextBook = compactTiptapBookDocument({
-        type: "tiptap-book",
-        version: 1,
-        pages,
-      });
-      const nextSignature = JSON.stringify(nextBook);
-      if (appliedExternalSignatureRef.current === nextSignature) return false;
-
-      internalLayoutPassKeyRef.current = createLayoutPassKey(nextSignature, pageFormat, customPageSize);
-      appliedExternalSignatureRef.current = nextSignature;
-      pagesRef.current = nextBook.pages;
-      setBook(nextBook);
-      onChange(nextBook);
-      return true;
-    },
-    [customPageSize, onChange, pageFormat],
-  );
-
-  const clearOversizedPage = useCallback((pageId: string) => {
-    setOversizedPageIds((current) => {
-      if (!current.has(pageId)) return current;
-      const next = new Set(current);
-      next.delete(pageId);
-      return next;
-    });
-  }, []);
-
-  const markOversizedPage = useCallback((pageId: string) => {
-    setOversizedPageIds((current) => {
-      if (current.has(pageId)) return current;
-      const next = new Set(current);
-      next.add(pageId);
-      return next;
-    });
-  }, []);
-
-  const requestOverflowCheck = useCallback(
-    (pageId: string) => {
-      const pendingFrame = overflowFrameRefs.current.get(pageId);
-      if (pendingFrame !== undefined) {
-        window.cancelAnimationFrame(pendingFrame);
-      }
-
-      const frame = window.requestAnimationFrame(() => {
-        overflowFrameRefs.current.delete(pageId);
-        const body = pageBodyRefs.current.get(pageId);
-        const pageIndex = pagesRef.current.findIndex((bookPage) => bookPage.id === pageId);
-        resetPageSurfaceScroll(body);
-        if (!body || pageIndex < 0 || pageOverflowAmount(body) <= 8) return;
-
-        const pages = moveOverflowNodeForward(pagesRef.current, pageId);
-        if (!pages) {
-          markOversizedPage(pageId);
-          return;
-        }
-
-        clearOversizedPage(pageId);
-        if (!commitPages(pages)) return;
-
-        window.setTimeout(() => {
-          requestOverflowCheck(pageId);
-          const nextPageId = pages[pageIndex + 1]?.id;
-          if (nextPageId) requestOverflowCheck(nextPageId);
-        }, 0);
-      });
-
-      overflowFrameRefs.current.set(pageId, frame);
-    },
-    [clearOversizedPage, commitPages, markOversizedPage],
-  );
-
-  useEffect(
-    () => () => {
-      for (const frame of overflowFrameRefs.current.values()) {
-        window.cancelAnimationFrame(frame);
-      }
-      overflowFrameRefs.current.clear();
-    },
-    [],
-  );
-
-  const updatePageDoc = useCallback(
-    (pageId: string, nextDoc: TiptapDocJson) => {
-      const pages = replacePageDoc(pagesRef.current, pageId, nextDoc);
-      if (!pages) return;
-
-      clearOversizedPage(pageId);
-      commitPages(pages);
-      requestOverflowCheck(pageId);
-    },
-    [clearOversizedPage, commitPages, requestOverflowCheck],
-  );
+    const nextDoc = flattenBookDoc(initialBook);
+    const nextLayout = {
+      headerText: initialBook.layout?.headerText ?? "",
+      footerText: initialBook.layout?.footerText ?? "{page}",
+    };
+    editorDocRef.current = nextDoc;
+    layoutRef.current = nextLayout;
+    setEditorDoc(nextDoc);
+    setLayout(nextLayout);
+    setPageCount(1);
+  }, [externalSignature, initialBook, title]);
 
   useEffect(() => {
-    if (layoutPassKeyRef.current === layoutPassKey) return;
-    layoutPassKeyRef.current = layoutPassKey;
-    if (internalLayoutPassKeyRef.current === layoutPassKey) return;
+    onPageCountChange?.(pageCount);
+  }, [onPageCountChange, pageCount]);
 
-    const runChecks = () => {
-      for (const page of pagesRef.current) {
-        requestOverflowCheck(page.id);
-      }
-    };
-    const timeouts = [
-      window.setTimeout(runChecks, 0),
-      window.setTimeout(runChecks, 80),
-      window.setTimeout(runChecks, 240),
-    ];
+  const commitDocument = useCallback(
+    (nextDoc: TiptapDocJson, nextLayout: TiptapBookLayout) => {
+      const nextBook = createBookDocument(nextDoc, nextLayout);
+      appliedExternalSignatureRef.current = bookSignature(nextBook);
+      onChange(nextBook);
+    },
+    [onChange],
+  );
 
-    return () => {
-      for (const timeout of timeouts) window.clearTimeout(timeout);
-    };
-  }, [layoutPassKey, requestOverflowCheck]);
+  const updateDoc = useCallback(
+    (nextDoc: TiptapDocJson) => {
+      editorDocRef.current = nextDoc;
+      setEditorDoc(nextDoc);
+      commitDocument(nextDoc, layoutRef.current);
+    },
+    [commitDocument],
+  );
 
-  const toolbarPageId = activeToolbarPageId ?? book.pages[0]?.id ?? null;
+  const updateLayout = useCallback(
+    (nextLayout: TiptapBookLayout) => {
+      layoutRef.current = nextLayout;
+      setLayout(nextLayout);
+      commitDocument(editorDocRef.current, nextLayout);
+    },
+    [commitDocument],
+  );
+
+  const editHeader = useCallback(() => {
+    const nextHeader = window.prompt("Header", layout.headerText ?? "");
+    if (nextHeader === null) return;
+    updateLayout({ ...layout, headerText: nextHeader });
+  }, [layout, updateLayout]);
+
+  const editFooter = useCallback(() => {
+    const nextFooter = window.prompt("Footer. Use {page} and {total}.", layout.footerText ?? "{page}");
+    if (nextFooter === null) return;
+    updateLayout({ ...layout, footerText: nextFooter });
+  }, [layout, updateLayout]);
+
+  const handlePageCountChange = useCallback((nextPageCount: number) => {
+    setPageCount((current) => (current === nextPageCount ? current : nextPageCount));
+  }, []);
+
+  const pagination = useMemo(
+    () => ({
+      enabled: true,
+      pageWidthPx: page.previewWidth,
+      pageHeightPx: previewHeight,
+      pageGapPx: PAGE_GAP_PX,
+      paddingTopPx: padding.top,
+      paddingRightPx: padding.right,
+      paddingBottomPx: padding.bottom,
+      paddingLeftPx: padding.left,
+      headerHeightPx: page.headerHeightPx,
+      footerHeightPx: page.footerHeightPx,
+      headerText: layout.headerText ?? "",
+      footerText: layout.footerText ?? "{page}",
+      onEditHeader: editHeader,
+      onEditFooter: editFooter,
+      onPageCountChange: handlePageCountChange,
+    }),
+    [
+      editFooter,
+      editHeader,
+      handlePageCountChange,
+      layout.footerText,
+      layout.headerText,
+      padding.bottom,
+      padding.left,
+      padding.right,
+      padding.top,
+      page.headerHeightPx,
+      page.footerHeightPx,
+      page.previewWidth,
+      previewHeight,
+    ],
+  );
 
   return (
     <div
+      ref={shellRef}
+      className="celion-book-editor-shell"
       style={{
         height: "100%",
         overflow: "auto",
-        background: "#f2ede4",
+        background: "#faf9f5",
         color: "#1d1712",
         padding: "36px 48px 64px",
         boxSizing: "border-box",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "30px", alignItems: "center" }}>
-        {book.pages.map((bookPage, index) => (
-          <section
-            key={bookPage.id}
-            style={{ position: "relative", width: page.previewWidth + "px" }}
-          >
-            <div
-              style={{
-                height: "24px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                margin: "0 0 0",
-                color: "#9b9185",
-                fontFamily: "'Geist', sans-serif",
-                fontSize: "11px",
-                fontWeight: 650,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-              }}
-            >
-              Page {index + 1}
-            </div>
-            <div
-              className={`celion-page-frame${oversizedPageIds.has(bookPage.id) ? " is-oversized" : ""}`}
-              style={{
-                width: page.previewWidth + "px",
-                minWidth: page.previewWidth + "px",
-                maxWidth: page.previewWidth + "px",
-                height: oversizedPageIds.has(bookPage.id) ? "auto" : previewHeight + "px",
-                minHeight: previewHeight + "px",
-                maxHeight: oversizedPageIds.has(bookPage.id) ? undefined : previewHeight + "px",
-                padding: page.pagePadding,
-                background: "#ffffff",
-                boxSizing: "border-box",
-                overflow: oversizedPageIds.has(bookPage.id) ? "visible" : "clip",
-                border: "1px solid #ece7df",
-                borderRadius: "6px",
-                boxShadow: "0 1px 2px rgba(31, 22, 14, 0.04)",
-              }}
-            >
-              <div
-                ref={(node) => {
-                  if (node) {
-                    pageBodyRefs.current.set(bookPage.id, node);
-                    resetPageSurfaceScroll(node);
-                  }
-                  else pageBodyRefs.current.delete(bookPage.id);
-                }}
-                style={{
-                  height: oversizedPageIds.has(bookPage.id) ? "auto" : "100%",
-                  minHeight: "100%",
-                  maxHeight: oversizedPageIds.has(bookPage.id) ? undefined : "100%",
-                  overflow: oversizedPageIds.has(bookPage.id) ? "visible" : "clip",
-                }}
-              >
-                <TiptapPageEditor
-                  doc={bookPage.doc}
-                  toolbarHostId={toolbarHostId}
-                  showToolbar={bookPage.id === toolbarPageId}
-                  placeholder={index === 0 ? "Start writing, or generate a draft from the right panel." : undefined}
-                  onFocus={() => setActiveToolbarPageId(bookPage.id)}
-                  onChange={(nextDoc) => updatePageDoc(bookPage.id, nextDoc)}
-                />
-              </div>
-            </div>
-          </section>
-        ))}
+      <div
+        className="celion-book-editor-page"
+        style={{
+          width: page.previewWidth + "px",
+          minHeight: previewHeight + "px",
+          marginInline: "auto",
+          "--celion-page-width": `${page.previewWidth}px`,
+          "--celion-page-height": `${previewHeight}px`,
+          "--celion-page-gap": `${PAGE_GAP_PX}px`,
+          "--celion-page-padding-top": `${padding.top}px`,
+          "--celion-page-padding-right": `${padding.right}px`,
+          "--celion-page-padding-bottom": `${padding.bottom}px`,
+          "--celion-page-padding-left": `${padding.left}px`,
+          "--celion-header-height": `${page.headerHeightPx}px`,
+          "--celion-footer-height": `${page.footerHeightPx}px`,
+          "--celion-page-count": pageCount,
+        } as React.CSSProperties}
+      >
+        <TiptapPageEditor
+          doc={editorDoc}
+          toolbarHostId={toolbarHostId}
+          showToolbar
+          placeholder="Start writing, or generate a draft from the right panel."
+          pagination={pagination}
+          onChange={updateDoc}
+        />
       </div>
       <style>{`
+        .celion-book-editor-page {
+          position: relative;
+        }
+
         .celion-tiptap-editor {
           position: relative;
           width: 100%;
-          max-width: 640px;
-          min-height: 100%;
+          min-height: var(--celion-page-height);
           margin-inline: auto;
-          background: #ffffff;
+          color: #2e3035;
         }
 
         .celion-tiptap-placeholder {
           position: absolute;
-          top: 0;
-          left: 0;
-          max-width: 420px;
+          top: calc(var(--celion-page-padding-top) + var(--celion-header-height));
+          left: var(--celion-page-padding-left);
+          max-width: min(420px, calc(100% - var(--celion-page-padding-left) - var(--celion-page-padding-right)));
           color: #aaa39a;
           font-family: 'Geist', sans-serif;
           font-size: 16px;
           line-height: 1.52;
           pointer-events: none;
           user-select: none;
+          z-index: 3;
         }
 
         .celion-selection-menu {
@@ -422,16 +288,110 @@ export function TiptapBookEditor({
         }
 
         .celion-tiptap-content {
+          min-height: calc(
+            (var(--celion-page-height) + var(--celion-page-gap)) * var(--celion-page-count, 1)
+            - var(--celion-page-gap)
+          );
+          padding:
+            calc(var(--celion-page-padding-top) + var(--celion-header-height))
+            var(--celion-page-padding-right)
+            calc(var(--celion-page-padding-bottom) + var(--celion-footer-height))
+            var(--celion-page-padding-left);
+          background: #ffffff;
+          box-sizing: border-box;
           color: #2e3035;
           font-family: 'Geist', sans-serif;
           font-size: 16px;
           line-height: 1.52;
-        }
-
-        .celion-tiptap-content {
-          min-height: 100%;
           outline: none;
           white-space: pre-wrap;
+        }
+
+        .celion-with-pagination {
+          position: relative;
+          overflow: visible;
+        }
+
+        .celion-pagination-first-page {
+          position: absolute;
+          inset: 0 0 auto;
+          height: var(--celion-page-height);
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        .celion-pagination-header,
+        .celion-pagination-footer {
+          position: absolute;
+          left: var(--celion-page-padding-left);
+          right: var(--celion-page-padding-right);
+          border: 0;
+          background: transparent;
+          font-family: 'Geist', sans-serif;
+          text-align: center;
+          pointer-events: auto;
+          cursor: text;
+        }
+
+        .celion-pagination-header {
+          top: 14px;
+          height: 24px;
+          color: #b8afa4;
+          font-size: 10px;
+          font-weight: 650;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .celion-pagination-footer {
+          top: calc(var(--celion-page-height) - var(--celion-page-padding-bottom) - 28px);
+          height: 28px;
+          color: #8f887f;
+          font-size: 12px;
+        }
+
+        .celion-pagination-break {
+          position: relative;
+          display: block;
+          margin-left: calc(-1 * var(--celion-page-padding-left));
+          margin-right: calc(-1 * var(--celion-page-padding-right));
+          background: transparent;
+          pointer-events: none;
+          overflow: visible;
+        }
+
+        .celion-pagination-break::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: var(--celion-break-gap-top);
+          height: var(--celion-page-gap);
+          background: #faf9f5;
+          z-index: 0;
+        }
+
+        .celion-pagination-break-header,
+        .celion-pagination-break-next-footer {
+          z-index: 1;
+        }
+
+        .celion-pagination-break-header {
+          top: var(--celion-break-header-top);
+        }
+
+        .celion-pagination-break-next-footer {
+          top: var(--celion-break-next-footer-top);
+        }
+
+        .celion-br-decoration,
+        .celion-with-pagination *:has(> br.ProseMirror-trailingBreak:only-child) {
+          display: table;
+          width: 100%;
+        }
+
+        .celion-tiptap-content p:has(> br.ProseMirror-trailingBreak:only-child) {
+          min-height: 1.52em;
         }
 
         .celion-tiptap-content p,
@@ -681,16 +641,6 @@ export function TiptapBookEditor({
 
         .celion-tiptap-content li[data-type='taskItem'] > label {
           flex: 0 0 auto;
-        }
-
-        .celion-page-frame,
-        .celion-page-frame .ProseMirror {
-          overflow: clip;
-        }
-
-        .celion-page-frame.is-oversized,
-        .celion-page-frame.is-oversized .ProseMirror {
-          overflow: visible;
         }
       `}</style>
     </div>

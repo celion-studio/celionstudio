@@ -3,6 +3,7 @@ import { z } from "zod";
 import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
 import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
+import { isDatabaseUnavailableError } from "@/lib/db";
 
 const createProjectSchema = z.object({
   title: z.string().trim().min(1),
@@ -42,8 +43,19 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const projects = await listProjectRecordsForUser(session.user.id);
-  return NextResponse.json({ projects });
+
+  try {
+    const projects = await listProjectRecordsForUser(session.user.id);
+    return NextResponse.json({ projects });
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return NextResponse.json(
+        { message: "Database is temporarily unavailable. Please retry in a moment." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {
@@ -61,23 +73,33 @@ export async function POST(request: Request) {
     );
   }
 
-  const p = parsed.data.profile;
-  const project = await createProjectForUser(session.user.id, {
-    title: parsed.data.title,
-    profile: {
-      author: p.author,
-      targetAudience: p.targetAudience,
-      coreMessage: p.coreMessage,
-      designMode: p.designMode,
-      pageFormat: p.pageFormat,
-      customPageSize: p.customPageSize,
-      tone: p.tone,
-      plan: p.plan ?? null,
-      document: normalizeTiptapBookDocument(p.document),
-    },
-    sources: parsed.data.sources,
-  });
+  try {
+    const p = parsed.data.profile;
+    const project = await createProjectForUser(session.user.id, {
+      title: parsed.data.title,
+      profile: {
+        author: p.author,
+        targetAudience: p.targetAudience,
+        coreMessage: p.coreMessage,
+        designMode: p.designMode,
+        pageFormat: p.pageFormat,
+        customPageSize: p.customPageSize,
+        tone: p.tone,
+        plan: p.plan ?? null,
+        document: normalizeTiptapBookDocument(p.document),
+      },
+      sources: parsed.data.sources,
+    });
 
-  return NextResponse.json({ project }, { status: 201 });
+    return NextResponse.json({ project }, { status: 201 });
+  } catch (error) {
+    if (isDatabaseUnavailableError(error)) {
+      return NextResponse.json(
+        { message: "Database is temporarily unavailable. Please retry in a moment." },
+        { status: 503 },
+      );
+    }
+    throw error;
+  }
 }
 

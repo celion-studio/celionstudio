@@ -35,9 +35,11 @@ export type PaginationBreak = {
   spacerHeight: number;
   headerTop: number;
   nextFooterTop: number;
+  gapTop: number;
 };
 
 export type PaginationState = {
   breaks: PaginationBreak[];
   pageCount: number;
+  version: number;
 };

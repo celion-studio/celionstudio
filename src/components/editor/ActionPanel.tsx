@@ -9,9 +9,12 @@ import {
   Undo2,
 } from "lucide-react";
 
+type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+
 type ActionPanelProps = {
   hasDraft: boolean;
   hasLocalDocumentEdits: boolean;
+  saveStatus: SaveStatus;
   revisionPrompt: string;
   feedback: string;
   canUndoDocumentEdit: boolean;
@@ -66,9 +69,40 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
   </p>
 );
 
+function saveStatusLabel(status: SaveStatus) {
+  switch (status) {
+    case "dirty":
+      return "Unsaved";
+    case "saving":
+      return "Saving...";
+    case "saved":
+      return "Saved";
+    case "error":
+      return "Error";
+    default:
+      return "Ready";
+  }
+}
+
+function saveStatusColor(status: SaveStatus) {
+  switch (status) {
+    case "dirty":
+      return "#8a5a12";
+    case "saving":
+      return "#4f46b8";
+    case "saved":
+      return "#2f6f4e";
+    case "error":
+      return "#a33a31";
+    default:
+      return "#8a867e";
+  }
+}
+
 export function ActionPanel({
   hasDraft,
   hasLocalDocumentEdits,
+  saveStatus,
   revisionPrompt,
   feedback,
   canUndoDocumentEdit,
@@ -81,6 +115,16 @@ export function ActionPanel({
   onRegenerateDraft,
   onReviseDraft,
 }: ActionPanelProps) {
+  const showSaveControls = hasDraft || hasLocalDocumentEdits || saveStatus !== "idle";
+  const canRequestSave = hasLocalDocumentEdits && saveStatus !== "saving";
+  const saveButtonLabel = saveStatus === "saving"
+    ? "Saving..."
+    : saveStatus === "error"
+      ? "Retry save"
+      : hasLocalDocumentEdits
+        ? "Save edits"
+        : "Saved";
+
   return (
     <aside
       style={{
@@ -92,9 +136,23 @@ export function ActionPanel({
         overflowY: "auto",
       }}
     >
-      {hasLocalDocumentEdits && (
+      {showSaveControls && (
         <div style={{ padding: "20px 18px", borderBottom: "1px solid #ebe7dd" }}>
-          <SectionLabel>Edits</SectionLabel>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "10px" }}>
+            <SectionLabel>Save</SectionLabel>
+            <span
+              style={{
+                flexShrink: 0,
+                fontSize: "11px",
+                lineHeight: 1,
+                color: saveStatusColor(saveStatus),
+                fontFamily: "'Geist', sans-serif",
+                fontWeight: 650,
+              }}
+            >
+              {saveStatusLabel(saveStatus)}
+            </span>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
             <button
               type="button"
@@ -125,9 +183,18 @@ export function ActionPanel({
               Redo
             </button>
           </div>
-          <button type="button" onClick={onRequestSaveDocument} style={btnBase}>
+          <button
+            type="button"
+            onClick={onRequestSaveDocument}
+            disabled={!canRequestSave}
+            style={{
+              ...btnBase,
+              opacity: canRequestSave ? 1 : 0.45,
+              cursor: canRequestSave ? "pointer" : "not-allowed",
+            }}
+          >
             <Save size={14} style={{ color: "#8a867e" }} />
-            Save edits
+            {saveButtonLabel}
           </button>
         </div>
       )}

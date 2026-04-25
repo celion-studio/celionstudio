@@ -9,9 +9,15 @@ export type TiptapBookPage = {
   doc: TiptapDocJson;
 };
 
+export type TiptapBookLayout = {
+  headerText?: string;
+  footerText?: string;
+};
+
 export type TiptapBookDocument = {
   type: "tiptap-book";
   version: 1;
+  layout?: TiptapBookLayout;
   pages: TiptapBookPage[];
 };
 
@@ -21,6 +27,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function pageId(index: number) {
   return `page-${index + 1}`;
+}
+
+function normalizeBookLayout(value: unknown): TiptapBookLayout | undefined {
+  if (!isRecord(value)) return undefined;
+  const layout: TiptapBookLayout = {};
+  if (typeof value.headerText === "string") layout.headerText = value.headerText;
+  if (typeof value.footerText === "string") layout.footerText = value.footerText;
+  return Object.keys(layout).length > 0 ? layout : undefined;
 }
 
 export function createEmptyTiptapDoc(): TiptapDocJson {
@@ -161,7 +175,12 @@ export function normalizeTiptapBookDocument(input: unknown): TiptapBookDocument 
       })
       .filter((page): page is TiptapBookPage => Boolean(page));
 
-    return { type: "tiptap-book", version: 1, pages: pages.length > 0 ? pages : createEmptyTiptapBookDocument().pages };
+    return {
+      type: "tiptap-book",
+      version: 1,
+      layout: normalizeBookLayout(input.layout),
+      pages: pages.length > 0 ? pages : createEmptyTiptapBookDocument().pages,
+    };
   }
 
   if (isRecord(input) && input.type === "book" && Array.isArray(input.pages)) {
@@ -197,6 +216,7 @@ export function compactTiptapBookDocument(input: TiptapBookDocument): TiptapBook
   return {
     type: "tiptap-book",
     version: 1,
+    layout: normalizeBookLayout(input.layout),
     pages: input.pages.length > 0
       ? input.pages.map((page, index) => ({
           id: page.id || pageId(index),

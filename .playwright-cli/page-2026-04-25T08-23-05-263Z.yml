@@ -1,0 +1,114 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - link "Dashboard" [ref=e5] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e6]
+          - text: Dashboard
+        - generic [ref=e8]: /
+        - generic [ref=e9]: Untitled Draft
+      - generic [ref=e10]:
+        - button "Ebook 152x229" [ref=e12] [cursor=pointer]:
+          - text: Ebook
+          - generic [ref=e13]: 152x229
+          - img [ref=e14]
+        - button "Export" [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+          - text: Export
+    - generic [ref=e20]:
+      - complementary [ref=e21]:
+        - generic [ref=e22]:
+          - img [ref=e23]
+          - text: Pages
+        - button "Page 1 Page 1 1 nodes" [ref=e27]:
+          - generic [ref=e30]:
+            - generic [ref=e31]: Page 1
+            - generic [ref=e32]: Page 1
+            - generic [ref=e33]: 1 nodes
+        - generic [ref=e34]:
+          - img [ref=e35]
+          - text: Outline
+        - paragraph [ref=e38]: Outline will appear here.
+      - generic [ref=e39]:
+        - generic [ref=e90]:
+          - button "Undo" [disabled] [ref=e91]:
+            - img [ref=e92]
+          - button "Redo" [disabled] [ref=e95]:
+            - img [ref=e96]
+          - button "Paragraph" [pressed] [ref=e100] [cursor=pointer]:
+            - img [ref=e101]
+          - button "Heading 2" [ref=e103] [cursor=pointer]:
+            - img [ref=e104]
+          - button "Bold" [ref=e107] [cursor=pointer]:
+            - img [ref=e108]
+          - button "Italic" [ref=e110] [cursor=pointer]:
+            - img [ref=e111]
+          - button "Underline" [ref=e113] [cursor=pointer]:
+            - img [ref=e114]
+          - button "Strike" [ref=e116] [cursor=pointer]:
+            - img [ref=e117]
+          - button "Code" [ref=e120] [cursor=pointer]:
+            - img [ref=e121]
+          - button "Highlight" [ref=e124] [cursor=pointer]:
+            - img [ref=e125]
+          - button "Bullet list" [ref=e129] [cursor=pointer]:
+            - img [ref=e130]
+          - button "Ordered list" [ref=e131] [cursor=pointer]:
+            - img [ref=e132]
+          - button "Checklist" [ref=e135] [cursor=pointer]:
+            - img [ref=e136]
+          - button "Quote" [ref=e139] [cursor=pointer]:
+            - img [ref=e140]
+          - button "Divider" [ref=e143] [cursor=pointer]:
+            - img [ref=e144]
+          - button "Image" [ref=e145] [cursor=pointer]:
+            - img [ref=e146]
+          - button "Align left" [ref=e151] [cursor=pointer]:
+            - img [ref=e152]
+          - button "Align center" [ref=e153] [cursor=pointer]:
+            - img [ref=e154]
+          - button "Align right" [ref=e155] [cursor=pointer]:
+            - img [ref=e156]
+          - button "Justify" [ref=e157] [cursor=pointer]:
+            - img [ref=e158]
+        - generic [ref=e161]:
+          - generic: Start writing, or generate a draft from the right panel.
+          - generic [active] [ref=e163]:
+            - generic:
+              - button "UNTITLED DRAFT" [ref=e164]
+              - button "1" [ref=e165]
+            - paragraph [ref=e166]
+      - complementary [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - paragraph [ref=e46]: Save
+            - generic [ref=e47]: Ready
+          - generic [ref=e48]:
+            - button "Undo" [disabled] [ref=e49]:
+              - img [ref=e50]
+              - text: Undo
+            - button "Redo" [disabled] [ref=e53]:
+              - img [ref=e54]
+              - text: Redo
+          - button "Saved" [disabled] [ref=e57]:
+            - img [ref=e58]
+            - text: Saved
+        - generic [ref=e62]:
+          - paragraph [ref=e63]: Generate
+          - generic [ref=e64]:
+            - button "Generate draft" [ref=e65] [cursor=pointer]:
+              - img [ref=e66]
+              - text: Generate draft
+            - button "Regenerate full draft" [ref=e68] [cursor=pointer]:
+              - img [ref=e69]
+              - text: Regenerate full draft
+        - generic [ref=e74]:
+          - paragraph [ref=e75]: Revise with AI
+          - textbox "Make the tone sharper, shorten the intro, add more examples..." [ref=e76]
+          - button "Apply revision" [disabled] [ref=e77]:
+            - img [ref=e78]
+            - text: Apply revision
+  - button "Open Next.js Dev Tools" [ref=e85] [cursor=pointer]:
+    - img [ref=e86]
+  - alert [ref=e89]

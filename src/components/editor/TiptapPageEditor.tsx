@@ -10,9 +10,20 @@ import ImageExtension from "@tiptap/extension-image";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
+import UnderlineExtension from "@tiptap/extension-underline";
 import { Node, ResizableNodeView, type Editor, type NodeViewRendererProps } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import type { TiptapDocJson } from "@/lib/tiptap-document";
+import { CelionPaginationExtension, type CelionPaginationOptions } from "@/components/editor/CelionPaginationExtension";
+import {
+  paginationKey,
+  requestPaginationRefresh,
+} from "@/components/editor/pagination/pagination-plugin";
+import {
+  ImageStorageError,
+  prepareImageForStorage,
+  validateImageBlobMetadata,
+} from "@/lib/image-storage";
 import {
   AlignCenter,
   AlignJustify,
@@ -44,8 +55,24 @@ type TiptapPageEditorProps = {
   toolbarHostId?: string;
   showToolbar?: boolean;
   placeholder?: string;
+  pagination?: CelionPaginationOptions;
   onFocus?: () => void;
   onChange(doc: TiptapDocJson): void;
+};
+
+const DISABLED_PAGINATION_OPTIONS: CelionPaginationOptions = {
+  enabled: false,
+  pageWidthPx: 720,
+  pageHeightPx: 1080,
+  pageGapPx: 36,
+  paddingTopPx: 48,
+  paddingRightPx: 58,
+  paddingBottomPx: 58,
+  paddingLeftPx: 58,
+  headerHeightPx: 42,
+  footerHeightPx: 42,
+  headerText: "",
+  footerText: "{page}",
 };
 
 type ToolbarButtonProps = {
@@ -87,6 +114,12 @@ function clampImageWidthPercent(value: unknown) {
   return Math.min(Math.max(numeric, 24), 68);
 }
 
+function clampImagePixelWidth(value: number, element: HTMLElement) {
+  const editorContent = element.closest<HTMLElement>(".celion-tiptap-content");
+  const maxWidth = Math.max((editorContent?.clientWidth ?? 720) - 2, 120);
+  return Math.round(Math.min(Math.max(value, 80), maxWidth));
+}
+
 function applyImageAttributes(element: HTMLImageElement, attrs: ImageAttrs, className: string | undefined) {
   const fit = attrs.fit === "crop" ? "crop" : "contain";
   const align = ["left", "center", "right", "full"].includes(String(attrs.align)) ? String(attrs.align) : "center";
@@ -119,7 +152,7 @@ function applyMediaTextAttributes(dom: HTMLElement, image: HTMLImageElement, att
   applyImageAttributes(image, { ...attrs, align: "full" }, className);
 }
 
-const CelionImageExtension = ImageExtension.extend({
+export const CelionImageExtension = ImageExtension.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -147,6 +180,7 @@ const CelionImageExtension = ImageExtension.extend({
     const className = typeof this.options.HTMLAttributes.class === "string" ? this.options.HTMLAttributes.class : undefined;
 
     return ({ node, getPos, editor }: NodeViewRendererProps) => {
+      let currentNode = node;
       const element = document.createElement("img");
       applyImageAttributes(element, node.attrs as ImageAttrs, className);
 
@@ -156,23 +190,29 @@ const CelionImageExtension = ImageExtension.extend({
         node,
         getPos,
         onResize: (width, height) => {
-          element.style.width = `${width}px`;
-          element.style.height = `${height}px`;
+          const nextWidth = clampImagePixelWidth(width, element);
+          const nextHeight = width > 0 ? Math.round((height * nextWidth) / width) : height;
+          element.style.width = `${nextWidth}px`;
+          element.style.height = `${nextHeight}px`;
         },
         onCommit: (width, height) => {
           const pos = getPos();
           if (pos === undefined) return;
-          const isCrop = node.attrs.fit === "crop";
+          const attrs = currentNode.attrs as ImageAttrs;
+          const isCrop = attrs.fit === "crop";
+          const nextWidth = clampImagePixelWidth(width, element);
+          const nextHeight = width > 0 ? Math.round((height * nextWidth) / width) : height;
 
           this.editor.chain().setNodeSelection(pos).updateAttributes(this.name, {
-            width: node.attrs.align === "full" ? null : width,
-            height: isCrop ? height : null,
-            align: node.attrs.align ?? "center",
-            fit: node.attrs.fit ?? "contain",
+            width: attrs.align === "full" ? null : nextWidth,
+            height: isCrop ? nextHeight : null,
+            align: attrs.align ?? "center",
+            fit: attrs.fit ?? "contain",
           }).run();
         },
         onUpdate: (updatedNode) => {
           if (updatedNode.type !== node.type) return false;
+          currentNode = updatedNode;
           applyImageAttributes(element, updatedNode.attrs as ImageAttrs, className);
           return true;
         },
@@ -191,7 +231,7 @@ const CelionImageExtension = ImageExtension.extend({
   },
 });
 
-const MediaTextExtension = Node.create({
+export const MediaTextExtension = Node.create({
   name: "mediaText",
   group: "block",
   content: "block+",
@@ -425,7 +465,7 @@ function Divider() {
   return <span style={{ width: "1px", height: "20px", background: "#E8E2DA", margin: "0 3px" }} />;
 }
 
-function TiptapToolbar({ editor, onPickImage }: { editor: Editor | null; onPickImage: () => void }) {
+export function TiptapToolbar({ editor, onPickImage }: { editor: Editor | null; onPickImage: () => void }) {
   if (!editor) return null;
 
   return (
@@ -513,7 +553,7 @@ function TiptapToolbar({ editor, onPickImage }: { editor: Editor | null; onPickI
   );
 }
 
-function SelectionBubbleMenu({ editor }: { editor: Editor | null }) {
+export function SelectionBubbleMenu({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
 
   return (
@@ -555,7 +595,7 @@ function SelectionBubbleMenu({ editor }: { editor: Editor | null }) {
   );
 }
 
-function ImageBubbleMenu({ editor }: { editor: Editor | null }) {
+export function ImageBubbleMenu({ editor }: { editor: Editor | null }) {
   if (!editor) return null;
 
   const imageAttrs = editor.getAttributes("image") as {
@@ -671,19 +711,42 @@ export function TiptapPageEditor({
   toolbarHostId,
   showToolbar = true,
   placeholder,
+  pagination,
   onFocus,
   onChange,
 }: TiptapPageEditorProps) {
   const suppressChangeRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
+  const [imageInsertError, setImageInsertError] = useState("");
   const externalSignature = useMemo(() => docSignature(doc), [doc]);
   const appliedExternalSignatureRef = useRef(externalSignature);
   const onFocusRef = useRef(onFocus);
   const onChangeRef = useRef(onChange);
+  const paginationRef = useRef<CelionPaginationOptions | undefined>(pagination);
+  const getPaginationOptionsRef = useRef(
+    () => paginationRef.current ?? DISABLED_PAGINATION_OPTIONS,
+  );
   const showPlaceholder = Boolean(placeholder && !hasVisibleContent(doc));
+  const paginationSignature = useMemo(() => {
+    if (!pagination?.enabled) return "pagination:off";
+    return [
+      pagination.pageWidthPx,
+      pagination.pageHeightPx,
+      pagination.pageGapPx,
+      pagination.paddingTopPx,
+      pagination.paddingRightPx,
+      pagination.paddingBottomPx,
+      pagination.paddingLeftPx,
+      pagination.headerHeightPx,
+      pagination.footerHeightPx,
+      pagination.headerText,
+      pagination.footerText,
+    ].join(":");
+  }, [pagination]);
   onFocusRef.current = onFocus;
   onChangeRef.current = onChange;
+  paginationRef.current = pagination;
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -694,6 +757,7 @@ export function TiptapPageEditor({
         },
       }),
       Highlight.configure({ multicolor: true }),
+      UnderlineExtension,
       CelionImageExtension.configure({
         allowBase64: true,
         resize: {
@@ -711,11 +775,17 @@ export function TiptapPageEditor({
       TaskList,
       TaskItem.configure({ nested: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
+      CelionPaginationExtension.configure({
+        ...DISABLED_PAGINATION_OPTIONS,
+        getOptions: getPaginationOptionsRef.current,
+      }),
     ],
     content: doc,
     editorProps: {
       attributes: {
-        class: "celion-tiptap-content",
+        class: pagination?.enabled
+          ? "celion-tiptap-content celion-with-pagination"
+          : "celion-tiptap-content",
       },
       handleClickOn(view, _pos, node, nodePos) {
         if (node.type.name !== "image") return false;
@@ -732,11 +802,43 @@ export function TiptapPageEditor({
       appliedExternalSignatureRef.current = docSignature(nextDoc);
       onChangeRef.current(nextDoc);
     },
-  });
+  }, []);
 
   useEffect(() => {
     setToolbarHost(toolbarHostId ? document.getElementById(toolbarHostId) : null);
   }, [toolbarHostId]);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const className = pagination?.enabled
+      ? "celion-tiptap-content celion-with-pagination"
+      : "celion-tiptap-content";
+
+    editor.setOptions({
+      editorProps: {
+        ...editor.options.editorProps,
+        attributes: {
+          ...editor.options.editorProps.attributes,
+          class: className,
+        },
+      },
+    });
+  }, [editor, pagination?.enabled]);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    editor.view.dispatch(
+      editor.view.state.tr
+        .setMeta(paginationKey, requestPaginationRefresh())
+        .setMeta("addToHistory", false),
+    );
+  }, [
+    editor,
+    pagination,
+    paginationSignature,
+  ]);
 
   useEffect(() => {
     if (!editor || appliedExternalSignatureRef.current === externalSignature) return;
@@ -755,10 +857,35 @@ export function TiptapPageEditor({
   function insertImageFile(file: File) {
     if (!editor || !file.type.startsWith("image/")) return;
 
+    const fileValidation = validateImageBlobMetadata(file);
+    if (!fileValidation.ok) {
+      setImageInsertError(fileValidation.error.message);
+      return;
+    }
+
     const reader = new FileReader();
     reader.addEventListener("load", () => {
       if (typeof reader.result !== "string") return;
-      editor.chain().focus().setImage({ src: reader.result, alt: file.name }).run();
+      try {
+        const stored = prepareImageForStorage({
+          dataUrl: reader.result,
+          file,
+        });
+        setImageInsertError("");
+        editor.chain().focus().setImage({
+          src: stored.src,
+          alt: stored.metadata.name ?? file.name,
+        }).run();
+      } catch (error) {
+        setImageInsertError(
+          error instanceof ImageStorageError
+            ? error.message
+            : "Could not prepare this image for storage.",
+        );
+      }
+    });
+    reader.addEventListener("error", () => {
+      setImageInsertError("Could not read this image file.");
     });
     reader.readAsDataURL(file);
   }
@@ -772,6 +899,24 @@ export function TiptapPageEditor({
         {showPlaceholder ? (
           <div className="celion-tiptap-placeholder" aria-hidden="true">
             {placeholder}
+          </div>
+        ) : null}
+        {imageInsertError ? (
+          <div
+            role="status"
+            style={{
+              margin: "0 0 12px",
+              border: "1px solid #ead6d1",
+              borderRadius: "4px",
+              background: "#fff8f6",
+              color: "#9a3b30",
+              fontFamily: "'Geist', sans-serif",
+              fontSize: "12px",
+              lineHeight: 1.5,
+              padding: "8px 10px",
+            }}
+          >
+            {imageInsertError}
           </div>
         ) : null}
         <input

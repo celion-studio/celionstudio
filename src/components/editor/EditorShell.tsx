@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { ArrowLeft, Download } from "lucide-react";
 import { EditorLeftPanel } from "@/components/editor/EditorLeftPanel";
 import { DocumentEditorPanel } from "@/components/editor/DocumentEditorPanel";
@@ -21,10 +22,16 @@ import {
 } from "@/lib/page-format";
 import type { ProjectRecord } from "@/types/project";
 
+type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+
 function cloneBookDocument(document: unknown) {
   return JSON.parse(
     JSON.stringify(normalizeTiptapBookDocument(document)),
   ) as TiptapBookDocument;
+}
+
+function documentSignature(document: unknown) {
+  return JSON.stringify(normalizeTiptapBookDocument(document));
 }
 
 function saveDocumentPayload(document: unknown) {
@@ -35,6 +42,11 @@ export function EditorShell({ projectId }: { projectId: string }) {
   const [project, setProject] = useState<ProjectRecord | null>(null);
   const [hasLocalDocumentEdits, setHasLocalDocumentEdits] = useState(false);
   const hasLocalDocumentEditsRef = useRef(false);
+  const latestDocumentRef = useRef<TiptapBookDocument>(cloneBookDocument([]));
+  const savedDocumentSignatureRef = useRef(documentSignature([]));
+  const activeSavePromiseRef = useRef<Promise<void> | null>(null);
+  const [saveStatus, setSaveStatusState] = useState<SaveStatus>("idle");
+  const saveStatusRef = useRef<SaveStatus>("idle");
   const [undoStack, setUndoStack] = useState<TiptapBookDocument[]>([]);
   const [redoStack, setRedoStack] = useState<TiptapBookDocument[]>([]);
   const [revisionPrompt, setRevisionPrompt] = useState("");
@@ -47,6 +59,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setLoading(true);
     setFeedback("");
     setLocalDocumentEdits(false);
+    setSaveStatus("idle");
     setUndoStack([]);
     setRedoStack([]);
 
@@ -55,6 +68,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
       .then((payload: { project?: ProjectRecord; message?: string }) => {
         if (!active) return;
         if (payload.project) {
+          markDocumentSavedFromProject(payload.project);
           setProject(payload.project);
         }
         else setFeedback(payload.message ?? "Could not load this draft.");
@@ -93,9 +107,52 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setVisualPageCount(undefined);
   }, [projectId, pageFormat, customPageSize.widthMm, customPageSize.heightMm]);
 
+  useEffect(() => {
+    latestDocumentRef.current = bookDocument;
+  }, [bookDocument]);
+
+  useEffect(() => {
+    const shouldWarn =
+      hasLocalDocumentEdits ||
+      saveStatus === "saving" ||
+      saveStatus === "error";
+    if (!shouldWarn) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasLocalDocumentEdits, saveStatus]);
+
   function setLocalDocumentEdits(value: boolean) {
     hasLocalDocumentEditsRef.current = value;
     setHasLocalDocumentEdits(value);
+  }
+
+  function setSaveStatus(value: SaveStatus) {
+    saveStatusRef.current = value;
+    setSaveStatusState(value);
+  }
+
+  function markDocumentSavedFromProject(nextProject: ProjectRecord) {
+    const nextDocument = normalizeTiptapBookDocument(nextProject.profile.document ?? []);
+    latestDocumentRef.current = nextDocument;
+    savedDocumentSignatureRef.current = documentSignature(nextDocument);
+  }
+
+  function confirmNavigationWithUnsavedChanges(event: MouseEvent<HTMLAnchorElement>) {
+    const shouldWarn =
+      hasLocalDocumentEditsRef.current ||
+      saveStatusRef.current === "saving" ||
+      saveStatusRef.current === "error";
+    if (!shouldWarn) return;
+
+    if (!window.confirm("You have unsaved editor changes. Leave this page?")) {
+      event.preventDefault();
+    }
   }
 
   async function applyMutation(
@@ -111,8 +168,10 @@ export function EditorShell({ projectId }: { projectId: string }) {
     });
     const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string } | null;
     if (!res.ok || !payload?.project) throw new Error(payload?.message ?? "Could not update this draft.");
+    markDocumentSavedFromProject(payload.project);
     setProject(payload.project);
     setLocalDocumentEdits(false);
+    setSaveStatus("saved");
     setUndoStack([]);
     setRedoStack([]);
     setFeedback(successMessage);
@@ -138,8 +197,10 @@ export function EditorShell({ projectId }: { projectId: string }) {
     }
     setRedoStack([]);
     setProjectDocument(nextDocument);
+    latestDocumentRef.current = nextDocument;
     setLocalDocumentEdits(true);
-    setFeedback("Document edits are staged locally.");
+    setSaveStatus("dirty");
+    setFeedback("Unsaved edits. Save when ready.");
   }
 
   function undoDocumentEdit() {
@@ -149,7 +210,9 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setUndoStack((history) => history.slice(0, -1));
     setRedoStack((history) => [...history, cloneBookDocument(bookDocument)]);
     setProjectDocument(previousDocument);
+    latestDocumentRef.current = previousDocument;
     setLocalDocumentEdits(true);
+    setSaveStatus("dirty");
     setFeedback("Document edit undone.");
   }
 
@@ -160,30 +223,72 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setRedoStack((history) => history.slice(0, -1));
     setUndoStack((history) => [...history, cloneBookDocument(bookDocument)]);
     setProjectDocument(nextDocument);
+    latestDocumentRef.current = nextDocument;
     setLocalDocumentEdits(true);
+    setSaveStatus("dirty");
     setFeedback("Document edit redone.");
   }
 
   async function requestSaveDocument() {
-    const res = await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(saveDocumentPayload(bookDocument)),
-    });
-    const payload = (await res.json().catch(() => null)) as {
-      project?: ProjectRecord;
-      message?: string;
-    } | null;
-
-    if (!res.ok || !payload?.project) {
-      throw new Error(payload?.message ?? "Could not save document edits.");
+    if (activeSavePromiseRef.current) {
+      await activeSavePromiseRef.current;
+      return;
     }
 
-    setProject(payload.project);
-    setLocalDocumentEdits(false);
-    setUndoStack([]);
-    setRedoStack([]);
-    setFeedback("Document edits saved.");
+    const documentToSave = cloneBookDocument(latestDocumentRef.current);
+    const signatureToSave = documentSignature(documentToSave);
+    if (signatureToSave === savedDocumentSignatureRef.current) {
+      setLocalDocumentEdits(false);
+      setSaveStatus("saved");
+      setFeedback("All edits saved.");
+      return;
+    }
+
+    setSaveStatus("saving");
+    setFeedback("Saving edits...");
+
+    const savePromise = (async () => {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(saveDocumentPayload(documentToSave)),
+      });
+      const payload = (await res.json().catch(() => null)) as {
+        project?: ProjectRecord;
+        message?: string;
+      } | null;
+
+      if (!res.ok || !payload?.project) {
+        throw new Error(payload?.message ?? "Could not save document edits.");
+      }
+
+      savedDocumentSignatureRef.current = signatureToSave;
+      if (documentSignature(latestDocumentRef.current) === signatureToSave) {
+        latestDocumentRef.current = normalizeTiptapBookDocument(payload.project.profile.document ?? []);
+        setProject(payload.project);
+        setLocalDocumentEdits(false);
+        setSaveStatus("saved");
+        setUndoStack([]);
+        setRedoStack([]);
+        setFeedback("Document edits saved.");
+      } else {
+        setLocalDocumentEdits(true);
+        setSaveStatus("dirty");
+        setFeedback("Saved earlier edits. New edits are still unsaved.");
+      }
+    })();
+
+    activeSavePromiseRef.current = savePromise;
+
+    try {
+      await savePromise;
+    } catch (e) {
+      setLocalDocumentEdits(true);
+      setSaveStatus("error");
+      throw e;
+    } finally {
+      activeSavePromiseRef.current = null;
+    }
   }
 
   async function updatePageFormat(nextFormat: PageFormat, nextPageSize: PageSize) {
@@ -270,6 +375,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           </p>
           <Link
             href="/dashboard"
+            onClick={confirmNavigationWithUnsavedChanges}
             style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", background: "#1a1714", color: "#fff", borderRadius: "6px", textDecorationLine: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
           >
             <ArrowLeft size={13} />
@@ -297,6 +403,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           <Link
             href="/dashboard"
+            onClick={confirmNavigationWithUnsavedChanges}
             style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#8a867e", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
           >
             <ArrowLeft size={14} />
@@ -374,7 +481,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           />
           <div style={{ flex: 1, minHeight: 0 }}>
             <DocumentEditorPanel
-              key={`${project.id}:${project.updatedAt}`}
+              key={project.id}
               title={project.title}
               document={bookDocument}
               pageFormat={pageFormat}
@@ -388,6 +495,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
         <ActionPanel
           hasDraft={hasDraft}
           hasLocalDocumentEdits={hasLocalDocumentEdits}
+          saveStatus={saveStatus}
           revisionPrompt={revisionPrompt}
           feedback={feedback}
           canUndoDocumentEdit={undoStack.length > 0}

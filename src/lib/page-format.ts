@@ -23,6 +23,8 @@ export type PageFormatSpec = {
   heightMm: number;
   previewWidth: number;
   pagePadding: string;
+  headerHeightPx: number;
+  footerHeightPx: number;
 };
 
 export const DEFAULT_PAGE_FORMAT: PageFormat = "ebook";
@@ -37,7 +39,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 152,
     heightMm: 229,
     previewWidth: 720,
-    pagePadding: "64px 58px 78px",
+    pagePadding: "28px 72px 36px",
+    headerHeightPx: 32,
+    footerHeightPx: 32,
   },
   {
     id: "kindle",
@@ -47,7 +51,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 108,
     heightMm: 162,
     previewWidth: 620,
-    pagePadding: "56px 46px 70px",
+    pagePadding: "16px 48px 22px",
+    headerHeightPx: 28,
+    footerHeightPx: 28,
   },
   {
     id: "tablet",
@@ -57,7 +63,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 180,
     heightMm: 240,
     previewWidth: 800,
-    pagePadding: "70px 66px 86px",
+    pagePadding: "28px 76px 36px",
+    headerHeightPx: 32,
+    footerHeightPx: 32,
   },
   {
     id: "mobile",
@@ -67,7 +75,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 86,
     heightMm: 160,
     previewWidth: 520,
-    pagePadding: "48px 34px 62px",
+    pagePadding: "10px 32px 14px",
+    headerHeightPx: 24,
+    footerHeightPx: 24,
   },
   {
     id: "a5",
@@ -77,7 +87,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 148,
     heightMm: 210,
     previewWidth: 700,
-    pagePadding: "64px 54px 78px",
+    pagePadding: "32px 80px 40px",
+    headerHeightPx: 36,
+    footerHeightPx: 36,
   },
   {
     id: "a4",
@@ -87,7 +99,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 210,
     heightMm: 297,
     previewWidth: 820,
-    pagePadding: "72px 64px 96px",
+    pagePadding: "36px 88px 48px",
+    headerHeightPx: 40,
+    footerHeightPx: 40,
   },
   {
     id: "a3",
@@ -97,7 +111,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 297,
     heightMm: 420,
     previewWidth: 980,
-    pagePadding: "84px 78px 112px",
+    pagePadding: "40px 96px 54px",
+    headerHeightPx: 44,
+    footerHeightPx: 44,
   },
   {
     id: "a2",
@@ -107,7 +123,9 @@ export const PAGE_FORMATS: PageFormatSpec[] = [
     widthMm: 420,
     heightMm: 594,
     previewWidth: 1120,
-    pagePadding: "96px 92px 128px",
+    pagePadding: "48px 104px 60px",
+    headerHeightPx: 48,
+    footerHeightPx: 48,
   },
 ];
 
@@ -165,7 +183,9 @@ export function getPageFormatSpec(
       widthMm: size.widthMm,
       heightMm: size.heightMm,
       previewWidth,
-      pagePadding: "64px 56px 80px",
+      pagePadding: "28px 72px 36px",
+      headerHeightPx: 32,
+      footerHeightPx: 32,
     };
   }
 

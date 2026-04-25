@@ -2,7 +2,7 @@
 
 Created: 2026-04-19
 Updated: 2026-04-24
-Version: v0.7
+Version: v0.8
 
 ## 1. Scope
 
@@ -49,10 +49,11 @@ Out of scope for this document:
 ### AI and document pipeline
 
 - Gemini API key based generation
-- The editor stores a paged Tiptap document JSON payload
-- Tiptap renders and edits each page in the editor
+- The editor stores a Tiptap book document JSON payload
+- Tiptap renders and edits one continuous document inside a visual page frame
 - The editor supports image nodes with file insertion, selection menus, alignment, crop-frame display, and horizontal resizing
 - The editor supports a custom `mediaText` node for stable image-plus-text side-by-side layouts
+- Image insertion currently uses a validated local inline fallback. Production image storage is not wired yet.
 - Generated HTML is derived at export time from the saved document and is not persisted
 - PDF export path remains part of the intended architecture
 - Initial ebook generation should use one Gemini Flash call after project creation
@@ -61,7 +62,7 @@ Out of scope for this document:
 Current product direction:
 
 - Celion is now a document-focused editor, closer to Tiptap/Simple Editor document editing than to raw HTML/CSS page composition.
-- A paged Tiptap document is the editable source of truth.
+- A Tiptap document is the editable source of truth.
 - HTML/CSS is only the renderer/export artifact.
 - The previous AI layout-token direction is superseded.
 - The wizard is an intake flow: setup, source upload, format, generate.
@@ -98,7 +99,7 @@ References:
         +--> [Neon Auth client/session]
         +--> [Project API routes]
         +--> [Project generation/revision flow]
-        +--> [Tiptap paged document editor / export flow]
+        +--> [Tiptap document editor / visual page frame / export flow]
         |
         v
 [@neondatabase/serverless]
@@ -114,7 +115,7 @@ Key principles:
 
 - The app is a single Next.js application.
 - Authentication and application data both live on Neon.
-- Paged book document JSON is the canonical editable document model.
+- Tiptap book document JSON is the canonical editable document model.
 - HTML is an export-only derived artifact.
 - Rich layout affordances should be represented as Tiptap JSON nodes, not as raw HTML stored in the database.
 - Project data is persisted in Postgres, not localStorage.
@@ -169,7 +170,7 @@ These tables are created lazily by the app on first use. There is no active Driz
 - A project belongs to a signed-in user via `user_id`
 - Profile metadata is stored separately in `project_profiles`
 - Uploaded sources are stored in `source_items`
-- Editable paged Tiptap document JSON is stored in `project_profiles.document`
+- Editable Tiptap book document JSON is stored in `project_profiles.document`
 - Export HTML is derived on demand from the saved document
 
 Current `project_profiles` metadata is intentionally small: author, target reader, core message, tone, design mode, page format, generation plan, and Tiptap document JSON. `plan` and `document` are stored as JSONB.
@@ -187,6 +188,12 @@ Primary editor files:
 
 Current document node policy:
 
+- `tiptap-book` remains the database wrapper for compatibility, but the active editor model is a single continuous Tiptap `doc`.
+- The current editor does not split and rewrite content into separate saved page documents while the user types.
+- `TiptapBookEditor` flattens any older multi-page payload into one editable document and saves it back as one `page-1` document plus layout metadata.
+- Visual page frames, header text, and footer text are editor layout affordances. Header/footer can be edited from the page chrome and are saved in `document.layout`.
+- This is intentionally a "Pages Lite" implementation, not a full clone of Tiptap Pro Pages yet.
+- The visual page count is calculated from content height; exact line-level pagination and header/footer collision avoidance remain TODO.
 - Standard Tiptap document nodes remain the default for generated copy.
 - `image` nodes are supported for user-inserted images.
 - Image attrs currently include `src`, `alt`, `title`, `width`, `height`, `fit`, and `align`.
@@ -194,6 +201,34 @@ Current document node policy:
 - `mediaText` is the stable side-by-side image/text layout node. It is preferred over CSS float text wrapping because page overflow currently moves top-level nodes as whole units.
 - `mediaText` stores image metadata on the node attrs and stores the adjacent editable text as child block content.
 - Export HTML must explicitly render custom nodes. If a new custom Tiptap node is added, `tiptapDocumentToHtml()` and its tests must be updated in the same change.
+
+### Image storage direction
+
+Current implementation:
+
+- `src/lib/image-storage.ts` defines the image storage boundary.
+- `local-inline` is the only active provider today.
+- Inline images are limited to MVP-sized images and are treated as a temporary fallback, not the production target.
+- Current temporary limits are 5MB per inline image and 16MB per saved document payload.
+- `save-document` validates document payload size and rejects non-persistable image sources such as `blob:` URLs.
+
+Production direction:
+
+- Store image bytes in object storage.
+- Store only stable image URLs and metadata in the Tiptap document JSON / Neon records.
+- Keep Neon as the application database for project rows, document JSON, image metadata, ownership, and references.
+- Do not use Neon/Postgres as the primary store for large image binaries unless there is a very specific reason.
+
+Preferred provider order:
+
+1. Vercel Blob if staying tightly centered on Vercel deployment and simplest Next.js integration matters most.
+2. Cloudflare R2 if long-term portability, S3-compatible APIs, and object-storage cost profile matter more.
+3. S3-compatible storage as a generic fallback if R2 is not chosen.
+
+References:
+
+- Vercel Blob: https://vercel.com/docs/vercel-blob
+- Cloudflare R2 S3-compatible API: https://developers.cloudflare.com/r2/get-started/s3/
 
 ### Current API surface
 
@@ -311,14 +346,51 @@ If the team wants to reintroduce any of those later, that should be treated as a
 - Prefer structured Tiptap nodes for editor behavior. Avoid introducing freeform canvas positioning into the document editor.
 - Prefer `mediaText` for image-plus-text layouts. Avoid float-based text wrapping until pagination behavior is deliberately redesigned.
 
-## 11. Near-Term Next Steps
+## 11. Open TODO List
 
-- Keep the app on the canonical Neon project and branch model
-- Update any remaining stale docs only when they are intended to be active references
-- Polish the Tiptap editor surface to match Celion's restrained UI
-- Add storage-backed image uploads to replace base64 image persistence in document JSON
-- Add more polished media/text controls such as image-side toggle and caption support
-- Add DOCX/text-PDF extraction as a dedicated ingestion slice later
-- Replace temporary document JSON -> HTML export with a stronger export pipeline
-- If schema management becomes painful, evaluate a move to explicit migrations later
-- If auth requirements outgrow Neon Auth, decide explicitly whether to stay on Neon Auth or move to a self-hosted Better Auth architecture
+### P0 / P1
+
+- [ ] QA editor pagination and Tiptap editing behavior manually.
+  - Verify backspace/delete behavior across page boundaries.
+  - Verify visual page count with headings, lists, images, and `mediaText`.
+  - Verify header/footer editing and persistence.
+  - Decide whether Pages Lite is enough for MVP or whether line-accurate pagination must be implemented before launch.
+- [ ] Replace inline image persistence with object storage.
+  - Decide between Vercel Blob and Cloudflare R2.
+  - If Vercel Blob is chosen, add upload route/client upload flow and persist returned blob URLs.
+  - If R2 is chosen, add S3-compatible upload route, credentials, bucket config, and public/signed URL strategy.
+  - Keep Neon for metadata and references only.
+  - Add cleanup behavior for deleted/replaced images later.
+- [ ] Improve manual save QA.
+  - Test save while typing under slow network.
+  - Test image insertion while save is pending.
+  - Test tab close, refresh, and Dashboard navigation with unsaved changes.
+  - Test save failure retry behavior.
+
+### P2
+
+- [ ] Add richer image controls.
+  - Image-side toggle for `mediaText`.
+  - Caption support.
+  - Alt text editing UI.
+  - Replace/clear image action.
+- [ ] Harden document validation.
+  - Validate supported Tiptap node types server-side.
+  - Add max depth / max node count checks.
+  - Keep image payload limits aligned with the chosen object-storage path.
+- [ ] Improve PDF export quality.
+  - Replace the temporary print-dialog based flow with a stronger export pipeline.
+  - Verify page size, margins, page breaks, fonts, image rendering, and multi-page output.
+  - Do not start this until editor/pagination QA is acceptable.
+- [ ] Add source extraction for DOCX and text PDFs.
+  - DOCX: evaluate `mammoth`.
+  - Text PDF: evaluate `unpdf` or `pdf-parse`.
+  - Scanned/image PDF OCR remains a later advanced path.
+  - Do not send raw binary DOCX/PDF directly to Gemini as the default path.
+
+### P3 / Later
+
+- [ ] Update stale docs only when they are intended to be active references.
+- [ ] If schema management becomes painful, evaluate a move to explicit migrations later.
+- [ ] If auth requirements outgrow Neon Auth, decide explicitly whether to stay on Neon Auth or move to a self-hosted Better Auth architecture.
+- [ ] Add collaboration/history only after the single-user editing model feels stable.

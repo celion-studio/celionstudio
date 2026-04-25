@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Zap } from "lucide-react";
 import { z } from "zod";
-import type { ProjectRecord, ProjectSource, SourceKind } from "@/types/project";
+import type { ProjectRecord } from "@/types/project";
 import { useProjectWizardStore } from "@/store/useProjectWizardStore";
 import type { WizardStep } from "@/store/useProjectWizardStore";
 import { BasicsStep } from "@/components/wizard/BasicsStep";
 import { SourceStep } from "@/components/wizard/SourceStep";
 import { FormatStep } from "@/components/wizard/FormatStep";
 import { GenerateStep } from "@/components/wizard/GenerateStep";
+import { buildProjectSourcesFromFiles, getSourceFileSupport } from "@/lib/source-ingestion";
 
 const TOTAL_STEPS = 4;
 
@@ -24,7 +25,7 @@ const STEP_TITLES = [
 const STEP_DESCRIPTIONS = [
   "Title, author, target reader, core message, and tone.",
   "Add the document material Celion should turn into an ebook.",
-  "Use the ebook default or switch to a print/custom size.",
+  "Choose the editor page size used when you print or save as PDF.",
   "Celion will create an editable document you can refine directly.",
 ] as const;
 
@@ -53,50 +54,22 @@ function getStepIssue(
   }
   if (step === 2) {
     if (state.files.length === 0) return "Upload at least one source document.";
-    if (state.files.some((file) => /\.(hwp|hwpx)$/i.test(file.name))) {
-      return "HWP files are not supported.";
-    }
-    if (state.files.some((file) => /\.(pdf|docx)$/i.test(file.name))) {
-      return "PDF/DOCX extraction is not connected yet. Use MD or TXT for now.";
-    }
+    const firstUnsupported = state.files
+      .map((file) => getSourceFileSupport(file))
+      .find((support) => support.status !== "supported");
+    if (firstUnsupported) return firstUnsupported.message;
     return null;
   }
   return null;
 }
 
-function getFileKind(fileName: string): SourceKind | null {
-  const ext = fileName.split(".").pop()?.toLowerCase();
-  if (ext === "md" || ext === "txt") return ext;
-  if (ext === "pdf" || ext === "docx") {
-    throw new Error("PDF/DOCX extraction is not connected yet. Use MD or TXT for now.");
-  }
-  return null;
-}
-
-async function buildSources(files: File[]): Promise<ProjectSource[]> {
-  const sources: ProjectSource[] = [];
-
-  for (const file of files) {
-    const kind = getFileKind(file.name);
-    if (!kind) throw new Error(`${file.name} is not a supported file type.`);
-
-    const content = (await file.text()).trim();
-
-    if (!content) throw new Error(`${file.name} is empty.`);
-
-    sources.push({
-      id: crypto.randomUUID(),
-      kind,
-      name: file.name,
-      content,
-      excerpt: content.slice(0, 180),
-    });
-  }
-
-  return sources;
-}
-
-export function WizardContent({ onCreated }: { onCreated?: (project: ProjectRecord) => void }) {
+export function WizardContent({
+  isSignedIn = true,
+  onCreated,
+}: {
+  isSignedIn?: boolean;
+  onCreated?: (project: ProjectRecord) => void;
+}) {
   const router = useRouter();
   const {
     step,
@@ -145,10 +118,15 @@ export function WizardContent({ onCreated }: { onCreated?: (project: ProjectReco
       return;
     }
 
+    if (!isSignedIn) {
+      setError("Sign in before generating so Celion can save the draft to your workspace.");
+      return;
+    }
+
     setSubmitting(true);
     setGenerating(true);
     try {
-      const sources = await buildSources(files);
+      const sources = await buildProjectSourcesFromFiles(files);
       if (sources.length === 0) throw new Error("No usable source files.");
 
       const createRes = await fetch("/api/projects", {
@@ -178,6 +156,9 @@ export function WizardContent({ onCreated }: { onCreated?: (project: ProjectReco
         project?: ProjectRecord;
         message?: string;
       } | null;
+      if (createRes.status === 401) {
+        throw new Error("Your session expired. Sign in again before generating.");
+      }
       if (!createRes.ok || !created?.project) {
         throw new Error(created?.message ?? "Could not create draft.");
       }
@@ -191,6 +172,9 @@ export function WizardContent({ onCreated }: { onCreated?: (project: ProjectReco
         project?: ProjectRecord;
         message?: string;
       } | null;
+      if (generateRes.status === 401) {
+        throw new Error("Your session expired. Sign in again before generating.");
+      }
       if (!generateRes.ok || !generated?.project) {
         throw new Error(generated?.message ?? "Could not generate the ebook.");
       }

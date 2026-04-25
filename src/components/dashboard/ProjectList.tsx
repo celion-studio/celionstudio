@@ -10,7 +10,7 @@ const statusLabel: Record<string, string> = {
   generating: "Generating",
   ready: "Ready",
   revising: "Revising",
-  exported: "Exported",
+  exported: "Print opened",
 };
 
 const statusColor: Record<string, { bg: string; text: string }> = {

@@ -145,7 +145,7 @@ export function DashboardShell({
     };
   }, [authPending, hasVerifier, resolvedSignedIn]);
 
-  const exported = projects.filter((project) => project.status === "exported").length;
+  const printOpened = projects.filter((project) => project.status === "exported").length;
   const inProgress = projects.filter(
     (project) => !["draft", "exported"].includes(project.status),
   ).length;
@@ -316,7 +316,7 @@ export function DashboardShell({
                 {[
                   { label: "Total drafts", value: projects.length, icon: FileText },
                   { label: "In progress", value: inProgress, icon: Clock },
-                  { label: "Exported", value: exported, icon: BookOpen },
+                  { label: "Print opened", value: printOpened, icon: BookOpen },
                 ].map(({ label, value, icon: Icon }) => (
                   <div
                     key={label}

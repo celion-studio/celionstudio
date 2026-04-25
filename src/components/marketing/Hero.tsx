@@ -221,7 +221,7 @@ export function Hero({
                 <div className="process-num-bg">03</div>
                 <div className="process-content">
                   <h3 className="process-title">Revise and ship</h3>
-                  <p className="process-body">Argue with paragraphs, not outlines. Export as HTML, PDF, or EPUB when it's ready to read.</p>
+                  <p className="process-body">Argue with paragraphs, not outlines. Open the print flow and save a PDF when it's ready to read.</p>
                 </div>
                 <div className="process-visual"></div>
               </div>
@@ -270,7 +270,7 @@ export function Hero({
               <div className="cta-copy">
                 <div className="section-kicker">Start here</div>
                 <h3>Start with the draft you already have.</h3>
-                <p>Notes in, structure out, export when it reads like a real book.</p>
+                <p>Notes in, structure out, then print to PDF when it reads like a real book.</p>
               </div>
               <div className="cta-buttons">
                 {isResolvedSignedIn ? (
@@ -302,7 +302,7 @@ export function Hero({
               <h4>Product</h4>
               <Link href="#">How it works</Link>
               <Link href="#">Preview</Link>
-              <Link href="#">Export</Link>
+              <Link href="#">Print PDF</Link>
               <Link href="#">Pricing</Link>
             </div>
             <div className="footer-col">

@@ -5,7 +5,11 @@ import { createCelionPaginationPlugin } from "@/components/editor/pagination/pag
 export type { CelionPaginationOptions } from "@/components/editor/pagination/pagination-types";
 import type { CelionPaginationOptions } from "@/components/editor/pagination/pagination-types";
 
-export const CelionPaginationExtension = Extension.create<CelionPaginationOptions>({
+export type CelionPaginationExtensionOptions = CelionPaginationOptions & {
+  getOptions?: () => CelionPaginationOptions;
+};
+
+export const CelionPaginationExtension = Extension.create<CelionPaginationExtensionOptions>({
   name: "celionPagination",
 
   addOptions() {
@@ -22,10 +26,15 @@ export const CelionPaginationExtension = Extension.create<CelionPaginationOption
       footerHeightPx: 42,
       headerText: "",
       footerText: "{page}",
+      getOptions: undefined,
     };
   },
 
   addProseMirrorPlugins() {
-    return [createCelionPaginationPlugin(this.options)];
+    return [
+      createCelionPaginationPlugin(
+        () => this.options.getOptions?.() ?? this.options,
+      ),
+    ];
   },
 });

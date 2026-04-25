@@ -1,13 +1,12 @@
 "use client";
 
 import { FileText, Trash2, UploadCloud } from "lucide-react";
+import { SOURCE_FILE_ACCEPT } from "@/lib/source-ingestion";
 
 type SourceStepProps = {
   fileNames: string[];
   onFilesChange: (files: File[]) => void;
 };
-
-const acceptedExtensions = ".md,.txt";
 
 export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
   return (
@@ -88,7 +87,7 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
           <input
             type="file"
             multiple
-            accept={acceptedExtensions}
+            accept={SOURCE_FILE_ACCEPT}
             className="hidden"
             onChange={(e) => onFilesChange(Array.from(e.target.files ?? []))}
           />
