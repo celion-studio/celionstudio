@@ -39,7 +39,12 @@ export function createFirstPageWidget(
   const root = document.createElement("div");
   root.className = "celion-pagination-first-page";
   root.contentEditable = "false";
+  root.style.position = "absolute";
+  root.style.inset = "0 0 auto";
+  root.style.pointerEvents = "none";
+  root.style.zIndex = "2";
   root.style.setProperty("--celion-page-height", `${options.pageHeightPx}px`);
+  root.style.height = `${options.pageHeightPx}px`;
 
   root.append(
     createChromeButton(
