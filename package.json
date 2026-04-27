@@ -8,7 +8,7 @@
         "build:deploy": "npm run db:init && npm run build",
         "start": "next start",
         "db:init": "tsx scripts/init-db.ts",
-        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/page-format.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
+        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/page-format.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/document-validation.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
@@ -24,6 +24,7 @@
         "@tiptap/pm": "^3.22.4",
         "@tiptap/react": "^3.22.4",
         "@tiptap/starter-kit": "^3.22.4",
+        "@vercel/blob": "^2.3.3",
         "dotenv": "^17.4.2",
         "lucide-react": "^0.542.0",
         "next": "^16.2.4",

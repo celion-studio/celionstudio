@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { ArrowLeft, Download } from "lucide-react";
 import { EditorLeftPanel } from "@/components/editor/EditorLeftPanel";
@@ -13,6 +13,7 @@ import {
   normalizeTiptapBookDocument,
   tiptapDocumentToHtml,
   type TiptapBookDocument,
+  type TiptapBookLayout,
 } from "@/lib/tiptap-document";
 import {
   normalizePageFormat,
@@ -24,18 +25,25 @@ import type { ProjectRecord } from "@/types/project";
 
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
+const AUTO_SAVE_DELAY_MS = 1200;
+
 function cloneBookDocument(document: unknown) {
   return JSON.parse(
     JSON.stringify(normalizeTiptapBookDocument(document)),
   ) as TiptapBookDocument;
 }
 
-function documentSignature(document: unknown) {
-  return JSON.stringify(normalizeTiptapBookDocument(document));
+function normalizedDocumentSignature(document: TiptapBookDocument) {
+  return JSON.stringify(document);
 }
 
 function saveDocumentPayload(document: unknown) {
   return { action: "save-document", document } as const;
+}
+
+function apiErrorMessage(payload: { message?: string; note?: string } | null, fallback: string) {
+  const message = payload?.message ?? fallback;
+  return payload?.note ? `${message} ${payload.note}` : message;
 }
 
 export function EditorShell({ projectId }: { projectId: string }) {
@@ -43,15 +51,23 @@ export function EditorShell({ projectId }: { projectId: string }) {
   const [hasLocalDocumentEdits, setHasLocalDocumentEdits] = useState(false);
   const hasLocalDocumentEditsRef = useRef(false);
   const latestDocumentRef = useRef<TiptapBookDocument>(cloneBookDocument([]));
-  const savedDocumentSignatureRef = useRef(documentSignature([]));
+  const savedDocumentSignatureRef = useRef(normalizedDocumentSignature(cloneBookDocument([])));
   const activeSavePromiseRef = useRef<Promise<void> | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
   const [saveStatus, setSaveStatusState] = useState<SaveStatus>("idle");
   const saveStatusRef = useRef<SaveStatus>("idle");
-  const [undoStack, setUndoStack] = useState<TiptapBookDocument[]>([]);
-  const [redoStack, setRedoStack] = useState<TiptapBookDocument[]>([]);
-  const [revisionPrompt, setRevisionPrompt] = useState("");
   const [feedback, setFeedback] = useState("");
   const [visualPageCount, setVisualPageCount] = useState<number | undefined>();
+  const [imageUploadPending, setImageUploadPending] = useState(false);
+  const imageUploadPendingRef = useRef(false);
+  const [editorLayout, setEditorLayout] = useState<TiptapBookLayout>({
+    headerType: "none",
+    headerText: "",
+    headerAlign: "center",
+    footerType: "page",
+    footerText: "{page}",
+    footerAlign: "center",
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -60,8 +76,8 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setFeedback("");
     setLocalDocumentEdits(false);
     setSaveStatus("idle");
-    setUndoStack([]);
-    setRedoStack([]);
+    clearAutoSaveTimer();
+    setImageUploadPendingState(false);
 
     fetch(`/api/projects/${projectId}`, { method: "GET", cache: "no-store" })
       .then((r) => r.json())
@@ -82,15 +98,17 @@ export function EditorShell({ projectId }: { projectId: string }) {
 
     return () => {
       active = false;
+      clearAutoSaveTimer();
     };
   }, [projectId]);
 
   const pageFormat = normalizePageFormat(project?.profile.pageFormat);
   const customPageSize = normalizePageSize(project?.profile.customPageSize);
-  const bookDocument = useMemo(
-    () => normalizeTiptapBookDocument(project?.profile.document ?? []),
-    [project?.profile.document],
-  );
+  const bookDocument = useMemo(() => {
+    const sourceDocument = project?.profile.document;
+    if (sourceDocument === latestDocumentRef.current) return latestDocumentRef.current;
+    return normalizeTiptapBookDocument(sourceDocument ?? []);
+  }, [project?.profile.document]);
 
   const exportHtml = useMemo(() => {
     if (!project) return "";
@@ -112,10 +130,19 @@ export function EditorShell({ projectId }: { projectId: string }) {
   }, [bookDocument]);
 
   useEffect(() => {
+    if (!imageUploadPending && hasLocalDocumentEdits && saveStatus !== "saving") {
+      scheduleAutoSave();
+    }
+  }, [hasLocalDocumentEdits, imageUploadPending, saveStatus]);
+
+  useEffect(() => () => clearAutoSaveTimer(), []);
+
+  useEffect(() => {
     const shouldWarn =
       hasLocalDocumentEdits ||
       saveStatus === "saving" ||
-      saveStatus === "error";
+      saveStatus === "error" ||
+      imageUploadPending;
     if (!shouldWarn) return;
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -125,7 +152,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasLocalDocumentEdits, saveStatus]);
+  }, [hasLocalDocumentEdits, imageUploadPending, saveStatus]);
 
   function setLocalDocumentEdits(value: boolean) {
     hasLocalDocumentEditsRef.current = value;
@@ -137,17 +164,42 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setSaveStatusState(value);
   }
 
+  const setImageUploadPendingState = useCallback((value: boolean) => {
+    imageUploadPendingRef.current = value;
+    setImageUploadPending(value);
+    if (value) setFeedback("Uploading image. Save will be available when it finishes.");
+  }, []);
+
+  function clearAutoSaveTimer() {
+    if (autoSaveTimerRef.current === null) return;
+    window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = null;
+  }
+
+  function scheduleAutoSave() {
+    clearAutoSaveTimer();
+    if (imageUploadPendingRef.current || saveStatusRef.current === "saving") return;
+
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      requestSaveDocument({ silent: true }).catch((error) => {
+        setFeedback(error instanceof Error ? error.message : "Auto-save failed.");
+      });
+    }, AUTO_SAVE_DELAY_MS);
+  }
+
   function markDocumentSavedFromProject(nextProject: ProjectRecord) {
     const nextDocument = normalizeTiptapBookDocument(nextProject.profile.document ?? []);
     latestDocumentRef.current = nextDocument;
-    savedDocumentSignatureRef.current = documentSignature(nextDocument);
+    savedDocumentSignatureRef.current = normalizedDocumentSignature(nextDocument);
   }
 
   function confirmNavigationWithUnsavedChanges(event: MouseEvent<HTMLAnchorElement>) {
     const shouldWarn =
       hasLocalDocumentEditsRef.current ||
       saveStatusRef.current === "saving" ||
-      saveStatusRef.current === "error";
+      saveStatusRef.current === "error" ||
+      imageUploadPendingRef.current;
     if (!shouldWarn) return;
 
     if (!window.confirm("You have unsaved editor changes. Leave this page?")) {
@@ -166,14 +218,12 @@ export function EditorShell({ projectId }: { projectId: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string } | null;
-    if (!res.ok || !payload?.project) throw new Error(payload?.message ?? "Could not update this draft.");
+    const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string; note?: string } | null;
+    if (!res.ok || !payload?.project) throw new Error(apiErrorMessage(payload, "Could not update this draft."));
     markDocumentSavedFromProject(payload.project);
     setProject(payload.project);
     setLocalDocumentEdits(false);
     setSaveStatus("saved");
-    setUndoStack([]);
-    setRedoStack([]);
     setFeedback(successMessage);
   }
 
@@ -192,102 +242,84 @@ export function EditorShell({ projectId }: { projectId: string }) {
   }
 
   function updateLocalDocument(nextDocument: TiptapBookDocument) {
-    if (!hasLocalDocumentEditsRef.current) {
-      setUndoStack((history) => [...history, cloneBookDocument(bookDocument)]);
-    }
-    setRedoStack([]);
     setProjectDocument(nextDocument);
     latestDocumentRef.current = nextDocument;
     setLocalDocumentEdits(true);
     setSaveStatus("dirty");
-    setFeedback("Unsaved edits. Save when ready.");
+    if (saveStatusRef.current === "error") setFeedback("");
+    scheduleAutoSave();
   }
 
-  function undoDocumentEdit() {
-    const previousDocument = undoStack[undoStack.length - 1];
-    if (!previousDocument) return;
+  async function requestSaveDocument({ silent = false } = {}) {
+    clearAutoSaveTimer();
 
-    setUndoStack((history) => history.slice(0, -1));
-    setRedoStack((history) => [...history, cloneBookDocument(bookDocument)]);
-    setProjectDocument(previousDocument);
-    latestDocumentRef.current = previousDocument;
-    setLocalDocumentEdits(true);
-    setSaveStatus("dirty");
-    setFeedback("Document edit undone.");
-  }
-
-  function redoDocumentEdit() {
-    const nextDocument = redoStack[redoStack.length - 1];
-    if (!nextDocument) return;
-
-    setRedoStack((history) => history.slice(0, -1));
-    setUndoStack((history) => [...history, cloneBookDocument(bookDocument)]);
-    setProjectDocument(nextDocument);
-    latestDocumentRef.current = nextDocument;
-    setLocalDocumentEdits(true);
-    setSaveStatus("dirty");
-    setFeedback("Document edit redone.");
-  }
-
-  async function requestSaveDocument() {
-    if (activeSavePromiseRef.current) {
-      await activeSavePromiseRef.current;
-      return;
-    }
-
-    const documentToSave = cloneBookDocument(latestDocumentRef.current);
-    const signatureToSave = documentSignature(documentToSave);
-    if (signatureToSave === savedDocumentSignatureRef.current) {
-      setLocalDocumentEdits(false);
-      setSaveStatus("saved");
-      setFeedback("All edits saved.");
-      return;
-    }
-
-    setSaveStatus("saving");
-    setFeedback("Saving edits...");
-
-    const savePromise = (async () => {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(saveDocumentPayload(documentToSave)),
-      });
-      const payload = (await res.json().catch(() => null)) as {
-        project?: ProjectRecord;
-        message?: string;
-      } | null;
-
-      if (!res.ok || !payload?.project) {
-        throw new Error(payload?.message ?? "Could not save document edits.");
+    while (true) {
+      if (imageUploadPendingRef.current) {
+        if (!silent) setFeedback("Wait for the image upload to finish before saving.");
+        return;
       }
 
-      savedDocumentSignatureRef.current = signatureToSave;
-      if (documentSignature(latestDocumentRef.current) === signatureToSave) {
-        latestDocumentRef.current = normalizeTiptapBookDocument(payload.project.profile.document ?? []);
-        setProject(payload.project);
+      const activeSave = activeSavePromiseRef.current;
+      if (activeSave) {
+        await activeSave;
+        continue;
+      }
+
+      const documentToSave = cloneBookDocument(latestDocumentRef.current);
+      const signatureToSave = normalizedDocumentSignature(documentToSave);
+      if (signatureToSave === savedDocumentSignatureRef.current) {
         setLocalDocumentEdits(false);
         setSaveStatus("saved");
-        setUndoStack([]);
-        setRedoStack([]);
-        setFeedback("Document edits saved.");
-      } else {
-        setLocalDocumentEdits(true);
-        setSaveStatus("dirty");
-        setFeedback("Saved earlier edits. New edits are still unsaved.");
+        if (!silent) setFeedback("All edits saved.");
+        return;
       }
-    })();
 
-    activeSavePromiseRef.current = savePromise;
+      setSaveStatus("saving");
+      if (!silent) setFeedback("Saving edits...");
 
-    try {
-      await savePromise;
-    } catch (e) {
-      setLocalDocumentEdits(true);
-      setSaveStatus("error");
-      throw e;
-    } finally {
-      activeSavePromiseRef.current = null;
+      const savePromise = (async () => {
+        const res = await fetch(`/api/projects/${projectId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(saveDocumentPayload(documentToSave)),
+        });
+        const payload = (await res.json().catch(() => null)) as {
+          project?: ProjectRecord;
+          message?: string;
+          note?: string;
+        } | null;
+
+        if (!res.ok || !payload?.project) {
+          throw new Error(apiErrorMessage(payload, "Could not save document edits."));
+        }
+
+        savedDocumentSignatureRef.current = signatureToSave;
+        if (normalizedDocumentSignature(latestDocumentRef.current) === signatureToSave) {
+          latestDocumentRef.current = normalizeTiptapBookDocument(payload.project.profile.document ?? []);
+          setProject(payload.project);
+          setLocalDocumentEdits(false);
+          setSaveStatus("saved");
+          if (!silent) setFeedback("Document edits saved.");
+        } else {
+          setLocalDocumentEdits(true);
+          setSaveStatus("dirty");
+          if (!silent) setFeedback("Saved earlier edits. Saving the latest edits now...");
+        }
+      })();
+
+      activeSavePromiseRef.current = savePromise;
+
+      try {
+        await savePromise;
+      } catch (e) {
+        setLocalDocumentEdits(true);
+        setSaveStatus("error");
+        throw e;
+      } finally {
+        if (activeSavePromiseRef.current === savePromise) {
+          activeSavePromiseRef.current = null;
+        }
+      }
     }
   }
 
@@ -318,21 +350,37 @@ export function EditorShell({ projectId }: { projectId: string }) {
     const payload = (await res.json().catch(() => null)) as {
       project?: ProjectRecord;
       message?: string;
+      note?: string;
     } | null;
 
     if (!res.ok || !payload?.project) {
       setProject(previousProject);
-      throw new Error(payload?.message ?? "Could not save page format.");
+      throw new Error(apiErrorMessage(payload, "Could not save page format."));
     }
 
     setProject(payload.project);
   }
 
   async function exportPdf() {
+    if (imageUploadPendingRef.current) {
+      setFeedback("Wait for the image upload to finish before exporting.");
+      return;
+    }
+
     if (!hasDraft) {
       setFeedback("No document to export.");
       return;
     }
+
+    if (hasLocalDocumentEditsRef.current || saveStatusRef.current === "error") {
+      try {
+        await requestSaveDocument();
+      } catch (error) {
+        setFeedback(error instanceof Error ? error.message : "Save failed. Export stopped.");
+        return;
+      }
+    }
+
     const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) {
       setFeedback("Print window was blocked.");
@@ -349,6 +397,14 @@ export function EditorShell({ projectId }: { projectId: string }) {
       setFeedback("Print opened, but export status could not be saved.");
     }
   }
+
+  const saveStatusLabel = imageUploadPending
+    ? "Uploading"
+    : saveStatus === "saving" || saveStatus === "dirty"
+      ? "Saving"
+      : saveStatus === "error"
+        ? "Save failed"
+        : "Saved";
 
   if (loading) {
     return (
@@ -416,6 +472,45 @@ export function EditorShell({ projectId }: { projectId: string }) {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span
+            style={{
+              minWidth: "72px",
+              color: imageUploadPending || saveStatus === "saving" || saveStatus === "dirty" ? "#8a5f1f" : saveStatus === "error" ? "#9a3b30" : "#8a867e",
+              fontFamily: "'Geist', sans-serif",
+              fontSize: "11.5px",
+              fontWeight: 560,
+              textAlign: "right",
+            }}
+          >
+            {saveStatusLabel}
+          </span>
+          {saveStatus === "error" ? (
+            <button
+              type="button"
+              disabled={imageUploadPending}
+              onClick={() => {
+                requestSaveDocument().catch((error) => {
+                  setFeedback(error instanceof Error ? error.message : "Could not save document edits.");
+                });
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                height: "30px",
+                border: "1px solid #ead6d1",
+                borderRadius: "4px",
+                background: "#fff8f6",
+                color: "#9a3b30",
+                padding: "0 12px",
+                fontFamily: "'Geist', sans-serif",
+                fontSize: "12px",
+                fontWeight: 550,
+                cursor: imageUploadPending ? "not-allowed" : "pointer",
+              }}
+            >
+              Retry save
+            </button>
+          ) : null}
           <PageFormatControl
             value={pageFormat}
             customPageSize={customPageSize}
@@ -427,7 +522,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           />
           <button
             type="button"
-            disabled={!hasDraft}
+            disabled={!hasDraft || imageUploadPending || saveStatus === "saving"}
             onClick={exportPdf}
             style={{
               display: "inline-flex",
@@ -436,13 +531,13 @@ export function EditorShell({ projectId }: { projectId: string }) {
               height: "30px",
               border: "1px solid #e2ded5",
               borderRadius: "4px",
-              background: hasDraft ? "#1a1714" : "#f7f4ee",
-              color: hasDraft ? "#fffdf8" : "#b8b0a5",
+              background: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#1a1714" : "#f7f4ee",
+              color: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#fffdf8" : "#b8b0a5",
               padding: "0 12px",
               fontFamily: "'Geist', sans-serif",
               fontSize: "12px",
               fontWeight: 550,
-              cursor: hasDraft ? "pointer" : "not-allowed",
+              cursor: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "pointer" : "not-allowed",
             }}
           >
             <Download size={13} strokeWidth={1.9} />
@@ -454,7 +549,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "260px minmax(0, 1fr) 300px",
+          gridTemplateColumns: "272px minmax(0, 1fr) 320px",
           height: "calc(100vh - 52px)",
           minHeight: "calc(100vh - 52px)",
           overflow: "hidden",
@@ -480,6 +575,24 @@ export function EditorShell({ projectId }: { projectId: string }) {
             }}
           />
           <div style={{ flex: 1, minHeight: 0 }}>
+            {feedback && (saveStatus === "error" || imageUploadPending) ? (
+              <div
+                role={saveStatus === "error" ? "alert" : "status"}
+                style={{
+                  margin: "10px 14px 0",
+                  border: saveStatus === "error" ? "1px solid #ead6d1" : "1px solid #e5dcc7",
+                  borderRadius: "6px",
+                  background: saveStatus === "error" ? "#fff8f6" : "#fffaf0",
+                  color: saveStatus === "error" ? "#9a3b30" : "#765d2f",
+                  fontFamily: "'Geist', sans-serif",
+                  fontSize: "12px",
+                  lineHeight: 1.45,
+                  padding: "8px 10px",
+                }}
+              >
+                {feedback}
+              </div>
+            ) : null}
             <DocumentEditorPanel
               key={project.id}
               title={project.title}
@@ -489,55 +602,16 @@ export function EditorShell({ projectId }: { projectId: string }) {
               toolbarHostId="editor-toolbar"
               onChange={updateLocalDocument}
               onPageCountChange={setVisualPageCount}
+              onLayoutChange={setEditorLayout}
+              onImageUploadStateChange={setImageUploadPendingState}
             />
           </div>
         </div>
         <ActionPanel
-          hasDraft={hasDraft}
-          hasLocalDocumentEdits={hasLocalDocumentEdits}
-          saveStatus={saveStatus}
-          revisionPrompt={revisionPrompt}
-          feedback={feedback}
-          canUndoDocumentEdit={undoStack.length > 0}
-          canRedoDocumentEdit={redoStack.length > 0}
-          onUndoDocumentEdit={undoDocumentEdit}
-          onRedoDocumentEdit={redoDocumentEdit}
-          onRevisionPromptChange={setRevisionPrompt}
-          onRequestSaveDocument={async () => {
-            try {
-              await requestSaveDocument();
-            } catch (e) {
-              setFeedback(e instanceof Error ? e.message : "Could not save document edits.");
-            }
-          }}
-          onGenerateFirstDraft={async () => {
-            try {
-              await applyMutation({ action: "generate" }, "Draft generated.");
-            } catch (e) {
-              setFeedback(e instanceof Error ? e.message : "Could not generate.");
-            }
-          }}
-          onRegenerateDraft={async () => {
-            try {
-              await applyMutation({ action: "regenerate" }, "Draft regenerated.");
-            } catch (e) {
-              setFeedback(e instanceof Error ? e.message : "Could not regenerate.");
-            }
-          }}
-          onReviseDraft={async () => {
-            if (!hasDraft) {
-              setFeedback("Generate or write a draft first.");
-              return;
-            }
-            try {
-              if (hasLocalDocumentEdits) {
-                await requestSaveDocument();
-              }
-              await applyMutation({ action: "revise", revisionPrompt }, "Revision applied.");
-              setRevisionPrompt("");
-            } catch (e) {
-              setFeedback(e instanceof Error ? e.message : "Revision failed.");
-            }
+          layout={editorLayout}
+          onLayoutChange={(nextLayout) => {
+            setEditorLayout(nextLayout);
+            updateLocalDocument({ ...latestDocumentRef.current, layout: nextLayout });
           }}
         />
       </div>

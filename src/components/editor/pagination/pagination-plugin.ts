@@ -202,7 +202,16 @@ export function createCelionPaginationPlugin(
       });
 
       return {
-        update() {
+        update(nextView, previousState) {
+          const previousPagination = getPaginationState(previousState);
+          const nextPagination = getPaginationState(nextView.state);
+          if (
+            previousState.doc === nextView.state.doc &&
+            previousPagination.version === nextPagination.version
+          ) {
+            return;
+          }
+
           schedule();
         },
         destroy() {

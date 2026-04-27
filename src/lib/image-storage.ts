@@ -1,4 +1,5 @@
 export const IMAGE_STORAGE_MAX_INLINE_BYTES = 5 * 1024 * 1024;
+export const IMAGE_STORAGE_MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const IMAGE_STORAGE_MAX_DOCUMENT_BYTES = 16 * 1024 * 1024;
 
 export const BASE64_IN_DOCUMENT_RISKS = [
@@ -23,13 +24,13 @@ export type ImageProviderSlot = {
 export const IMAGE_PROVIDER_SLOTS: ImageProviderSlot[] = [
   {
     provider: "local-inline",
-    status: "active",
-    note: "Current fallback only. Stores the data URL in the Tiptap document until object storage is wired.",
+    status: "future",
+    note: "Legacy fallback only. Saved documents should use stable object-storage URLs, not inline data URLs.",
   },
   {
     provider: "vercel-blob",
-    status: "future",
-    note: "Good fit for hosted object storage and public CDN URLs when the app is deployed on Vercel.",
+    status: "active",
+    note: "Active provider for editor image uploads. Stores bytes outside Postgres and persists stable Blob URLs in the Tiptap document.",
   },
   {
     provider: "s3",
@@ -166,7 +167,15 @@ function nonPersistableSourceFailure(src: string): ImageValidationFailure {
   return {
     code: "non_persistable_src",
     message: `Image source is not persistable: ${preview}`,
-    note: "Use an HTTPS/object-storage URL or a validated temporary base64 data URL.",
+    note: "Use an HTTPS object-storage URL or a same-origin URL. Saved documents cannot use blob:, http:, or inline data: image sources.",
+  };
+}
+
+function inlineImageSourceFailure(): ImageValidationFailure {
+  return {
+    code: "non_persistable_src",
+    message: "Inline base64 image sources cannot be saved in documents.",
+    note: "Upload images to Vercel Blob and save the returned HTTPS URL instead of embedding data URLs in document JSON.",
   };
 }
 
@@ -269,13 +278,13 @@ function byteLengthOfJson(value: unknown) {
 }
 
 function isPersistableRemoteImageSrc(src: string) {
-  return src.startsWith("https://") || src.startsWith("http://") || src.startsWith("/");
+  return src.startsWith("https://") || src.startsWith("/");
 }
 
 function validateImageSource(src: string, options: ImageValidationOptions): ImageValidationResult<true> {
   if (src.startsWith("data:")) {
     const result = validateImageDataUrl(src, options);
-    return result.ok ? { ok: true, value: true } : result;
+    return result.ok ? { ok: false, error: inlineImageSourceFailure() } : result;
   }
 
   if (isPersistableRemoteImageSrc(src)) {

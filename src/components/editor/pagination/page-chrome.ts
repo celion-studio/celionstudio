@@ -12,11 +12,12 @@ import type {
 function createChromeButton(
   className: string,
   label: string,
+  align: "left" | "center" | "right",
   onDoubleClick?: () => void,
 ) {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = className;
+  button.className = `${className} celion-align-${align}`;
   button.textContent = label;
   button.contentEditable = "false";
   button.addEventListener("mousedown", (event) => {
@@ -30,6 +31,22 @@ function createChromeButton(
     });
   }
   return button;
+}
+
+function resolveHeaderText(options: CelionPaginationOptions): string | null {
+  if (options.headerType === "none") return null;
+  if (options.headerType === "chapter") return options.headerText || null;
+  return options.headerText || null;
+}
+
+function resolveFooterText(
+  options: CelionPaginationOptions,
+  pageNumber: number,
+  pageCount: number,
+): string | null {
+  if (options.footerType === "none") return null;
+  if (options.footerType === "page") return String(pageNumber);
+  return renderPaginationTemplate(options.footerText, pageNumber, pageCount) || null;
 }
 
 export function createFirstPageWidget(
@@ -46,18 +63,25 @@ export function createFirstPageWidget(
   root.style.setProperty("--celion-page-height", `${options.pageHeightPx}px`);
   root.style.height = `${options.pageHeightPx}px`;
 
-  root.append(
-    createChromeButton(
+  const headerText = resolveHeaderText(options);
+  const footerText = resolveFooterText(options, 1, pageCount);
+
+  if (headerText !== null) {
+    root.append(createChromeButton(
       "celion-pagination-header",
-      options.headerText,
-      options.onEditHeader,
-    ),
-    createChromeButton(
+      headerText,
+      options.headerAlign,
+      options.headerType === "custom" ? options.onEditHeader : undefined,
+    ));
+  }
+  if (footerText !== null) {
+    root.append(createChromeButton(
       "celion-pagination-footer",
-      renderPaginationTemplate(options.footerText, 1, pageCount),
-      options.onEditFooter,
-    ),
-  );
+      footerText,
+      options.footerAlign,
+      options.footerType === "custom" ? options.onEditFooter : undefined,
+    ));
+  }
 
   return root;
 }
@@ -79,18 +103,25 @@ export function createPageBreakWidget(
   root.style.setProperty("--celion-break-next-footer-top", `${pageBreak.nextFooterTop}px`);
   root.style.setProperty("--celion-break-gap-top", `${pageBreak.gapTop}px`);
 
-  root.append(
-    createChromeButton(
+  const headerText = resolveHeaderText(options);
+  const footerText = resolveFooterText(options, pageBreak.pageNumber + 1, pageCount);
+
+  if (headerText !== null) {
+    root.append(createChromeButton(
       "celion-pagination-header celion-pagination-break-header",
-      options.headerText,
-      options.onEditHeader,
-    ),
-    createChromeButton(
+      headerText,
+      options.headerAlign,
+      options.headerType === "custom" ? options.onEditHeader : undefined,
+    ));
+  }
+  if (footerText !== null) {
+    root.append(createChromeButton(
       "celion-pagination-footer celion-pagination-break-next-footer",
-      renderPaginationTemplate(options.footerText, pageBreak.pageNumber + 1, pageCount),
-      options.onEditFooter,
-    ),
-  );
+      footerText,
+      options.footerAlign,
+      options.footerType === "custom" ? options.onEditFooter : undefined,
+    ));
+  }
 
   return root;
 }

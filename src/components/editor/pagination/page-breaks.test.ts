@@ -23,8 +23,12 @@ const options: CelionPaginationOptions = {
   paddingLeftPx: 60,
   headerHeightPx: 40,
   footerHeightPx: 40,
+  headerType: "custom",
   headerText: "Header",
+  headerAlign: "center",
+  footerType: "custom",
   footerText: "{page} / {total}",
+  footerAlign: "center",
 };
 
 function block(pos: number, top: number, bottom: number): MeasuredBlock {

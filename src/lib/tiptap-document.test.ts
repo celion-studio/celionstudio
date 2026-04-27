@@ -62,7 +62,7 @@ test("tiptapDocumentToHtml renders image nodes", () => {
         {
           type: "image",
           attrs: {
-            src: "data:image/png;base64,abc",
+            src: "https://cdn.example.com/cover.png",
             alt: "Cover",
           },
         },
@@ -70,7 +70,7 @@ test("tiptapDocumentToHtml renders image nodes", () => {
     },
   });
 
-  assert.match(html, /<figure data-align="center"><img src="data:image\/png;base64,abc" alt="Cover" \/><\/figure>/);
+  assert.match(html, /<figure data-align="center"><img src="https:\/\/cdn.example.com\/cover.png" alt="Cover" loading="eager" decoding="sync" crossorigin="anonymous" \/><\/figure>/);
 });
 
 test("tiptapDocumentToHtml preserves image sizing and crop mode", () => {
@@ -82,7 +82,7 @@ test("tiptapDocumentToHtml preserves image sizing and crop mode", () => {
         {
           type: "image",
           attrs: {
-            src: "data:image/png;base64,abc",
+            src: "https://cdn.example.com/cover.png",
             alt: "Cover",
             width: 420,
             height: 260,
@@ -106,7 +106,7 @@ test("tiptapDocumentToHtml preserves image alignment", () => {
         {
           type: "image",
           attrs: {
-            src: "data:image/png;base64,abc",
+            src: "https://cdn.example.com/cover.png",
             alt: "Cover",
             align: "right",
             width: 240,
@@ -129,7 +129,7 @@ test("tiptapDocumentToHtml renders media text blocks", () => {
         {
           type: "mediaText",
           attrs: {
-            src: "data:image/png;base64,abc",
+            src: "https://cdn.example.com/cover.png",
             alt: "Cover",
             imageSide: "left",
             imageWidth: 40,
@@ -148,4 +148,60 @@ test("tiptapDocumentToHtml renders media text blocks", () => {
   assert.match(html, /class="media-text"/);
   assert.match(html, /--media-image-width:40%/);
   assert.match(html, /<p>Side copy<\/p>/);
+});
+
+test("tiptapDocumentToHtml omits page chrome until export has real pagination", () => {
+  const html = tiptapDocumentToHtml({
+    title: "Export",
+    document: {
+      type: "tiptap-book",
+      version: 1,
+      layout: {
+        headerType: "custom",
+        headerText: "Celion Proof",
+        headerAlign: "right",
+        footerType: "page",
+        footerText: "{page} / {total}",
+        footerAlign: "center",
+      },
+      pages: [
+        {
+          id: "page-1",
+          doc: {
+            type: "doc",
+            content: [{ type: "paragraph", content: [{ type: "text", text: "Ready" }] }],
+          },
+        },
+      ],
+    },
+  });
+
+  assert.doesNotMatch(html, /page-header/);
+  assert.doesNotMatch(html, /page-footer/);
+});
+
+test("tiptapDocumentToHtml renders hard breaks and code blocks", () => {
+  const html = tiptapDocumentToHtml({
+    title: "Export",
+    document: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Line one" },
+            { type: "hardBreak" },
+            { type: "text", text: "Line two" },
+          ],
+        },
+        {
+          type: "codeBlock",
+          content: [{ type: "text", text: "const value = 1 < 2;" }],
+        },
+      ],
+    },
+  });
+
+  assert.match(html, /Line one<br \/>Line two/);
+  assert.match(html, /<pre><code>const value = 1 &lt; 2;<\/code><\/pre>/);
 });

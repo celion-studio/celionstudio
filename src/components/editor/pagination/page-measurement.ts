@@ -14,34 +14,32 @@ function numericStyleHeight(element: Element) {
   return element.offsetHeight;
 }
 
-function precedingPaginationSpacerHeight(element: HTMLElement) {
-  let height = 0;
-  let sibling = element.previousElementSibling;
-
-  while (sibling) {
-    if (sibling.classList.contains("celion-pagination-break")) {
-      height += numericStyleHeight(sibling);
-    }
-    sibling = sibling.previousElementSibling;
-  }
-
-  return height;
-}
-
 export function measureTopLevelBlocks(view: EditorView): MeasuredDomBlock[] {
-  const rootRect = view.dom.getBoundingClientRect();
+  const root = view.dom as HTMLElement;
+  const rootRect = root.getBoundingClientRect();
   const blocks: MeasuredDomBlock[] = [];
+  let siblingCursor: Element | null = root.firstElementChild;
+  let paginationSpacerHeight = 0;
 
   view.state.doc.forEach((_node, offset) => {
     const dom = view.nodeDOM(offset);
     if (!(dom instanceof HTMLElement)) return;
     if (dom.closest(".celion-pagination-break, .celion-pagination-first-page")) return;
 
+    if (dom.parentElement === root) {
+      while (siblingCursor && siblingCursor !== dom) {
+        if (siblingCursor.classList.contains("celion-pagination-break")) {
+          paginationSpacerHeight += numericStyleHeight(siblingCursor);
+        }
+        siblingCursor = siblingCursor.nextElementSibling;
+      }
+      if (siblingCursor === dom) siblingCursor = siblingCursor.nextElementSibling;
+    }
+
     const rect = dom.getBoundingClientRect();
     const style = window.getComputedStyle(dom);
     const marginTop = Number.parseFloat(style.marginTop) || 0;
     const marginBottom = Number.parseFloat(style.marginBottom) || 0;
-    const paginationSpacerHeight = precedingPaginationSpacerHeight(dom);
 
     blocks.push({
       pos: offset,

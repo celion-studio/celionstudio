@@ -20,13 +20,11 @@ type TiptapBookEditorProps = {
   toolbarHostId?: string;
   onChange(document: TiptapBookDocument): void;
   onPageCountChange?(pageCount: number): void;
+  onLayoutChange?(layout: TiptapBookLayout): void;
+  onImageUploadStateChange?(uploading: boolean): void;
 };
 
 const PAGE_GAP_PX = 36;
-
-function bookSignature(book: TiptapBookDocument) {
-  return JSON.stringify(book);
-}
 
 function flattenBookDoc(book: TiptapBookDocument): TiptapDocJson {
   const content = book.pages.flatMap((page) => page.doc.content ?? []);
@@ -64,19 +62,24 @@ export function TiptapBookEditor({
   toolbarHostId,
   onChange,
   onPageCountChange,
+  onLayoutChange,
+  onImageUploadStateChange,
 }: TiptapBookEditorProps) {
   const initialBook = useMemo(
     () => normalizeTiptapBookDocument(document),
     [document],
   );
-  const externalSignature = useMemo(() => bookSignature(initialBook), [initialBook]);
-  const appliedExternalSignatureRef = useRef(externalSignature);
+  const appliedDocumentRef = useRef(document);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [editorDoc, setEditorDoc] = useState<TiptapDocJson>(() => flattenBookDoc(initialBook));
   const editorDocRef = useRef<TiptapDocJson>(editorDoc);
   const [layout, setLayout] = useState<TiptapBookLayout>(() => ({
+    headerType: initialBook.layout?.headerType ?? "none",
     headerText: initialBook.layout?.headerText ?? "",
+    headerAlign: initialBook.layout?.headerAlign ?? "center",
+    footerType: initialBook.layout?.footerType ?? "page",
     footerText: initialBook.layout?.footerText ?? "{page}",
+    footerAlign: initialBook.layout?.footerAlign ?? "center",
   }));
   const layoutRef = useRef<TiptapBookLayout>(layout);
   const [pageCount, setPageCount] = useState(1);
@@ -93,29 +96,40 @@ export function TiptapBookEditor({
   }, [page.previewWidth, previewHeight]);
 
   useEffect(() => {
-    if (appliedExternalSignatureRef.current === externalSignature) return;
+    if (appliedDocumentRef.current === document) return;
 
-    appliedExternalSignatureRef.current = externalSignature;
+    appliedDocumentRef.current = document;
     const nextDoc = flattenBookDoc(initialBook);
     const nextLayout = {
+      headerType: initialBook.layout?.headerType ?? "none",
       headerText: initialBook.layout?.headerText ?? "",
+      headerAlign: initialBook.layout?.headerAlign ?? "center",
+      footerType: initialBook.layout?.footerType ?? "page",
       footerText: initialBook.layout?.footerText ?? "{page}",
-    };
+      footerAlign: initialBook.layout?.footerAlign ?? "center",
+    } satisfies TiptapBookLayout;
     editorDocRef.current = nextDoc;
     layoutRef.current = nextLayout;
     setEditorDoc(nextDoc);
     setLayout(nextLayout);
     setPageCount(1);
-  }, [externalSignature, initialBook, title]);
+    onLayoutChange?.(nextLayout);
+  }, [document, initialBook, onLayoutChange]);
 
   useEffect(() => {
     onPageCountChange?.(pageCount);
   }, [onPageCountChange, pageCount]);
 
+  useEffect(() => {
+    onLayoutChange?.(layout);
+    // Keep the parent sidebar initialized with the editor's first normalized layout.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onLayoutChange]);
+
   const commitDocument = useCallback(
     (nextDoc: TiptapDocJson, nextLayout: TiptapBookLayout) => {
       const nextBook = createBookDocument(nextDoc, nextLayout);
-      appliedExternalSignatureRef.current = bookSignature(nextBook);
+      appliedDocumentRef.current = nextBook;
       onChange(nextBook);
     },
     [onChange],
@@ -135,21 +149,32 @@ export function TiptapBookEditor({
       layoutRef.current = nextLayout;
       setLayout(nextLayout);
       commitDocument(editorDocRef.current, nextLayout);
+      onLayoutChange?.(nextLayout);
     },
-    [commitDocument],
+    [commitDocument, onLayoutChange],
   );
 
   const editHeader = useCallback(() => {
-    const nextHeader = window.prompt("Header", layout.headerText ?? "");
+    if (layout.headerType !== "custom") return;
+    const nextHeader = window.prompt("Header text", layout.headerText ?? "");
     if (nextHeader === null) return;
     updateLayout({ ...layout, headerText: nextHeader });
   }, [layout, updateLayout]);
 
   const editFooter = useCallback(() => {
-    const nextFooter = window.prompt("Footer. Use {page} and {total}.", layout.footerText ?? "{page}");
+    if (layout.footerType !== "custom") return;
+    const nextFooter = window.prompt("Footer text. Use {page} and {total}.", layout.footerText ?? "");
     if (nextFooter === null) return;
     updateLayout({ ...layout, footerText: nextFooter });
   }, [layout, updateLayout]);
+
+  const chapterText = useMemo(() => {
+    if (layout.headerType !== "chapter") return "";
+    for (const page of editorDoc.content ?? []) {
+      if (page.type === "heading") return (page.content ?? []).map((n) => n.text ?? "").join("");
+    }
+    return "";
+  }, [layout.headerType, editorDoc]);
 
   const handlePageCountChange = useCallback((nextPageCount: number) => {
     setPageCount((current) => (current === nextPageCount ? current : nextPageCount));
@@ -167,18 +192,27 @@ export function TiptapBookEditor({
       paddingLeftPx: padding.left,
       headerHeightPx: page.headerHeightPx,
       footerHeightPx: page.footerHeightPx,
-      headerText: layout.headerText ?? "",
+      headerType: layout.headerType ?? "none",
+      headerText: layout.headerType === "chapter" ? chapterText : (layout.headerText ?? ""),
+      headerAlign: layout.headerAlign ?? "center",
+      footerType: layout.footerType ?? "page",
       footerText: layout.footerText ?? "{page}",
+      footerAlign: layout.footerAlign ?? "center",
       onEditHeader: editHeader,
       onEditFooter: editFooter,
       onPageCountChange: handlePageCountChange,
     }),
     [
+      chapterText,
       editFooter,
       editHeader,
       handlePageCountChange,
+      layout.footerAlign,
       layout.footerText,
+      layout.footerType,
+      layout.headerAlign,
       layout.headerText,
+      layout.headerType,
       padding.bottom,
       padding.left,
       padding.right,
@@ -228,6 +262,7 @@ export function TiptapBookEditor({
           placeholder="Start writing, or generate a draft from the right panel."
           pagination={pagination}
           onChange={updateDoc}
+          onImageUploadStateChange={onImageUploadStateChange}
         />
       </div>
       <style>{`
@@ -348,6 +383,21 @@ export function TiptapBookEditor({
           height: 28px;
           color: #8f887f;
           font-size: 12px;
+        }
+
+        .celion-pagination-header.celion-align-left,
+        .celion-pagination-footer.celion-align-left {
+          text-align: left;
+        }
+
+        .celion-pagination-header.celion-align-center,
+        .celion-pagination-footer.celion-align-center {
+          text-align: center;
+        }
+
+        .celion-pagination-header.celion-align-right,
+        .celion-pagination-footer.celion-align-right {
+          text-align: right;
         }
 
         .celion-pagination-break {

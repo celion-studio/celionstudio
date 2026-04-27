@@ -1,8 +1,8 @@
 "use client";
 
-import { FileText, ListTree } from "lucide-react";
+import { FileText } from "lucide-react";
 import { getPageFormatSpec, type PageFormat, type PageSize } from "@/lib/page-format";
-import { textFromNode, type TiptapBookDocument } from "@/lib/tiptap-document";
+import type { TiptapBookDocument } from "@/lib/tiptap-document";
 
 type EditorLeftPanelProps = {
   document: TiptapBookDocument;
@@ -11,6 +11,8 @@ type EditorLeftPanelProps = {
   visualPageCount?: number;
 };
 
+const panelFont = "'Geist', sans-serif";
+
 export function EditorLeftPanel({
   document,
   pageFormat,
@@ -18,40 +20,19 @@ export function EditorLeftPanel({
   visualPageCount,
 }: EditorLeftPanelProps) {
   const pageCount = Math.max(1, visualPageCount ?? document.pages.length);
-  const pages = Array.from({ length: pageCount }, (_, index) => {
-    const sourcePage = document.pages[index];
-    const nodes = sourcePage?.doc.content ?? [];
-    const heading = nodes.find((node) => node.type === "heading");
-    const lines = nodes.map(textFromNode).filter(Boolean).slice(0, 8);
-    return {
-      number: index + 1,
-      title: heading ? textFromNode(heading) : `Page ${index + 1}`,
-      nodes,
-      lines,
-    };
-  });
+  const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
   const pageSpec = getPageFormatSpec(pageFormat, customPageSize);
-  const thumbnailHeight = Math.round((88 * pageSpec.heightMm) / pageSpec.widthMm);
-  const headings = pages
-    .flatMap((page) =>
-      page.nodes
-        .filter((node) => node.type === "heading")
-        .map((node) => ({
-          text: textFromNode(node),
-          level: Math.min(Math.max(Number(node.attrs?.level) || 2, 1), 6),
-          pageNumber: page.number,
-        })),
-    )
-    .filter((heading) => heading.text)
-    .slice(0, 14);
+  const thumbnailWidth = 126;
+  const thumbnailHeight = Math.round((thumbnailWidth * pageSpec.heightMm) / pageSpec.widthMm);
+  const previewHeight = Math.max(150, Math.min(thumbnailHeight, 176));
 
   return (
     <aside
       style={{
         height: "100%",
-        borderRight: "1px solid #e8e4dd",
+        borderRight: "1px solid #e4ded4",
         background: "#f7f4ee",
-        padding: "18px 16px 22px",
+        padding: "20px 18px 24px",
         overflowY: "auto",
       }}
     >
@@ -59,170 +40,136 @@ export function EditorLeftPanel({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "8px",
-          marginBottom: "12px",
-          color: "#a19a90",
-          fontFamily: "'Geist', sans-serif",
-          fontSize: "10px",
-          fontWeight: 650,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
+          justifyContent: "space-between",
+          marginBottom: "16px",
         }}
       >
-        <FileText size={12} strokeWidth={1.8} />
-        Pages
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
-        {pages.map((page, index) => (
-          <button
-            key={`page-${page.number}`}
-            type="button"
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <FileText size={13} strokeWidth={1.8} style={{ color: "#17130f" }} />
+          <span
             style={{
-              display: "grid",
-              gridTemplateColumns: "88px minmax(0, 1fr)",
-              gap: "10px",
-              width: "100%",
-              border: index === 0 ? "1px solid #bfb6a8" : "1px solid #e4ded3",
-              borderRadius: "6px",
-              background: index === 0 ? "#fffdf8" : "#fdfbf7",
-              padding: "8px",
-              textAlign: "left",
-              boxShadow: index === 0 ? "0 8px 18px rgba(55, 42, 28, 0.08)" : "none",
-              cursor: "default",
+              color: "#17130f",
+              fontFamily: panelFont,
+              fontSize: "10px",
+              fontWeight: 650,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
             }}
           >
-            <div
-              style={{
-                width: "88px",
-                height: `${thumbnailHeight}px`,
-                maxHeight: "132px",
-                minHeight: "112px",
-                border: "1px solid #e5dfd4",
-                background: "#fff",
-                padding: "11px 10px",
-                boxSizing: "border-box",
-                overflow: "hidden",
-              }}
-            >
-              {(page.lines.length > 0 ? page.lines : [""]).map((line, lineIndex) => (
-                <div
-                  key={`${page.number}-line-${lineIndex}`}
-                  style={{
-                    height: lineIndex === 0 ? "6px" : "4px",
-                    width: lineIndex === 0 ? "84%" : `${Math.max(38, Math.min(88, line.length * 3.4))}%`,
-                    marginBottom: lineIndex === 0 ? "9px" : "7px",
-                    background: lineIndex === 0 ? "#5b5147" : "#d7d0c5",
-                    borderRadius: "999px",
-                  }}
-                />
-              ))}
-            </div>
-            <div style={{ minWidth: 0, paddingTop: "2px" }}>
-              <div
-                style={{
-                  marginBottom: "6px",
-                  color: "#a19a90",
-                  fontFamily: "'Geist', sans-serif",
-                  fontSize: "10px",
-                  fontWeight: 650,
-                  textTransform: "uppercase",
-                }}
-              >
-                Page {page.number}
-              </div>
-              <div
-                style={{
-                  color: "#1a1714",
-                  fontFamily: "'Geist', sans-serif",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  lineHeight: 1.3,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: "vertical",
-                }}
-              >
-                {page.title}
-              </div>
-              <div
-                style={{
-                  marginTop: "8px",
-                  color: "#8d8378",
-                  fontFamily: "'Geist', sans-serif",
-                  fontSize: "11px",
-                  lineHeight: 1.35,
-                }}
-              >
-                {page.nodes.length} nodes
-              </div>
-            </div>
-          </button>
-        ))}
+            Pages
+          </span>
+        </div>
+        <span
+          style={{
+            color: "#8d8579",
+            fontFamily: panelFont,
+            fontSize: "11px",
+            fontWeight: 560,
+          }}
+        >
+          {pageCount}
+        </span>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "12px",
-          color: "#a19a90",
-          fontFamily: "'Geist', sans-serif",
-          fontSize: "10px",
-          fontWeight: 650,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
-        }}
-      >
-        <ListTree size={12} strokeWidth={1.8} />
-        Outline
-      </div>
-
-      {headings.length > 0 ? (
-        <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-          {headings.map((heading, index) => (
+      <div style={{ display: "grid", gap: "18px" }}>
+        {pages.map((pageNumber, index) => {
+          const isActive = index === 0;
+          return (
             <button
-              key={`${heading.text}-${heading.pageNumber}-${index}`}
+              key={`page-${pageNumber}`}
               type="button"
               style={{
                 width: "100%",
                 border: 0,
                 background: "transparent",
-                padding: "7px 0 7px " + (heading.level - 1) * 12 + "px",
+                padding: 0,
                 textAlign: "left",
-                color: index === 0 ? "#1a1714" : "#6f665c",
-                fontFamily: "'Geist', sans-serif",
-                fontSize: "12.5px",
-                lineHeight: 1.35,
                 cursor: "default",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
               }}
             >
-              <span>{heading.text}</span>
-              <span style={{ float: "right", color: "#b8b0a5", fontSize: "11px" }}>
-                {heading.pageNumber}
-              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "10px 8px 12px",
+                  border: isActive ? "1px solid #b9ae9f" : "1px solid #e9e3da",
+                  borderRadius: "8px",
+                  background: isActive ? "#fffdf8" : "#f9f6f0",
+                  boxShadow: isActive ? "0 14px 30px rgba(39, 29, 18, 0.07)" : "none",
+                }}
+              >
+                <div
+                  style={{
+                    position: "relative",
+                    width: `${thumbnailWidth}px`,
+                    height: `${previewHeight}px`,
+                    border: "1px solid #ded7cb",
+                    borderRadius: "3px",
+                    background: "#fffefa",
+                    boxShadow: "0 10px 22px rgba(40, 31, 22, 0.06)",
+                    padding: "18px 15px",
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      color: "#b8afa4",
+                      fontFamily: panelFont,
+                      fontSize: "8px",
+                      fontWeight: 650,
+                    }}
+                  >
+                    {pageNumber}
+                  </div>
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "38px",
+                      left: "16px",
+                      right: "16px",
+                      display: "grid",
+                      gap: "8px",
+                    }}
+                  >
+                    {[74, 58, 84, 45, 67].map((width, lineIndex) => (
+                      <div
+                        key={`${pageNumber}-line-${lineIndex}`}
+                        style={{
+                          height: lineIndex === 0 ? "6px" : "4px",
+                          width: `${width}%`,
+                          borderRadius: "999px",
+                          background: lineIndex === 0 ? "#312c26" : "#ddd6cc",
+                          opacity: pageNumber === 1 ? 1 : 0.42,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    color: isActive ? "#17130f" : "#8f877d",
+                    fontFamily: panelFont,
+                    fontSize: "11px",
+                    fontWeight: 620,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Page {pageNumber}
+                </div>
+              </div>
             </button>
-          ))}
-        </nav>
-      ) : (
-        <p
-          style={{
-            margin: 0,
-            color: "#b8b0a5",
-            fontFamily: "'Geist', sans-serif",
-            fontSize: "12.5px",
-            lineHeight: 1.5,
-          }}
-        >
-          Outline will appear here.
-        </p>
-      )}
+          );
+        })}
+      </div>
     </aside>
   );
 }

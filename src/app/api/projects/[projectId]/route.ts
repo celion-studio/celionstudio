@@ -7,7 +7,7 @@ import {
   updateProjectDocument,
   updateProjectPageFormat,
 } from "@/lib/projects";
-import { validateDocumentImageStorage } from "@/lib/image-storage";
+import { validateTiptapBookDocument } from "@/lib/document-validation";
 import { getRouteSession } from "@/lib/session";
 
 const mutationSchema = z.discriminatedUnion("action", [
@@ -92,13 +92,13 @@ export async function PATCH(
     if (document === undefined) {
       return NextResponse.json({ message: "document is required" }, { status: 400 });
     }
-    const imageStorage = validateDocumentImageStorage(document);
-    if (!imageStorage.ok) {
+    const validation = validateTiptapBookDocument(document);
+    if (!validation.ok) {
       return NextResponse.json(
         {
-          code: imageStorage.error.code,
-          message: imageStorage.error.message,
-          note: imageStorage.error.note,
+          code: validation.error.code,
+          message: validation.error.message,
+          note: validation.error.note,
         },
         { status: 400 },
       );
@@ -106,7 +106,7 @@ export async function PATCH(
     const project = await updateProjectDocument(
       session.user.id,
       projectId,
-      document,
+      validation.document,
     );
     if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
     return NextResponse.json({ project });

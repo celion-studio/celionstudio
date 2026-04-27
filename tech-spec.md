@@ -53,9 +53,9 @@ Out of scope for this document:
 - Tiptap renders and edits one continuous document inside a visual page frame
 - The editor supports image nodes with file insertion, selection menus, alignment, crop-frame display, and horizontal resizing
 - The editor supports a custom `mediaText` node for stable image-plus-text side-by-side layouts
-- Image insertion currently uses a validated local inline fallback. Production image storage is not wired yet.
+- Image insertion uploads to Vercel Blob and stores stable Blob URLs in the Tiptap document.
 - Generated HTML is derived at export time from the saved document and is not persisted
-- PDF export path remains part of the intended architecture
+- PDF export uses improved print HTML/CSS, stable image URLs, and page sizing; accurate repeating page chrome remains a later export-pipeline upgrade.
 - Initial ebook generation should use one Gemini Flash call after project creation
 - Source files are converted to text before they are sent to the model
 
@@ -207,10 +207,10 @@ Current document node policy:
 Current implementation:
 
 - `src/lib/image-storage.ts` defines the image storage boundary.
-- `local-inline` is the only active provider today.
-- Inline images are limited to MVP-sized images and are treated as a temporary fallback, not the production target.
-- Current temporary limits are 5MB per inline image and 16MB per saved document payload.
-- `save-document` validates document payload size and rejects non-persistable image sources such as `blob:` URLs.
+- `vercel-blob` is the active image upload provider today.
+- `local-inline` remains a legacy fallback helper only and should not be used for saved editor documents.
+- Server uploads are limited to 4MB per image to stay below Vercel request body limits; saved documents are limited to 16MB JSON payloads.
+- `save-document` validates document payload size, supported Tiptap node/mark types, nesting depth, node count, image URLs, and rejects non-persistable image sources such as `blob:` or inline `data:` URLs.
 
 Production direction:
 
@@ -287,6 +287,7 @@ Important rule:
 - `NEON_AUTH_BASE_URL`
 - `NEON_AUTH_COOKIE_SECRET`
 - `GEMINI_API_KEY`
+- `BLOB_READ_WRITE_TOKEN`
 
 ### AI generation contract
 
@@ -355,10 +356,9 @@ If the team wants to reintroduce any of those later, that should be treated as a
   - Verify visual page count with headings, lists, images, and `mediaText`.
   - Verify header/footer editing and persistence.
   - Decide whether Pages Lite is enough for MVP or whether line-accurate pagination must be implemented before launch.
-- [ ] Replace inline image persistence with object storage.
-  - Decide between Vercel Blob and Cloudflare R2.
-  - If Vercel Blob is chosen, add upload route/client upload flow and persist returned blob URLs.
-  - If R2 is chosen, add S3-compatible upload route, credentials, bucket config, and public/signed URL strategy.
+- [x] Replace inline image persistence with object storage.
+  - Vercel Blob is the active provider.
+  - Upload route/client upload flow persists returned blob URLs.
   - Keep Neon for metadata and references only.
   - Add cleanup behavior for deleted/replaced images later.
 - [ ] Improve manual save QA.
@@ -374,13 +374,14 @@ If the team wants to reintroduce any of those later, that should be treated as a
   - Caption support.
   - Alt text editing UI.
   - Replace/clear image action.
-- [ ] Harden document validation.
-  - Validate supported Tiptap node types server-side.
-  - Add max depth / max node count checks.
+- [x] Harden document validation.
+  - Validate supported Tiptap node and mark types server-side.
+  - Add max depth / max node count / max saved page checks.
   - Keep image payload limits aligned with the chosen object-storage path.
-- [ ] Improve PDF export quality.
-  - Replace the temporary print-dialog based flow with a stronger export pipeline.
-  - Verify page size, margins, page breaks, fonts, image rendering, and multi-page output.
+- [x] Improve PDF export HTML quality.
+  - Print HTML now includes page size, margins, richer typography, code/hard-break rendering, and remote image loading attributes.
+  - Header/footer page chrome is intentionally not rendered in export until real export-time pagination is available.
+  - A stronger non-browser PDF pipeline remains a later upgrade.
   - Do not start this until editor/pagination QA is acceptable.
 - [ ] Add source extraction for DOCX and text PDFs.
   - DOCX: evaluate `mammoth`.

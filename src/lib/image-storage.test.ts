@@ -4,6 +4,7 @@ import {
   BASE64_IN_DOCUMENT_RISKS,
   IMAGE_PROVIDER_SLOTS,
   IMAGE_STORAGE_MAX_DOCUMENT_BYTES,
+  IMAGE_STORAGE_MAX_UPLOAD_BYTES,
   ImageStorageError,
   prepareImageForStorage,
   validateDocumentImageStorage,
@@ -22,13 +23,17 @@ test("image storage exposes future provider slots without enabling paid services
   assert.deepEqual(
     IMAGE_PROVIDER_SLOTS.map((slot) => [slot.provider, slot.status]),
     [
-      ["local-inline", "active"],
-      ["vercel-blob", "future"],
+      ["local-inline", "future"],
+      ["vercel-blob", "active"],
       ["s3", "future"],
       ["r2", "future"],
       ["neon-postgres", "not_recommended"],
     ],
   );
+});
+
+test("editor upload limit stays below Vercel server upload body limits", () => {
+  assert.equal(IMAGE_STORAGE_MAX_UPLOAD_BYTES, 4 * 1024 * 1024);
 });
 
 test("validateImageDataUrl accepts supported base64 image data URLs", () => {
@@ -92,12 +97,12 @@ test("prepareImageForStorage throws typed errors for invalid data URLs", () => {
   );
 });
 
-test("validateDocumentImageStorage accepts persisted image references and small inline images", () => {
+test("validateDocumentImageStorage accepts persisted image references", () => {
   const result = validateDocumentImageStorage({
     type: "doc",
     content: [
-      { type: "image", attrs: { src: tinyPng } },
       { type: "image", attrs: { src: "https://cdn.example.com/cover.png" } },
+      { type: "image", attrs: { src: "/uploads/cover.png" } },
     ],
   });
 
@@ -105,12 +110,26 @@ test("validateDocumentImageStorage accepts persisted image references and small 
 });
 
 test("validateDocumentImageStorage rejects non-persistable image sources and huge payloads", () => {
+  const inlineSrc = validateDocumentImageStorage({
+    type: "doc",
+    content: [{ type: "image", attrs: { src: tinyPng } }],
+  });
+  assert.equal(inlineSrc.ok, false);
+  if (!inlineSrc.ok) assert.equal(inlineSrc.error.code, "non_persistable_src");
+
   const blobSrc = validateDocumentImageStorage({
     type: "doc",
     content: [{ type: "image", attrs: { src: "blob:http://local/image" } }],
   });
   assert.equal(blobSrc.ok, false);
   if (!blobSrc.ok) assert.equal(blobSrc.error.code, "non_persistable_src");
+
+  const insecureRemoteSrc = validateDocumentImageStorage({
+    type: "doc",
+    content: [{ type: "image", attrs: { src: "http://cdn.example.com/image.png" } }],
+  });
+  assert.equal(insecureRemoteSrc.ok, false);
+  if (!insecureRemoteSrc.ok) assert.equal(insecureRemoteSrc.error.code, "non_persistable_src");
 
   const hugeDocument = validateDocumentImageStorage(
     { text: "x".repeat(IMAGE_STORAGE_MAX_DOCUMENT_BYTES + 1) },

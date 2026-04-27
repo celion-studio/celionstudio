@@ -9,8 +9,12 @@ export type CelionPaginationOptions = {
   paddingLeftPx: number;
   headerHeightPx: number;
   footerHeightPx: number;
+  headerType: "none" | "chapter" | "custom";
   headerText: string;
+  headerAlign: "left" | "center" | "right";
+  footerType: "none" | "page" | "custom";
   footerText: string;
+  footerAlign: "left" | "center" | "right";
   onEditHeader?: () => void;
   onEditFooter?: () => void;
   onPageCountChange?: (pageCount: number) => void;

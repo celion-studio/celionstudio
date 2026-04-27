@@ -20,8 +20,7 @@ import {
   requestPaginationRefresh,
 } from "@/components/editor/pagination/pagination-plugin";
 import {
-  ImageStorageError,
-  prepareImageForStorage,
+  IMAGE_STORAGE_MAX_UPLOAD_BYTES,
   validateImageBlobMetadata,
 } from "@/lib/image-storage";
 import {
@@ -58,6 +57,7 @@ type TiptapPageEditorProps = {
   pagination?: CelionPaginationOptions;
   onFocus?: () => void;
   onChange(doc: TiptapDocJson): void;
+  onImageUploadStateChange?(uploading: boolean): void;
 };
 
 const DISABLED_PAGINATION_OPTIONS: CelionPaginationOptions = {
@@ -71,8 +71,12 @@ const DISABLED_PAGINATION_OPTIONS: CelionPaginationOptions = {
   paddingLeftPx: 58,
   headerHeightPx: 42,
   footerHeightPx: 42,
+  headerType: "none",
   headerText: "",
+  headerAlign: "center",
+  footerType: "page",
   footerText: "{page}",
+  footerAlign: "center",
 };
 
 type ToolbarButtonProps = {
@@ -351,8 +355,13 @@ export const MediaTextExtension = Node.create({
   },
 });
 
-function docSignature(doc: TiptapDocJson) {
-  return JSON.stringify(doc);
+function uploadErrorMessage(payload: { message?: string; note?: string } | null) {
+  const message = payload?.message ?? "Could not upload this image.";
+  return payload?.note ? `${message} ${payload.note}` : message;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
 function hasVisibleContent(node: unknown): boolean {
@@ -465,7 +474,15 @@ function Divider() {
   return <span style={{ width: "1px", height: "20px", background: "#E8E2DA", margin: "0 3px" }} />;
 }
 
-export function TiptapToolbar({ editor, onPickImage }: { editor: Editor | null; onPickImage: () => void }) {
+export function TiptapToolbar({
+  editor,
+  imageUploading,
+  onPickImage,
+}: {
+  editor: Editor | null;
+  imageUploading: boolean;
+  onPickImage: () => void;
+}) {
   if (!editor) return null;
 
   return (
@@ -533,7 +550,7 @@ export function TiptapToolbar({ editor, onPickImage }: { editor: Editor | null; 
       <ToolbarButton label="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
         <Minus size={16} strokeWidth={1.8} />
       </ToolbarButton>
-      <ToolbarButton label="Image" onClick={onPickImage}>
+      <ToolbarButton label={imageUploading ? "Uploading image" : "Image"} disabled={imageUploading} onClick={onPickImage}>
         <ImageIcon size={16} strokeWidth={1.8} />
       </ToolbarButton>
       <Divider />
@@ -714,13 +731,18 @@ export function TiptapPageEditor({
   pagination,
   onFocus,
   onChange,
+  onImageUploadStateChange,
 }: TiptapPageEditorProps) {
   const suppressChangeRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadControllerRef = useRef<AbortController | null>(null);
+  const uploadTokenRef = useRef(0);
+  const mountedRef = useRef(false);
   const [toolbarHost, setToolbarHost] = useState<HTMLElement | null>(null);
   const [imageInsertError, setImageInsertError] = useState("");
-  const externalSignature = useMemo(() => docSignature(doc), [doc]);
-  const appliedExternalSignatureRef = useRef(externalSignature);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [lastFailedImageFile, setLastFailedImageFile] = useState<File | null>(null);
+  const appliedDocRef = useRef<TiptapDocJson>(doc);
   const onFocusRef = useRef(onFocus);
   const onChangeRef = useRef(onChange);
   const paginationRef = useRef<CelionPaginationOptions | undefined>(pagination);
@@ -740,13 +762,33 @@ export function TiptapPageEditor({
       pagination.paddingLeftPx,
       pagination.headerHeightPx,
       pagination.footerHeightPx,
+      pagination.headerType,
       pagination.headerText,
+      pagination.headerAlign,
+      pagination.footerType,
       pagination.footerText,
+      pagination.footerAlign,
     ].join(":");
   }, [pagination]);
   onFocusRef.current = onFocus;
   onChangeRef.current = onChange;
   paginationRef.current = pagination;
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      uploadTokenRef.current += 1;
+      uploadControllerRef.current?.abort();
+      uploadControllerRef.current = null;
+      onImageUploadStateChange?.(false);
+    };
+  }, [onImageUploadStateChange]);
+
+  useEffect(() => {
+    onImageUploadStateChange?.(imageUploading);
+  }, [imageUploading, onImageUploadStateChange]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -755,11 +797,12 @@ export function TiptapPageEditor({
         link: {
           openOnClick: false,
         },
+        underline: false,
       }),
       Highlight.configure({ multicolor: true }),
       UnderlineExtension,
       CelionImageExtension.configure({
-        allowBase64: true,
+        allowBase64: false,
         resize: {
           enabled: true,
           directions: ["left", "right"],
@@ -799,7 +842,7 @@ export function TiptapPageEditor({
     onUpdate({ editor }) {
       if (suppressChangeRef.current) return;
       const nextDoc = editor.getJSON() as TiptapDocJson;
-      appliedExternalSignatureRef.current = docSignature(nextDoc);
+      appliedDocRef.current = nextDoc;
       onChangeRef.current(nextDoc);
     },
   }, []);
@@ -841,59 +884,107 @@ export function TiptapPageEditor({
   ]);
 
   useEffect(() => {
-    if (!editor || appliedExternalSignatureRef.current === externalSignature) return;
+    if (!editor || appliedDocRef.current === doc) return;
 
     suppressChangeRef.current = true;
     editor.commands.setContent(doc, { emitUpdate: false });
-    appliedExternalSignatureRef.current = externalSignature;
+    appliedDocRef.current = doc;
 
     const timeout = window.setTimeout(() => {
       suppressChangeRef.current = false;
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [doc, editor, externalSignature]);
+  }, [doc, editor]);
 
-  function insertImageFile(file: File) {
-    if (!editor || !file.type.startsWith("image/")) return;
+  async function insertImageFile(file: File) {
+    if (!editor || imageUploading || !file.type.startsWith("image/")) return;
 
-    const fileValidation = validateImageBlobMetadata(file);
+    setLastFailedImageFile(null);
+    const fileValidation = validateImageBlobMetadata(file, {
+      maxBytes: IMAGE_STORAGE_MAX_UPLOAD_BYTES,
+    });
     if (!fileValidation.ok) {
       setImageInsertError(fileValidation.error.message);
       return;
     }
 
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      if (typeof reader.result !== "string") return;
-      try {
-        const stored = prepareImageForStorage({
-          dataUrl: reader.result,
-          file,
-        });
-        setImageInsertError("");
-        editor.chain().focus().setImage({
-          src: stored.src,
-          alt: stored.metadata.name ?? file.name,
-        }).run();
-      } catch (error) {
-        setImageInsertError(
-          error instanceof ImageStorageError
-            ? error.message
-            : "Could not prepare this image for storage.",
-        );
+    const insertionRange = {
+      from: editor.state.selection.from,
+      to: editor.state.selection.to,
+    };
+    const uploadToken = uploadTokenRef.current + 1;
+    uploadTokenRef.current = uploadToken;
+    uploadControllerRef.current?.abort();
+    const controller = new AbortController();
+    uploadControllerRef.current = controller;
+    let retryableFailure = true;
+
+    setImageUploading(true);
+    setImageInsertError("Uploading image...");
+
+    const formData = new FormData();
+    formData.set("file", file);
+
+    try {
+      const response = await fetch("/api/images/upload", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            image?: {
+              url?: string;
+              name?: string;
+            };
+            message?: string;
+            note?: string;
+          }
+        | null;
+
+      const imageUrl = payload?.image?.url;
+      if (!response.ok || !imageUrl) {
+        retryableFailure = response.status === 429 || response.status >= 500;
+        throw new Error(uploadErrorMessage(payload));
       }
-    });
-    reader.addEventListener("error", () => {
-      setImageInsertError("Could not read this image file.");
-    });
-    reader.readAsDataURL(file);
+
+      if (!mountedRef.current || uploadTokenRef.current !== uploadToken || editor.isDestroyed) return;
+
+      setImageInsertError("");
+      setLastFailedImageFile(null);
+      editor.chain().focus().insertContentAt(insertionRange, {
+        type: "image",
+        attrs: {
+          src: imageUrl,
+          alt: payload.image?.name ?? file.name,
+        },
+      }).run();
+    } catch (error) {
+      if (isAbortError(error) || !mountedRef.current || uploadTokenRef.current !== uploadToken) return;
+      setLastFailedImageFile(retryableFailure ? file : null);
+      setImageInsertError(
+        error instanceof Error ? error.message : "Could not upload this image.",
+      );
+    } finally {
+      if (uploadTokenRef.current === uploadToken) {
+        uploadControllerRef.current = null;
+        if (mountedRef.current) setImageUploading(false);
+      }
+    }
   }
 
   return (
     <>
       {showToolbar && toolbarHost
-        ? createPortal(<TiptapToolbar editor={editor} onPickImage={() => fileInputRef.current?.click()} />, toolbarHost)
+        ? createPortal(
+            <TiptapToolbar
+              editor={editor}
+              imageUploading={imageUploading}
+              onPickImage={() => fileInputRef.current?.click()}
+            />,
+            toolbarHost,
+          )
         : null}
       <div className="celion-tiptap-editor">
         {showPlaceholder ? (
@@ -916,7 +1007,27 @@ export function TiptapPageEditor({
               padding: "8px 10px",
             }}
           >
-            {imageInsertError}
+            <span>{imageInsertError}</span>
+            {lastFailedImageFile && !imageUploading ? (
+              <button
+                type="button"
+                onClick={() => void insertImageFile(lastFailedImageFile)}
+                style={{
+                  marginLeft: "8px",
+                  border: "1px solid rgba(154,59,48,0.25)",
+                  borderRadius: "4px",
+                  background: "#fff",
+                  color: "#7a2f27",
+                  cursor: "pointer",
+                  fontFamily: "'Geist', sans-serif",
+                  fontSize: "11px",
+                  fontWeight: 650,
+                  padding: "3px 7px",
+                }}
+              >
+                Retry
+              </button>
+            ) : null}
           </div>
         ) : null}
         <input
@@ -928,7 +1039,7 @@ export function TiptapPageEditor({
           style={{ display: "none" }}
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
-            if (file) insertImageFile(file);
+            if (file) void insertImageFile(file);
             event.currentTarget.value = "";
           }}
         />

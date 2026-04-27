@@ -1,7 +1,7 @@
 "use client";
 
 import { DynamicTiptapBookEditor } from "./DynamicTiptapBookEditor";
-import type { TiptapBookDocument } from "@/lib/tiptap-document";
+import type { TiptapBookDocument, TiptapBookLayout } from "@/lib/tiptap-document";
 import type { PageFormat, PageSize } from "@/lib/page-format";
 
 type DocumentEditorPanelProps = {
@@ -12,6 +12,8 @@ type DocumentEditorPanelProps = {
   toolbarHostId?: string;
   onChange(document: TiptapBookDocument): void;
   onPageCountChange?(pageCount: number): void;
+  onLayoutChange?(layout: TiptapBookLayout): void;
+  onImageUploadStateChange?(uploading: boolean): void;
 };
 
 export function DocumentEditorPanel(props: DocumentEditorPanelProps) {

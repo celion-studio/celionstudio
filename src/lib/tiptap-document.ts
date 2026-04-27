@@ -1,5 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
-import { getPageCssSize, type PageFormat, type PageSize } from "@/lib/page-format";
+import {
+  getPageCssSize,
+  getPageFormatSpec,
+  type PageFormat,
+  type PageSize,
+} from "@/lib/page-format";
 import type { LegacyBlock } from "@/types/legacy-block";
 
 export type TiptapDocJson = JSONContent & { type: "doc" };
@@ -10,8 +15,12 @@ export type TiptapBookPage = {
 };
 
 export type TiptapBookLayout = {
+  headerType?: "none" | "chapter" | "custom";
   headerText?: string;
+  headerAlign?: "left" | "center" | "right";
+  footerType?: "none" | "page" | "custom";
   footerText?: string;
+  footerAlign?: "left" | "center" | "right";
 };
 
 export type TiptapBookDocument = {
@@ -32,8 +41,15 @@ function pageId(index: number) {
 function normalizeBookLayout(value: unknown): TiptapBookLayout | undefined {
   if (!isRecord(value)) return undefined;
   const layout: TiptapBookLayout = {};
+  const headerTypes = ["none", "chapter", "custom"] as const;
+  const footerTypes = ["none", "page", "custom"] as const;
+  const aligns = ["left", "center", "right"] as const;
+  if (headerTypes.includes(value.headerType as typeof headerTypes[number])) layout.headerType = value.headerType as TiptapBookLayout["headerType"];
   if (typeof value.headerText === "string") layout.headerText = value.headerText;
+  if (aligns.includes(value.headerAlign as typeof aligns[number])) layout.headerAlign = value.headerAlign as TiptapBookLayout["headerAlign"];
+  if (footerTypes.includes(value.footerType as typeof footerTypes[number])) layout.footerType = value.footerType as TiptapBookLayout["footerType"];
   if (typeof value.footerText === "string") layout.footerText = value.footerText;
+  if (aligns.includes(value.footerAlign as typeof aligns[number])) layout.footerAlign = value.footerAlign as TiptapBookLayout["footerAlign"];
   return Object.keys(layout).length > 0 ? layout : undefined;
 }
 
@@ -251,6 +267,7 @@ function escapeHtml(value: string) {
 function renderInline(nodes: JSONContent[] | undefined): string {
   return (nodes ?? [])
     .map((node) => {
+      if (node.type === "hardBreak") return "<br />";
       if (node.type !== "text") return renderInline(node.content);
       let text = escapeHtml(node.text ?? "");
       for (const mark of node.marks ?? []) {
@@ -281,7 +298,7 @@ function renderNode(node: JSONContent): string {
     const imageWidth = Math.min(Math.max(rawWidth, 24), 68);
     const titleAttr = title ? ` title="${escapeHtml(title)}"` : "";
     const image = src
-      ? `<figure><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr} data-fit="${escapeHtml(fit)}" /></figure>`
+      ? `<figure><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr} data-fit="${escapeHtml(fit)}" loading="eager" decoding="sync" crossorigin="anonymous" /></figure>`
       : "";
     return `<div class="media-text" data-image-side="${escapeHtml(imageSide)}" style="--media-image-width:${imageWidth}%">${image}<div class="media-text-copy">${(node.content ?? []).map(renderNode).join("")}</div></div>`;
   }
@@ -306,9 +323,11 @@ function renderNode(node: JSONContent): string {
       .join(";");
     const styleAttr = style ? ` style="${escapeHtml(style)}"` : "";
     const fitAttr = fit === "crop" ? ` data-fit="crop"` : "";
-    return `<figure data-align="${escapeHtml(align)}"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}${fitAttr}${styleAttr} /></figure>`;
+    return `<figure data-align="${escapeHtml(align)}"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}${fitAttr}${styleAttr} loading="eager" decoding="sync" crossorigin="anonymous" /></figure>`;
   }
   if (node.type === "paragraph") return `<p>${renderInline(node.content)}</p>`;
+  if (node.type === "hardBreak") return "<br />";
+  if (node.type === "codeBlock") return `<pre><code>${escapeHtml(textFromNode(node))}</code></pre>`;
   if (node.type === "blockquote") return `<blockquote>${(node.content ?? []).map(renderNode).join("")}</blockquote>`;
   if (node.type === "horizontalRule") return `<hr />`;
   if (node.type === "bulletList") return `<ul>${(node.content ?? []).map(renderNode).join("")}</ul>`;
@@ -328,9 +347,10 @@ export function tiptapDocumentToHtml(input: {
 }) {
   const book = normalizeTiptapBookDocument(input.document);
   const body = book.pages
-    .map((page) => `<section class="page">${(page.doc.content ?? []).map(renderNode).join("\n")}</section>`)
+    .map((page) => `<section class="page"><article class="page-body">${(page.doc.content ?? []).map(renderNode).join("\n")}</article></section>`)
     .join("\n");
   const pageCssSize = getPageCssSize(input.pageFormat ?? "ebook", input.customPageSize);
+  const pageSpec = getPageFormatSpec(input.pageFormat ?? "ebook", input.customPageSize);
   return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -338,29 +358,40 @@ export function tiptapDocumentToHtml(input: {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeHtml(input.title)}</title>
     <style>
-      @page { size: ${pageCssSize}; margin: 16mm; }
-      body { margin: 0; background: #f7f4ee; color: #17130f; font-family: Georgia, serif; }
-      main { max-width: 720px; margin: 0 auto; padding: 32px 24px; box-sizing: border-box; }
-      .page { max-width: 640px; min-height: calc(100vh - 64px); margin: 0 auto 28px; padding: 64px 40px; background: #ffffff; box-sizing: border-box; break-after: page; }
+      @page { size: ${pageCssSize}; margin: 18mm 16mm; }
+      * { box-sizing: border-box; }
+      html { background: #f7f4ee; }
+      body { margin: 0; background: #f7f4ee; color: #17130f; font-family: Georgia, 'Times New Roman', serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      main { max-width: ${Math.max(pageSpec.previewWidth, 720)}px; margin: 0 auto; padding: 32px 24px; }
+      .page { width: ${pageSpec.widthMm}mm; min-height: ${pageSpec.heightMm}mm; max-width: 100%; margin: 0 auto 28px; padding: 18mm 16mm; background: #ffffff; box-shadow: 0 18px 50px rgba(31, 22, 14, 0.12); break-after: page; display: flex; flex-direction: column; gap: 10mm; }
       .page:last-child { break-after: auto; }
+      .page-body { flex: 1; }
       @media print {
-        body { background: #fff; }
+        html, body { background: #fff; }
         main { max-width: none; margin: 0; padding: 0; background: #fff; }
-        .page { max-width: none; min-height: auto; margin: 0; padding: 0; background: #fff; break-after: page; }
+        .page { width: auto; min-height: auto; max-width: none; margin: 0; padding: 0; background: #fff; box-shadow: none; break-after: page; gap: 7mm; }
         .page:last-child { break-after: auto; }
         h1, h2, h3, h4, h5, h6, figure, table, blockquote { break-inside: avoid; }
         p, li { orphans: 3; widows: 3; }
       }
-      h1, h2, h3, h4, h5, h6 { font-family: system-ui, sans-serif; letter-spacing: 0; }
-      p, li, blockquote { font-size: 16px; line-height: 1.75; }
+      h1, h2, h3, h4, h5, h6 { font-family: system-ui, sans-serif; letter-spacing: -0.02em; line-height: 1.12; color: #17130f; }
+      h1 { font-size: 32px; margin: 0 0 22px; }
+      h2 { font-size: 24px; margin: 30px 0 14px; }
+      h3, h4, h5, h6 { margin: 24px 0 12px; }
+      p, li, blockquote { font-size: 15.5px; line-height: 1.72; }
+      p { margin: 0 0 13px; }
+      ul, ol { padding-left: 1.35em; margin: 12px 0 16px; }
+      li + li { margin-top: 6px; }
       blockquote { border-left: 3px solid #c6a36b; margin-left: 0; padding-left: 18px; color: #5f5347; }
+      pre { margin: 18px 0; padding: 14px 16px; overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid #e8dfd1; border-radius: 6px; background: #faf7f1; color: #2f2a24; font-size: 13px; line-height: 1.55; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
       hr { border: 0; border-top: 1px solid #e4dbcd; margin: 32px 0; }
       figure { margin: 24px 0; }
       figure[data-align='left'] { text-align: left; }
       figure[data-align='center'] { text-align: center; }
       figure[data-align='right'] { text-align: right; }
       figure[data-align='full'] { text-align: center; }
-      img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 4px; }
+      img { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 4px; object-position: center; }
       figure[data-align='left'] img { margin-left: 0; margin-right: auto; }
       figure[data-align='right'] img { margin-left: auto; margin-right: 0; }
       figure[data-align='full'] img { width: 100%; }
