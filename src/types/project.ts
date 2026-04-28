@@ -8,6 +8,15 @@
   | "revising"
   | "exported";
 
+export type ProjectKind = "product" | "document";
+
+export type EbookStyle =
+  | "minimal"
+  | "editorial"
+  | "neo-brutalism"
+  | "bold"
+  | "elegant";
+
 export type SourceKind = "pasted_text" | "pdf" | "md" | "txt" | "docx";
 
 export type DesignMode = "text" | "balanced" | "visual";
@@ -49,6 +58,16 @@ export type ProjectPlan = {
 
 export type ProjectDocumentPayload = unknown;
 
+export type EbookOutlineChapter = {
+  title: string;
+  summary: string;
+  pageCount: number;
+};
+
+export type EbookOutline = {
+  chapters: EbookOutlineChapter[];
+};
+
 export type ProjectProfile = {
   author: string;
   targetAudience: string;
@@ -59,10 +78,15 @@ export type ProjectProfile = {
   customPageSize: PageSize;
   plan: ProjectPlan | null;
   document: ProjectDocumentPayload;
+  ebookStyle: EbookStyle | null;
+  ebookHtml: string | null;
+  ebookPageCount: number;
+  accentColor: string;
 };
 
 export type ProjectRecord = {
   id: string;
+  kind: ProjectKind;
   title: string;
   status: ProjectStatus;
   createdAt: string;

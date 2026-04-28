@@ -404,6 +404,11 @@ export function EditorShell({ projectId }: { projectId: string }) {
     popup.document.close();
     popup.focus();
     popup.print();
+    if (project.kind === "document") {
+      setFeedback("Print dialog opened. Save as PDF.");
+      return;
+    }
+
     try {
       await applyMutation({ action: "mark-exported" }, "Print dialog opened. Save as PDF.");
     } catch {

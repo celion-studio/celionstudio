@@ -10,8 +10,10 @@ import {
 import { withGeneratedProject, withRevisedProject } from "@/lib/project-generation";
 import type {
   DesignMode,
+  EbookStyle,
   ProjectProfile,
   ProjectRecord,
+  ProjectKind,
   ProjectSource,
   ProjectStatus,
   ProjectPlan,
@@ -19,12 +21,14 @@ import type {
 
 type ProjectCreateInput = {
   title: string;
+  kind?: ProjectKind;
   profile: ProjectProfile;
   sources: ProjectSource[];
 };
 
 type ProjectRow = {
   id: string;
+  kind: ProjectKind;
   title: string;
   status: ProjectStatus;
   createdAt: Date | string;
@@ -43,6 +47,10 @@ type ProfileRow = {
   pageHeightMm: number | string | null;
   plan: unknown;
   document: unknown;
+  ebookStyle: string | null;
+  ebookHtml: string | null;
+  ebookPageCount: number | string;
+  accentColor: string;
 };
 
 type SourceRow = {
@@ -55,12 +63,30 @@ type SourceRow = {
   createdAt: Date | string;
 };
 
+const productLifecycleActions = new Set([
+  "generate",
+  "regenerate",
+  "revise",
+  "mark-exported",
+]);
+
+export class ProjectActionNotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectActionNotAllowedError";
+  }
+}
+
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
 function normalizeProjectRecord(input: ProjectRecord): ProjectRecord {
-  return { ...input, revisionPrompt: input.revisionPrompt || undefined };
+  return {
+    ...input,
+    kind: input.kind ?? "product",
+    revisionPrompt: input.revisionPrompt || undefined,
+  };
 }
 
 function generationProfileState(project: ProjectRecord) {
@@ -93,6 +119,10 @@ function emptyProfile(): ProjectProfile {
     tone: "",
     plan: null,
     document: normalizeTiptapBookDocument([]),
+    ebookStyle: null,
+    ebookHtml: null,
+    ebookPageCount: 16,
+    accentColor: "#6366f1",
   };
 }
 
@@ -113,6 +143,10 @@ function profileFromRow(row: ProfileRow): ProjectProfile {
     tone: row.tone,
     plan: parseJson<ProjectPlan | null>(row.plan, null),
     document: normalizeTiptapBookDocument(rawDocument),
+    ebookStyle: (row.ebookStyle as EbookStyle | null) ?? null,
+    ebookHtml: row.ebookHtml ?? null,
+    ebookPageCount: Number(row.ebookPageCount) || 16,
+    accentColor: row.accentColor ?? "#6366f1",
   };
 }
 
@@ -128,14 +162,21 @@ function isMissingProjectProfileColumnError(caught: unknown) {
   );
 }
 
-export async function listProjectRecordsForUser(userId: string) {
+export async function listProjectRecordsForUser(
+  userId: string,
+  kind: ProjectKind = "product",
+) {
   await ensureAppSchema();
 
   const sql = getSql();
   const projectRows = (await sql`
     SELECT id::text AS id, title, status,
+      COALESCE(project_type, 'product') AS kind,
       created_at AS "createdAt", updated_at AS "updatedAt"
-    FROM projects WHERE user_id = ${userId} ORDER BY updated_at DESC
+    FROM projects
+    WHERE user_id = ${userId}
+      AND COALESCE(project_type, 'product') = ${kind}
+    ORDER BY updated_at DESC
   `) as ProjectRow[];
 
   if (projectRows.length === 0) return [] as ProjectRecord[];
@@ -152,7 +193,11 @@ export async function listProjectRecordsForUser(userId: string) {
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
         COALESCE(page_height_mm, 229) AS "pageHeightMm",
         plan AS plan,
-        COALESCE(document, '[]'::jsonb) AS document
+        COALESCE(document, '[]'::jsonb) AS document,
+        ebook_style AS "ebookStyle",
+        ebook_html AS "ebookHtml",
+        COALESCE(ebook_page_count, 16) AS "ebookPageCount",
+        COALESCE(accent_color, '#6366f1') AS "accentColor"
       FROM project_profiles WHERE project_id::text = ANY(${projectIds})
     `,
     sql`
@@ -180,7 +225,7 @@ export async function listProjectRecordsForUser(userId: string) {
 
   return projectRows.map((row) =>
     normalizeProjectRecord({
-      id: row.id, title: row.title, status: row.status,
+      id: row.id, kind: row.kind, title: row.title, status: row.status,
       createdAt: toIsoString(row.createdAt), updatedAt: toIsoString(row.updatedAt),
       sources: sourceMap.get(row.id) ?? [],
       profile: profileMap.get(row.id) ?? emptyProfile(),
@@ -194,6 +239,7 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
   const sql = getSql();
   const [projectRow] = (await sql`
     SELECT id::text AS id, title, status,
+      COALESCE(project_type, 'product') AS kind,
       created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
   `) as ProjectRow[];
@@ -210,7 +256,11 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
         COALESCE(page_height_mm, 229) AS "pageHeightMm",
         plan AS plan,
-        COALESCE(document, '[]'::jsonb) AS document
+        COALESCE(document, '[]'::jsonb) AS document,
+        ebook_style AS "ebookStyle",
+        ebook_html AS "ebookHtml",
+        COALESCE(ebook_page_count, 16) AS "ebookPageCount",
+        COALESCE(accent_color, '#6366f1') AS "accentColor"
       FROM project_profiles WHERE project_id::text = ${projectRow.id} LIMIT 1
     `,
     sql`
@@ -225,6 +275,7 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
 
   return normalizeProjectRecord({
     id: projectRow.id, title: projectRow.title, status: projectRow.status,
+    kind: projectRow.kind,
     createdAt: toIsoString(projectRow.createdAt), updatedAt: toIsoString(projectRow.updatedAt),
     profile: profileRows[0] ? profileFromRow(profileRows[0]) : emptyProfile(),
     sources: sourceRows.map((row) => ({
@@ -261,14 +312,15 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
 
     await sql.transaction([
       sql`
-        INSERT INTO projects (id, user_id, title, status, created_at, updated_at)
-        VALUES (${projectId}, ${userId}, ${draft.title}, ${draft.status}, ${createdAt}, ${updatedAt})
+        INSERT INTO projects (id, user_id, project_type, title, status, created_at, updated_at)
+        VALUES (${projectId}, ${userId}, ${draft.kind}, ${draft.title}, ${draft.status}, ${createdAt}, ${updatedAt})
       `,
       sql`
         INSERT INTO project_profiles (
           project_id, target_audience, tone,
           author, core_message, design_mode, page_format, page_width_mm, page_height_mm,
-          plan, document, created_at, updated_at
+          plan, document, ebook_style, ebook_html, ebook_page_count, accent_color,
+          created_at, updated_at
         ) VALUES (
           ${projectId},
           ${p.targetAudience}, ${p.tone},
@@ -276,6 +328,8 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
           ${p.customPageSize.widthMm}, ${p.customPageSize.heightMm},
           ${p.plan ? JSON.stringify(p.plan) : null}::jsonb,
           ${JSON.stringify(p.document ?? [])}::jsonb,
+          ${p.ebookStyle ?? null}, ${p.ebookHtml ?? null},
+          ${p.ebookPageCount ?? 16}, ${p.accentColor ?? "#6366f1"},
           ${createdAt}, ${updatedAt}
         )
       `,
@@ -374,6 +428,36 @@ export async function updateProjectDocument(userId: string, projectId: string, d
   return { updatedAt: updatedAt.toISOString() };
 }
 
+export async function updateProjectEbookHtml(
+  userId: string,
+  projectId: string,
+  ebookHtml: string,
+) {
+  await ensureAppSchema();
+
+  const sql = getSql();
+  const updatedAt = new Date();
+  const [profileRows, projectRows] = await sql.transaction([
+    sql`
+      UPDATE project_profiles
+      SET ebook_html = ${ebookHtml}, updated_at = ${updatedAt}
+      WHERE project_id::text = ${projectId}
+        AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+      RETURNING project_id::text AS id
+    `,
+    sql`
+      UPDATE projects
+      SET status = 'ready', updated_at = ${updatedAt}
+      WHERE id::text = ${projectId} AND user_id = ${userId}
+      RETURNING id::text AS id
+    `,
+  ]) as [{ id: string }[], { id: string }[]];
+
+  if (profileRows.length === 0 || projectRows.length === 0) return null;
+
+  return { updatedAt: updatedAt.toISOString() };
+}
+
 export async function deleteProjectForUser(userId: string, projectId: string) {
   await ensureAppSchema();
 
@@ -399,6 +483,11 @@ export async function mutateProjectForUser(
   const sql = getSql();
   const current = await getProjectRecordForUser(userId, projectId);
   if (!current) return null;
+  if (current.kind !== "product" && productLifecycleActions.has(input.action)) {
+    throw new ProjectActionNotAllowedError(
+      "Product lifecycle actions are not available for document projects.",
+    );
+  }
 
   const generatedProjectResult =
     input.action === "generate" || input.action === "regenerate"

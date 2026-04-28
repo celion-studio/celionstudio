@@ -1,12 +1,7 @@
 import { create } from "zustand";
-import {
-  DEFAULT_CUSTOM_PAGE_SIZE,
-  DEFAULT_PAGE_FORMAT,
-  type PageFormat,
-  type PageSize,
-} from "@/lib/page-format";
+import type { EbookOutline, EbookStyle } from "@/types/project";
 
-export type WizardStep = 1 | 2 | 3 | 4;
+export type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type WizardTone =
   | "preserve"
@@ -17,25 +12,32 @@ export type WizardTone =
 
 type WizardState = {
   step: WizardStep;
+  // Step 1: Basics
   title: string;
   author: string;
   targetAudience: string;
   coreMessage: string;
-  tone: WizardTone;
-  files: File[];
-  pageFormat: PageFormat;
-  customPageSize: PageSize;
+  // Step 2: Style
+  ebookStyle: EbookStyle | null;
+  // Step 3: Format
+  pageCount: number;
+  accentColor: string;
+  // Step 4: Source
+  sourceText: string;
+  // Step 5: Outline
+  outline: EbookOutline | null;
+  outlineLoading: boolean;
+  // Step 6: Generate
   generating: boolean;
   error: string;
 
   setStep: (step: WizardStep) => void;
-  setField: (
-    field: "title" | "author" | "targetAudience" | "coreMessage",
-    value: string,
-  ) => void;
-  setTone: (tone: WizardTone) => void;
-  setFiles: (value: File[]) => void;
-  setPageFormat: (pageFormat: PageFormat, customPageSize: PageSize) => void;
+  setField: (field: "title" | "author" | "targetAudience" | "coreMessage" | "sourceText", value: string) => void;
+  setEbookStyle: (style: EbookStyle) => void;
+  setPageCount: (count: number) => void;
+  setAccentColor: (color: string) => void;
+  setOutline: (outline: EbookOutline | null) => void;
+  setOutlineLoading: (loading: boolean) => void;
   setGenerating: (value: boolean) => void;
   setError: (value: string) => void;
   reset: () => void;
@@ -47,10 +49,12 @@ const initialState = {
   author: "",
   targetAudience: "",
   coreMessage: "",
-  tone: "preserve" as WizardTone,
-  files: [] as File[],
-  pageFormat: DEFAULT_PAGE_FORMAT,
-  customPageSize: DEFAULT_CUSTOM_PAGE_SIZE,
+  ebookStyle: null as EbookStyle | null,
+  pageCount: 16,
+  accentColor: "#6366f1",
+  sourceText: "",
+  outline: null as EbookOutline | null,
+  outlineLoading: false,
   generating: false,
   error: "",
 };
@@ -59,10 +63,11 @@ export const useProjectWizardStore = create<WizardState>((set) => ({
   ...initialState,
   setStep: (step) => set({ step, error: "" }),
   setField: (field, value) => set({ [field]: value, error: "" }),
-  setTone: (tone) => set({ tone, error: "" }),
-  setFiles: (files) => set({ files, error: "" }),
-  setPageFormat: (pageFormat, customPageSize) =>
-    set({ pageFormat, customPageSize, error: "" }),
+  setEbookStyle: (ebookStyle) => set({ ebookStyle, error: "" }),
+  setPageCount: (pageCount) => set({ pageCount }),
+  setAccentColor: (accentColor) => set({ accentColor }),
+  setOutline: (outline) => set({ outline }),
+  setOutlineLoading: (outlineLoading) => set({ outlineLoading }),
   setGenerating: (generating) => set({ generating }),
   setError: (error) => set({ error }),
   reset: () => set(initialState),

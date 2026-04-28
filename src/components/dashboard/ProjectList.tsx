@@ -35,21 +35,28 @@ function StatusBadge({ status }: { status: string }) {
 
 type ProjectListProps = {
   projects: ProjectRecord[];
+  surface?: "workspace" | "documents";
   deletingProjectId?: string;
   onDeleteProject?: (project: ProjectRecord) => void;
 };
 
 export function ProjectList({
   projects,
+  surface = "workspace",
   deletingProjectId = "",
   onDeleteProject,
 }: ProjectListProps) {
   if (projects.length === 0) return null;
 
+  const isDocuments = surface === "documents";
+  const columns = isDocuments
+    ? ["Title", "Updated", "Format", "Status", ""]
+    : ["Title", "Audience", "Tone", "Status", ""];
+
   return (
     <div style={{ background: "#fff", border: "1px solid #ECEAE5", borderRadius: "12px", overflow: "hidden" }}>
       <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 20px", borderBottom: "1px solid #ECEAE5", background: "#FAFAF9" }}>
-        {["Title", "Audience", "Tone", "Status", ""].map((col) => (
+        {columns.map((col) => (
           <span key={col || "actions"} style={{ fontSize: "11px", fontWeight: 500, color: "#A1A1AA", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Geist', sans-serif" }}>
             {col}
           </span>
@@ -59,7 +66,9 @@ export function ProjectList({
       {projects.map((project, i) => {
         const isLast = i === projects.length - 1;
         const isDeleting = deletingProjectId === project.id;
-        const title = project.title || "Untitled Draft";
+        const title = project.title || (isDocuments ? "Untitled Document" : "Untitled Draft");
+        const updatedDate = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        const updatedDateWithYear = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         const deleteButton = (
           <button
             type="button"
@@ -107,7 +116,9 @@ export function ProjectList({
                   {title}
                 </p>
                 <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#A1A1AA" }}>
-                  {project.profile.targetAudience.slice(0, 24)} / {new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {isDocuments
+                    ? `Updated ${updatedDate}`
+                    : `${project.profile.targetAudience.slice(0, 24)} / ${updatedDate}`}
                 </p>
               </Link>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
@@ -125,14 +136,14 @@ export function ProjectList({
                   {title}
                 </p>
                 <p style={{ margin: "3px 0 0", fontSize: "11.5px", color: "#A1A1AA" }}>
-                  Updated {new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  Updated {updatedDateWithYear}
                 </p>
               </Link>
               <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.profile.targetAudience.slice(0, 18)}
+                {isDocuments ? updatedDateWithYear : project.profile.targetAudience.slice(0, 18)}
               </span>
               <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.profile.tone.slice(0, 18)}
+                {isDocuments ? project.profile.pageFormat.toUpperCase() : project.profile.tone.slice(0, 18)}
               </span>
               <div>
                 <StatusBadge status={project.status} />

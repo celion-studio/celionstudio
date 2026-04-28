@@ -5,7 +5,10 @@ import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects"
 import { getRouteSession } from "@/lib/session";
 import { isDatabaseUnavailableError } from "@/lib/db";
 
+const projectKindSchema = z.enum(["product", "document"]);
+
 const createProjectSchema = z.object({
+  kind: projectKindSchema.default("product"),
   title: z.string().trim().min(1),
   profile: z.object({
     author: z.string().default(""),
@@ -38,14 +41,17 @@ const createProjectSchema = z.object({
     .default([]),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await getRouteSession();
   if (!session?.user?.id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
+  const url = new URL(request.url);
+  const kind = projectKindSchema.catch("product").parse(url.searchParams.get("kind") ?? "product");
+
   try {
-    const projects = await listProjectRecordsForUser(session.user.id);
+    const projects = await listProjectRecordsForUser(session.user.id, kind);
     return NextResponse.json({ projects });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
@@ -76,6 +82,7 @@ export async function POST(request: Request) {
   try {
     const p = parsed.data.profile;
     const project = await createProjectForUser(session.user.id, {
+      kind: parsed.data.kind,
       title: parsed.data.title,
       profile: {
         author: p.author,
@@ -87,6 +94,10 @@ export async function POST(request: Request) {
         tone: p.tone,
         plan: p.plan ?? null,
         document: normalizeTiptapBookDocument(p.document),
+        ebookStyle: null,
+        ebookHtml: null,
+        ebookPageCount: 16,
+        accentColor: "#6366f1",
       },
       sources: parsed.data.sources,
     });

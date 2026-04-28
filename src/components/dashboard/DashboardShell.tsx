@@ -7,19 +7,63 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, Clock, FileText, PenLine, Sparkles, Wand2, X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ProjectList } from "@/components/dashboard/ProjectList";
-import { WorkspaceSidebar } from "@/components/dashboard/WorkspaceSidebar";
-import type { ProjectRecord } from "@/types/project";
+import { WorkspaceSidebar, type SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
+import type { ProjectKind, ProjectRecord } from "@/types/project";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
+  activeItem?: SidebarItemKey;
+  surface?: "workspace" | "documents";
+};
+
+const surfaceCopy = {
+  workspace: {
+    breadcrumbCurrent: "All Drafts",
+    heading: "Your drafts",
+    description: "All your manuscripts and works in progress.",
+    primaryActionLabel: "New ebook",
+    createDialogTitle: "New ebook",
+    blankTitle: "Untitled Draft",
+    blankOptionTitle: "Start blank",
+    blankOptionDescription: "Open the editor with an empty document.",
+    emptyTitle: "No drafts yet",
+    emptyDescription: "Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.",
+    emptyAction: "Create first ebook",
+    statTotal: "Total drafts",
+    statActive: "In progress",
+    statExported: "Print opened",
+  },
+  documents: {
+    breadcrumbCurrent: "Documents",
+    heading: "Document editor",
+    description: "Standalone writing and formatting drafts live here.",
+    primaryActionLabel: "New document",
+    createDialogTitle: "New document",
+    blankTitle: "Untitled Document",
+    blankOptionTitle: "Blank document",
+    blankOptionDescription: "Open the document editor without the product-generation flow.",
+    emptyTitle: "No documents yet",
+    emptyDescription: "Create a blank document when you want a direct writing and formatting workspace.",
+    emptyAction: "Create document",
+    statTotal: "Total documents",
+    statActive: "Editing",
+    statExported: "Exported",
+  },
+} as const;
+
+const surfaceProjectKind: Record<NonNullable<DashboardShellProps["surface"]>, ProjectKind> = {
+  workspace: "product",
+  documents: "document",
 };
 
 export function DashboardShell({
   isSignedIn,
   initialUserName,
   initialUserEmail,
+  activeItem = "workspace",
+  surface = "workspace",
 }: DashboardShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,9 +86,11 @@ export function DashboardShell({
   const [showCreateChoices, setShowCreateChoices] = useState(false);
   const [creatingBlank, setCreatingBlank] = useState(false);
   const showLoading = loading || (authPending && !hasVerifier);
+  const copy = surfaceCopy[surface];
+  const projectKind = surfaceProjectKind[surface];
 
   async function fetchProjects() {
-    const response = await fetch("/api/projects", {
+    const response = await fetch(`/api/projects?kind=${projectKind}`, {
       method: "GET",
       cache: "no-store",
     });
@@ -55,7 +101,7 @@ export function DashboardShell({
 
     await authClient.getSession();
 
-    return fetch("/api/projects", {
+    return fetch(`/api/projects?kind=${projectKind}`, {
       method: "GET",
       cache: "no-store",
     });
@@ -143,7 +189,7 @@ export function DashboardShell({
     return () => {
       active = false;
     };
-  }, [authPending, hasVerifier, resolvedSignedIn]);
+  }, [authPending, hasVerifier, projectKind, resolvedSignedIn]);
 
   const printOpened = projects.filter((project) => project.status === "exported").length;
   const inProgress = projects.filter(
@@ -191,7 +237,8 @@ export function DashboardShell({
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
-          title: "Untitled Draft",
+          title: copy.blankTitle,
+          kind: projectKind,
           sources: [],
           profile: {
             author: "",
@@ -243,11 +290,11 @@ export function DashboardShell({
       }}
     >
       <WorkspaceSidebar
-        activeItem="workspace"
+        activeItem={activeItem}
         isSignedIn={resolvedSignedIn}
         initialUserName={resolvedUserName}
         initialUserEmail={resolvedUserEmail}
-        primaryAction={{ href: "/new", label: "New ebook", onClick: openCreateChoices }}
+        primaryAction={{ href: "/new", label: copy.primaryActionLabel, onClick: openCreateChoices }}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -267,7 +314,7 @@ export function DashboardShell({
             <span style={{ fontSize: "13px", color: "#A1A1AA" }}>Workspace</span>
             <ChevronRight size={12} color="#D4D2CC" />
             <span style={{ fontSize: "13px", fontWeight: 500, color: "#111" }}>
-              All Drafts
+              {copy.breadcrumbCurrent}
             </span>
           </div>
 
@@ -304,19 +351,19 @@ export function DashboardShell({
                   color: "#111",
                 }}
               >
-                Your drafts
+                {copy.heading}
               </h1>
               <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: "#71717A" }}>
-                All your manuscripts and works in progress.
+                {copy.description}
               </p>
             </div>
 
             {resolvedSignedIn && projects.length > 0 ? (
               <div style={{ display: "flex", gap: "12px", marginBottom: "28px" }}>
                 {[
-                  { label: "Total drafts", value: projects.length, icon: FileText },
-                  { label: "In progress", value: inProgress, icon: Clock },
-                  { label: "Print opened", value: printOpened, icon: BookOpen },
+                  { label: copy.statTotal, value: projects.length, icon: FileText },
+                  { label: copy.statActive, value: inProgress, icon: Clock },
+                  { label: copy.statExported, value: printOpened, icon: BookOpen },
                 ].map(({ label, value, icon: Icon }) => (
                   <div
                     key={label}
@@ -398,6 +445,7 @@ export function DashboardShell({
             {!showLoading && resolvedSignedIn ? (
               <ProjectList
                 projects={projects}
+                surface={surface}
                 deletingProjectId={deletingProjectId}
                 onDeleteProject={deleteProject}
               />
@@ -506,7 +554,7 @@ export function DashboardShell({
                     color: "#111",
                   }}
                 >
-                  No drafts yet
+                  {copy.emptyTitle}
                 </h3>
                 <p
                   style={{
@@ -518,7 +566,7 @@ export function DashboardShell({
                     marginRight: "auto",
                   }}
                 >
-                  Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.
+                  {copy.emptyDescription}
                 </p>
                 <button
                   type="button"
@@ -540,7 +588,7 @@ export function DashboardShell({
                   }}
                 >
                   <FileText size={13} strokeWidth={2.2} />
-                  Create first ebook
+                  {copy.emptyAction}
                 </button>
               </div>
             ) : null}
@@ -551,7 +599,7 @@ export function DashboardShell({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Create new ebook"
+          aria-label={copy.createDialogTitle}
           style={{
             position: "fixed",
             inset: 0,
@@ -589,7 +637,7 @@ export function DashboardShell({
               }}
             >
               <span style={{ fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600, color: "#111" }}>
-                New ebook
+                {copy.createDialogTitle}
               </span>
               <button
                 type="button"
@@ -614,45 +662,47 @@ export function DashboardShell({
             </div>
 
             <div style={{ padding: "18px", display: "grid", gap: "10px" }}>
-              <Link
-                href={"/new" as Route}
-                onClick={() => setShowCreateChoices(false)}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "36px 1fr 18px",
-                  gap: "14px",
-                  alignItems: "center",
-                  padding: "16px",
-                  border: "1px solid #ECEAE5",
-                  borderRadius: "8px",
-                  textDecorationLine: "none",
-                  color: "#111",
-                  background: "#fff",
-                }}
-              >
-                <span
+              {surface === "workspace" ? (
+                <Link
+                  href={"/new" as Route}
+                  onClick={() => setShowCreateChoices(false)}
                   style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    background: "#F0EEE9",
-                    display: "inline-flex",
+                    display: "grid",
+                    gridTemplateColumns: "36px 1fr 18px",
+                    gap: "14px",
                     alignItems: "center",
-                    justifyContent: "center",
+                    padding: "16px",
+                    border: "1px solid #ECEAE5",
+                    borderRadius: "8px",
+                    textDecorationLine: "none",
+                    color: "#111",
+                    background: "#fff",
                   }}
                 >
-                  <Wand2 size={16} strokeWidth={1.8} />
-                </span>
-                <span>
-                  <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
-                    Start with wizard
+                  <span
+                    style={{
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "8px",
+                      background: "#F0EEE9",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Wand2 size={16} strokeWidth={1.8} />
                   </span>
-                  <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
-                    Add source material and generate a draft.
+                  <span>
+                    <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
+                      Start with wizard
+                    </span>
+                    <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
+                      Add source material and generate a draft.
+                    </span>
                   </span>
-                </span>
-                <ChevronRight size={16} color="#B9B2A8" />
-              </Link>
+                  <ChevronRight size={16} color="#B9B2A8" />
+                </Link>
+              ) : null}
 
               <button
                 type="button"
@@ -688,10 +738,10 @@ export function DashboardShell({
                 </span>
                 <span>
                   <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
-                    Start blank
+                    {copy.blankOptionTitle}
                   </span>
                   <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
-                    Open the editor with an empty document.
+                    {copy.blankOptionDescription}
                   </span>
                 </span>
                 <ChevronRight size={16} color="#B9B2A8" />

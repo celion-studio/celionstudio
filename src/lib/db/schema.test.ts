@@ -92,6 +92,27 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS project_type"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE TABLE IF NOT EXISTS app_migrations"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("backfill_existing_tiptap_projects_as_documents") &&
+      statement.includes("SET project_type = 'document'"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX IF NOT EXISTS projects_user_id_type_updated_at_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("DROP TABLE IF EXISTS html_versions"),
     ),
   );
@@ -117,7 +138,7 @@ test("applyAppSchema grants app table privileges when an app role is provided", 
   );
   assert.ok(
     statements.includes(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items TO "app""user"',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations TO "app""user"',
     ),
   );
   assert.ok(

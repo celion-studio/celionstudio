@@ -4,6 +4,7 @@ import {
   deleteProjectForUser,
   getProjectRecordForUser,
   mutateProjectForUser,
+  ProjectActionNotAllowedError,
   updateProjectDocument,
   updateProjectPageFormat,
 } from "@/lib/projects";
@@ -136,6 +137,10 @@ export async function PATCH(
   try {
     project = await mutateProjectForUser(session.user.id, projectId, parsed.data);
   } catch (error) {
+    if (error instanceof ProjectActionNotAllowedError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
       {
         message:

@@ -4,6 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  FileText,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -12,7 +13,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
-type SidebarItemKey = "workspace" | "new" | "settings";
+export type SidebarItemKey = "workspace" | "documents" | "new" | "settings";
 
 type WorkspaceSidebarProps = {
   activeItem: SidebarItemKey;
@@ -33,6 +34,7 @@ const NAV_ITEMS: Array<{
   href: Route;
 }> = [
   { key: "workspace", label: "Workspace", icon: LayoutDashboard, href: "/dashboard" },
+  { key: "documents", label: "Documents", icon: FileText, href: "/documents" as Route },
   { key: "new", label: "New ebook", icon: Plus, href: "/new" },
   { key: "settings", label: "Settings", icon: Settings, href: "/dashboard" },
 ];

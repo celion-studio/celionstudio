@@ -34,7 +34,7 @@ async function grantAppPrivileges(sql: SqlClientWithQuery, appRole: string) {
   await executeStatement(sql, `GRANT USAGE ON SCHEMA public TO ${role}`);
   await executeStatement(
     sql,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items TO ${role}`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations TO ${role}`,
   );
   await executeStatement(
     sql,
@@ -61,6 +61,43 @@ export async function applyAppSchema(
     ALTER TABLE projects
     DROP COLUMN IF EXISTS current_html_version_id
   `;
+
+  await sql`
+    ALTER TABLE projects
+    ADD COLUMN IF NOT EXISTS project_type text NOT NULL DEFAULT 'product'
+  `;
+
+  await sql`
+    ALTER TABLE projects
+    ALTER COLUMN project_type SET DEFAULT 'product'
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_migrations (
+      name text PRIMARY KEY,
+      applied_at timestamp NOT NULL DEFAULT now()
+    )
+  `;
+
+  await executeStatement(
+    sql,
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM app_migrations
+          WHERE name = '2026_04_28_backfill_existing_tiptap_projects_as_documents'
+        ) THEN
+          UPDATE projects
+          SET project_type = 'document'
+          WHERE project_type = 'product';
+
+          INSERT INTO app_migrations (name)
+          VALUES ('2026_04_28_backfill_existing_tiptap_projects_as_documents');
+        END IF;
+      END $$;
+    `,
+  );
 
   await sql`
     CREATE TABLE IF NOT EXISTS project_profiles (
@@ -195,6 +232,26 @@ export async function applyAppSchema(
   `;
 
   await sql`
+    ALTER TABLE project_profiles
+    ADD COLUMN IF NOT EXISTS ebook_style text
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    ADD COLUMN IF NOT EXISTS ebook_html text
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    ADD COLUMN IF NOT EXISTS ebook_page_count integer NOT NULL DEFAULT 16
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    ADD COLUMN IF NOT EXISTS accent_color text NOT NULL DEFAULT '#6366f1'
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS source_items (
       id text PRIMARY KEY,
       project_id text NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -211,6 +268,11 @@ export async function applyAppSchema(
   await sql`
     CREATE INDEX IF NOT EXISTS projects_user_id_updated_at_idx
     ON projects (user_id, updated_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS projects_user_id_type_updated_at_idx
+    ON projects (user_id, project_type, updated_at DESC)
   `;
 
   await sql`

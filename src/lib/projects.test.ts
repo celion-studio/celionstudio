@@ -8,6 +8,7 @@ import type { ProjectRecord } from "@/types/project";
 function projectFixture(): ProjectRecord {
   return {
     id: "project-1",
+    kind: "product",
     title: "Editable project",
     status: "draft",
     createdAt: new Date(0).toISOString(),
@@ -23,6 +24,10 @@ function projectFixture(): ProjectRecord {
       tone: "",
       plan: null,
       document: [],
+      ebookStyle: null,
+      ebookHtml: null,
+      ebookPageCount: 16,
+      accentColor: "#6366f1",
     },
   };
 }
