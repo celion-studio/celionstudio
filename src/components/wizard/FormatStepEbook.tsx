@@ -1,7 +1,5 @@
 "use client";
 
-const PAGE_COUNT_OPTIONS = [8, 12, 16, 20, 24, 32, 40];
-
 const ACCENT_COLORS = [
   { label: "Indigo", value: "#6366f1" },
   { label: "Rose", value: "#f43f5e" },
@@ -14,44 +12,13 @@ const ACCENT_COLORS = [
 ];
 
 type Props = {
-  pageCount: number;
   accentColor: string;
-  onPageCountChange: (count: number) => void;
   onAccentColorChange: (color: string) => void;
 };
 
-export function FormatStepEbook({ pageCount, accentColor, onPageCountChange, onAccentColorChange }: Props) {
+export function FormatStepEbook({ accentColor, onAccentColorChange }: Props) {
   return (
     <div className="space-y-6">
-      <div>
-        <label style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "13px", fontWeight: 500, color: "#1a1714", marginBottom: "10px" }}>
-          Page count
-        </label>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-          {PAGE_COUNT_OPTIONS.map((count) => (
-            <button
-              key={count}
-              type="button"
-              onClick={() => onPageCountChange(count)}
-              style={{
-                padding: "7px 14px",
-                borderRadius: "6px",
-                border: pageCount === count ? "2px solid #1a1714" : "1.5px solid #e1e4e8",
-                background: pageCount === count ? "#1a1714" : "#ffffff",
-                color: pageCount === count ? "#ffffff" : "#4b515a",
-                fontFamily: "'Geist', sans-serif",
-                fontSize: "13px",
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {count}p
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div>
         <label style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "13px", fontWeight: 500, color: "#1a1714", marginBottom: "10px" }}>
           Accent color
@@ -79,6 +46,9 @@ export function FormatStepEbook({ pageCount, accentColor, onPageCountChange, onA
         </div>
         <p style={{ marginTop: "8px", fontFamily: "'Geist', sans-serif", fontSize: "12px", color: "#8a867e" }}>
           Selected: {ACCENT_COLORS.find(c => c.value === accentColor)?.label ?? "Custom"} ({accentColor})
+        </p>
+        <p style={{ marginTop: "12px", maxWidth: "520px", fontFamily: "'Geist', sans-serif", fontSize: "12.5px", lineHeight: 1.55, color: "#8a867e" }}>
+          Celion will plan a fixed A5 sales-preview ebook from your source, then render it as editable HTML/CSS.
         </p>
       </div>
     </div>

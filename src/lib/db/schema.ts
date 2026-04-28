@@ -79,26 +79,6 @@ export async function applyAppSchema(
     )
   `;
 
-  await executeStatement(
-    sql,
-    `
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM app_migrations
-          WHERE name = '2026_04_28_backfill_existing_tiptap_projects_as_documents'
-        ) THEN
-          UPDATE projects
-          SET project_type = 'document'
-          WHERE project_type = 'product';
-
-          INSERT INTO app_migrations (name)
-          VALUES ('2026_04_28_backfill_existing_tiptap_projects_as_documents');
-        END IF;
-      END $$;
-    `,
-  );
-
   await sql`
     CREATE TABLE IF NOT EXISTS project_profiles (
       project_id text PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
@@ -250,6 +230,88 @@ export async function applyAppSchema(
     ALTER TABLE project_profiles
     ADD COLUMN IF NOT EXISTS accent_color text NOT NULL DEFAULT '#6366f1'
   `;
+
+  await executeStatement(
+    sql,
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM app_migrations
+          WHERE name = '2026_04_28_backfill_existing_tiptap_projects_as_documents'
+        ) THEN
+          UPDATE projects AS p
+          SET project_type = 'document'
+          FROM project_profiles AS pp
+          WHERE pp.project_id = p.id
+            AND p.project_type = 'product'
+            AND pp.ebook_html IS NULL
+            AND pp.ebook_style IS NULL
+            AND (
+              pp.plan IS NOT NULL
+              OR pp.document::text ~ '"text"\\s*:\\s*"[^"]+'
+            );
+
+          INSERT INTO app_migrations (name)
+          VALUES ('2026_04_28_backfill_existing_tiptap_projects_as_documents');
+        END IF;
+      END $$;
+    `,
+  );
+
+  await executeStatement(
+    sql,
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM app_migrations
+          WHERE name = '2026_04_28_reclassify_html_ebook_projects_as_products'
+        ) THEN
+          UPDATE projects AS p
+          SET project_type = 'product'
+          FROM project_profiles AS pp
+          WHERE pp.project_id = p.id
+            AND p.project_type = 'document'
+            AND (
+              pp.ebook_html IS NOT NULL
+              OR pp.ebook_style IS NOT NULL
+            );
+
+          INSERT INTO app_migrations (name)
+          VALUES ('2026_04_28_reclassify_html_ebook_projects_as_products');
+        END IF;
+      END $$;
+    `,
+  );
+
+  await executeStatement(
+    sql,
+    `
+      UPDATE projects
+      SET project_type = 'product'
+      WHERE project_type IS NULL
+        OR project_type NOT IN ('product', 'document')
+    `,
+  );
+
+  await executeStatement(
+    sql,
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint
+          WHERE conname = 'projects_project_type_check'
+            AND conrelid = 'public.projects'::regclass
+        ) THEN
+          ALTER TABLE projects
+          ADD CONSTRAINT projects_project_type_check
+          CHECK (project_type IN ('product', 'document'));
+        END IF;
+      END $$;
+    `,
+  );
 
   await sql`
     CREATE TABLE IF NOT EXISTS source_items (

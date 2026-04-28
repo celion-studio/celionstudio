@@ -10,28 +10,25 @@ import { BasicsStep } from "@/components/wizard/BasicsStep";
 import { StyleStep } from "@/components/wizard/StyleStep";
 import { FormatStepEbook } from "@/components/wizard/FormatStepEbook";
 import { SourceStepEbook } from "@/components/wizard/SourceStepEbook";
-import { OutlineStep } from "@/components/wizard/OutlineStep";
 import { GenerateStepEbook } from "@/components/wizard/GenerateStepEbook";
-import type { EbookOutline } from "@/types/project";
+import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
-const STEP_LABELS = ["Basics", "Style", "Format", "Source", "Outline", "Generate"] as const;
+const STEP_LABELS = ["Basics", "Style", "Format", "Source", "Generate"] as const;
 const STEP_TITLES = [
   "Set up your ebook",
   "Choose a style",
-  "Page format",
+  "Tune the visual system",
   "Add your source",
-  "Review the outline",
   "Generate your ebook",
 ] as const;
 const STEP_DESCRIPTIONS = [
   "Title, author, target reader, and core message.",
   "Pick the visual style for your ebook design.",
-  "Choose page count and accent color.",
-  "Paste notes or content for the AI to use.",
-  "Review the AI-generated chapter structure.",
-  "Celion will generate a full HTML/CSS ebook.",
+  "Choose an accent. Celion will calculate slide count from the source.",
+  "Upload source files for the AI to use.",
+  "Celion will plan and generate a full HTML/CSS sales-preview ebook in one pass.",
 ] as const;
 
 const basicsSchema = z.object({
@@ -57,67 +54,36 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
   const store = useProjectWizardStore();
   const {
     step, title, author, targetAudience, coreMessage,
-    ebookStyle, pageCount, accentColor, sourceText,
-    outline, outlineLoading, generating, error,
-    setStep, setField, setEbookStyle, setPageCount, setAccentColor,
-    setOutline, setOutlineLoading, setGenerating, setError, reset,
+    ebookStyle, accentColor, sourceText, sourceFiles,
+    generating, error,
+    setStep, setField, setEbookStyle, setAccentColor,
+    setSourceFiles, setGenerating, setError, reset,
   } = store;
 
   const [submitting, setSubmitting] = useState(false);
 
   const currentIssue = getStepIssue(step, store);
-  const busy = submitting || generating || outlineLoading;
+  const busy = submitting || generating;
   const canAdvance = currentIssue == null && !busy;
   const currentStepIndex = step - 1;
+  const promptSourceText = formatSourcesForPrompt(sourceFiles, sourceText);
 
   const handlePrevious = () => {
     if (step === 1 || busy) return;
     setStep((step - 1) as WizardStep);
   };
 
-  const generateOutline = async (): Promise<EbookOutline | null> => {
-    setOutlineLoading(true);
-    try {
-      const res = await fetch("/api/ebook/outline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, author, coreMessage, targetAudience, sourceText, pageCount, ebookStyle }),
-      });
-      const data = await res.json() as { outline?: EbookOutline; message?: string };
-      if (!res.ok || !data.outline) throw new Error(data.message ?? "Failed to generate outline.");
-      setOutline(data.outline);
-      return data.outline;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to generate outline.");
-      return null;
-    } finally {
-      setOutlineLoading(false);
-    }
-  };
-
   const handleNext = async () => {
     if (busy || currentIssue) return;
-
-    // Step 4 → 5: auto-generate outline
-    if (step === 4) {
-      setStep(5);
-      const result = await generateOutline();
-      if (!result) return;
-      return;
-    }
 
     if (step < TOTAL_STEPS) {
       setStep((step + 1) as WizardStep);
       return;
     }
 
-    // Step 6: generate ebook
+    // Step 5: generate ebook
     if (!isSignedIn) {
       setError("Sign in before generating so Celion can save your ebook.");
-      return;
-    }
-    if (!outline) {
-      setError("Generate an outline first.");
       return;
     }
 
@@ -127,7 +93,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
       const res = await fetch("/api/ebook/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, author, coreMessage, targetAudience, sourceText, pageCount, ebookStyle, accentColor, outline }),
+        body: JSON.stringify({ title, author, coreMessage, targetAudience, sourceText: promptSourceText, sources: sourceFiles, ebookStyle, accentColor }),
       });
       const data = await res.json() as { projectId?: string; message?: string };
       if (!res.ok || !data.projectId) throw new Error(data.message ?? "Could not generate ebook.");
@@ -144,13 +110,9 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
 
   const ctaLabel = generating || submitting
     ? "Generating..."
-    : outlineLoading
-      ? "Generating outline..."
-      : step === TOTAL_STEPS
+    : step === TOTAL_STEPS
         ? "Generate ebook"
-        : step === 4
-          ? "Generate outline"
-          : "Continue";
+        : "Continue";
 
   const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
 
@@ -229,24 +191,23 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
           )}
           {step === 3 && (
             <FormatStepEbook
-              pageCount={pageCount}
               accentColor={accentColor}
-              onPageCountChange={setPageCount}
               onAccentColorChange={setAccentColor}
             />
           )}
           {step === 4 && (
-            <SourceStepEbook sourceText={sourceText} onSourceTextChange={(v) => setField("sourceText", v)} />
+            <SourceStepEbook
+              sources={sourceFiles}
+              sourceTextLength={promptSourceText.length}
+              onSourceFilesChange={setSourceFiles}
+              onError={setError}
+            />
           )}
           {step === 5 && (
-            <OutlineStep outline={outline} loading={outlineLoading} />
-          )}
-          {step === 6 && (
             <GenerateStepEbook
               title={title}
               author={author}
               ebookStyle={ebookStyle}
-              pageCount={pageCount}
               accentColor={accentColor}
               generating={generating}
             />

@@ -89,6 +89,14 @@ export async function PATCH(
   }
 
   if (parsed.data.action === "save-document") {
+    const current = await getProjectRecordForUser(session.user.id, projectId);
+    if (!current) return NextResponse.json({ message: "Not found" }, { status: 404 });
+    if (current.kind !== "document") {
+      return NextResponse.json(
+        { message: "Document editor actions are not available for product projects." },
+        { status: 400 },
+      );
+    }
     const document = parsed.data.document;
     if (document === undefined) {
       return NextResponse.json({ message: "document is required" }, { status: 400 });
@@ -114,6 +122,14 @@ export async function PATCH(
   }
 
   if (parsed.data.action === "save-page-format") {
+    const current = await getProjectRecordForUser(session.user.id, projectId);
+    if (!current) return NextResponse.json({ message: "Not found" }, { status: 404 });
+    if (current.kind !== "document") {
+      return NextResponse.json(
+        { message: "Document editor actions are not available for product projects." },
+        { status: 400 },
+      );
+    }
     const project = await updateProjectPageFormat(
       session.user.id,
       projectId,

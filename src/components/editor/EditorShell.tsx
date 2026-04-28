@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MouseEvent } from "react";
@@ -27,6 +28,7 @@ type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
 const AUTO_SAVE_DELAY_MS = 2500;
 const AUTO_SAVE_MAX_WAIT_MS = 15000;
+const DOCUMENTS_ROUTE = "/documents" as Route;
 
 function cloneBookDocument(document: unknown) {
   return JSON.parse(
@@ -445,15 +447,15 @@ export function EditorShell({ projectId }: { projectId: string }) {
             Draft unavailable
           </h1>
           <p style={{ margin: "0 0 20px", fontSize: "13.5px", lineHeight: 1.6, color: "#858b93", fontFamily: "'Geist', sans-serif" }}>
-            {feedback || "Sign in and try again from your dashboard."}
+            {feedback || "Sign in and try again from your documents."}
           </p>
           <Link
-            href="/dashboard"
+            href={DOCUMENTS_ROUTE}
             onClick={confirmNavigationWithUnsavedChanges}
             style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", background: "#1a1714", color: "#fff", borderRadius: "6px", textDecorationLine: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
           >
             <ArrowLeft size={13} />
-            Back to dashboard
+            Back to documents
           </Link>
         </div>
       </main>
@@ -476,12 +478,12 @@ export function EditorShell({ projectId }: { projectId: string }) {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
           <Link
-            href="/dashboard"
+            href={DOCUMENTS_ROUTE}
             onClick={confirmNavigationWithUnsavedChanges}
             style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#858b93", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
           >
             <ArrowLeft size={14} />
-            Dashboard
+            Documents
           </Link>
           <span style={{ color: "#d6dbe1", fontSize: "13px" }}>/</span>
           <span style={{ fontSize: "13px", fontWeight: 500, color: "#1a1714", fontFamily: "'Geist', sans-serif", maxWidth: "360px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

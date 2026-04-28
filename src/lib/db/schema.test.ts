@@ -103,7 +103,24 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   assert.ok(
     statements.some((statement) =>
       statement.includes("backfill_existing_tiptap_projects_as_documents") &&
-      statement.includes("SET project_type = 'document'"),
+      statement.includes("SET project_type = 'document'") &&
+      statement.includes("pp.ebook_html IS NULL") &&
+      statement.includes("pp.ebook_style IS NULL") &&
+      statement.includes("pp.plan IS NOT NULL") &&
+      statement.includes("pp.document::text"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("reclassify_html_ebook_projects_as_products") &&
+      statement.includes("SET project_type = 'product'") &&
+      statement.includes("pp.ebook_html IS NOT NULL"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("projects_project_type_check") &&
+      statement.includes("project_type IN ('product', 'document')"),
     ),
   );
   assert.ok(

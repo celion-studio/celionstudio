@@ -1,6 +1,6 @@
 import type { ProjectSource, SourceKind } from "@/types/project";
 
-export const SOURCE_FILE_ACCEPT = ".md,.txt";
+export const SOURCE_FILE_ACCEPT = ".md,.markdown,.txt,.csv,.json,.html,.htm,.xml,.pdf,.docx";
 
 export type SourceIngestionErrorCode =
   | "unsupported_type"
@@ -64,12 +64,21 @@ function extensionFor(fileName: string) {
 export function getSourceFileSupport(file: SourceFileDescriptor): SourceFileSupport {
   const ext = extensionFor(file.name);
 
-  if (ext === "md" || ext === "txt") {
+  if (ext === "md" || ext === "markdown") {
     return {
       status: "supported",
-      kind: ext,
+      kind: "md",
       message: `${file.name} can be ingested.`,
-      note: "Markdown and plain text files are read directly with File.text().",
+      note: "Markdown files are read directly with File.text().",
+    };
+  }
+
+  if (["txt", "csv", "json", "html", "htm", "xml"].includes(ext)) {
+    return {
+      status: "supported",
+      kind: "txt",
+      message: `${file.name} can be ingested.`,
+      note: "Text-based files are read directly with File.text().",
     };
   }
 
@@ -95,7 +104,7 @@ export function getSourceFileSupport(file: SourceFileDescriptor): SourceFileSupp
     status: "unsupported_type",
     kind: null,
     message: `${file.name} is not a supported source file type.`,
-    note: `Supported source files today: ${SOURCE_FILE_ACCEPT}. PDF/DOCX need extraction first.`,
+    note: `Supported source files today: MD, TXT, CSV, JSON, HTML, and XML. PDF/DOCX need extraction first.`,
   };
 }
 
@@ -139,4 +148,15 @@ export async function buildProjectSourcesFromFiles(
   }
 
   return sources;
+}
+
+export function formatSourcesForPrompt(sources: ProjectSource[], fallbackText = "") {
+  if (sources.length === 0) return fallbackText.trim();
+
+  return sources
+    .map((source) => {
+      const label = `${source.name} (${source.kind})`;
+      return `# Source: ${label}\n\n${source.content.trim()}`;
+    })
+    .join("\n\n---\n\n");
 }

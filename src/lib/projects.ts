@@ -203,7 +203,8 @@ export async function listProjectRecordsForUser(
     sql`
       SELECT id::text AS id, project_id::text AS "projectId",
         source_type AS "sourceType", original_filename AS "originalFilename",
-        raw_text AS "rawText", normalized_text AS "normalizedText", created_at AS "createdAt"
+        raw_text AS "rawText", normalized_text AS "normalizedText",
+        created_at AS "createdAt"
       FROM source_items WHERE project_id::text = ANY(${projectIds}) ORDER BY created_at DESC
     `,
   ]);
@@ -266,7 +267,8 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
     sql`
       SELECT id::text AS id, project_id::text AS "projectId",
         source_type AS "sourceType", original_filename AS "originalFilename",
-        raw_text AS "rawText", normalized_text AS "normalizedText", created_at AS "createdAt"
+        raw_text AS "rawText", normalized_text AS "normalizedText",
+        created_at AS "createdAt"
       FROM source_items WHERE project_id::text = ${projectRow.id} ORDER BY created_at ASC
     `,
   ]);
@@ -381,7 +383,7 @@ export async function updateProjectPageFormat(
   const nextPageFormat = normalizePageFormat(pageFormat);
   const nextPageSize = normalizePageSize(customPageSize);
   const updatedAt = new Date();
-  await sql.transaction([
+  const [profileRows, projectRows] = await sql.transaction([
     sql`
       UPDATE project_profiles
       SET page_format = ${nextPageFormat},
@@ -389,14 +391,25 @@ export async function updateProjectPageFormat(
           page_height_mm = ${nextPageSize.heightMm},
           updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
-        AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+        AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id::text = ${projectId}
+            AND user_id = ${userId}
+            AND project_type = 'document'
+        )
+      RETURNING project_id::text AS id
     `,
     sql`
       UPDATE projects
       SET updated_at = ${updatedAt}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
+      WHERE id::text = ${projectId}
+        AND user_id = ${userId}
+        AND project_type = 'document'
+      RETURNING id::text AS id
     `,
-  ]);
+  ]) as [{ id: string }[], { id: string }[]];
+
+  if (profileRows.length === 0 || projectRows.length === 0) return null;
 
   return getProjectRecordForUser(userId, projectId);
 }
@@ -412,13 +425,20 @@ export async function updateProjectDocument(userId: string, projectId: string, d
       UPDATE project_profiles
       SET document = ${JSON.stringify(normalizedDocument)}::jsonb, updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
-        AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+        AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id::text = ${projectId}
+            AND user_id = ${userId}
+            AND project_type = 'document'
+        )
       RETURNING project_id::text AS id
     `,
     sql`
       UPDATE projects
       SET status = 'ready', updated_at = ${updatedAt}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
+      WHERE id::text = ${projectId}
+        AND user_id = ${userId}
+        AND project_type = 'document'
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -442,13 +462,20 @@ export async function updateProjectEbookHtml(
       UPDATE project_profiles
       SET ebook_html = ${ebookHtml}, updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
-        AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+        AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id::text = ${projectId}
+            AND user_id = ${userId}
+            AND COALESCE(project_type, 'product') = 'product'
+        )
       RETURNING project_id::text AS id
     `,
     sql`
       UPDATE projects
       SET status = 'ready', updated_at = ${updatedAt}
-      WHERE id::text = ${projectId} AND user_id = ${userId}
+      WHERE id::text = ${projectId}
+        AND user_id = ${userId}
+        AND COALESCE(project_type, 'product') = 'product'
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -510,7 +537,13 @@ export async function mutateProjectForUser(
           document = ${JSON.stringify(nextProject.profile.document)}::jsonb,
           updated_at = ${new Date(nextProject.updatedAt)}
       WHERE project_id::text = ${projectId}
-        AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+        AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id::text = ${projectId}
+            AND user_id = ${userId}
+            AND COALESCE(project_type, 'product') = 'product'
+        )
+      RETURNING project_id::text AS id
     `);
   }
 
@@ -518,10 +551,14 @@ export async function mutateProjectForUser(
     UPDATE projects
     SET title = ${nextProject.title}, status = ${nextProject.status},
         updated_at = ${new Date(nextProject.updatedAt)}
-    WHERE id::text = ${projectId} AND user_id = ${userId}
+    WHERE id::text = ${projectId}
+      AND user_id = ${userId}
+      AND COALESCE(project_type, 'product') = 'product'
+    RETURNING id::text AS id
   `);
 
-  await sql.transaction(queries);
+  const results = await sql.transaction(queries) as { id: string }[][];
+  if (results.some((rows) => rows.length === 0)) return null;
   return getProjectRecordForUser(userId, projectId);
 }
 

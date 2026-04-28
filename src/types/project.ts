@@ -58,16 +58,6 @@ export type ProjectPlan = {
 
 export type ProjectDocumentPayload = unknown;
 
-export type EbookOutlineChapter = {
-  title: string;
-  summary: string;
-  pageCount: number;
-};
-
-export type EbookOutline = {
-  chapters: EbookOutlineChapter[];
-};
-
 export type ProjectProfile = {
   author: string;
   targetAudience: string;

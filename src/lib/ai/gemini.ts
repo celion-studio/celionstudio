@@ -1,6 +1,7 @@
 import { AiJsonExtractionError, extractJsonObjectFromText } from "./json";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const EBOOK_GEMINI_MODEL = "gemini-3.1-pro-preview";
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 
 export type GeminiErrorCode =
@@ -34,6 +35,7 @@ export type GenerateJsonWithGeminiOptions = {
   system: string;
   user: string;
   model?: string;
+  temperature?: number;
   apiKey?: string;
   env?: GeminiEnv;
   fetchFn?: typeof fetch;
@@ -163,7 +165,7 @@ export async function generateJsonWithGemini(
         ],
         generationConfig: {
           response_mime_type: "application/json",
-          temperature: 0.2,
+          temperature: options.temperature ?? 0.2,
         },
       }),
     });

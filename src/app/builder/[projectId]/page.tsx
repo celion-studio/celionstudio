@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getPageSession } from "@/lib/session";
 import { getProjectRecordForUser } from "@/lib/projects";
@@ -16,6 +17,7 @@ export default async function BuilderPage({
   const { projectId } = await params;
   const project = await getProjectRecordForUser(session.user.id, projectId);
   if (!project) notFound();
+  if (project.kind === "document") redirect(`/editor/${project.id}` as Route);
 
   return (
     <BuilderShell

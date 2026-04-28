@@ -1,10 +1,9 @@
 ﻿"use client";
 
-import type { Route } from "next";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, ChevronRight, Clock, FileText, PenLine, Sparkles, Wand2, X } from "lucide-react";
+import { BookOpen, ChevronRight, Clock, FileText, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import { WorkspaceSidebar, type SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
@@ -24,13 +23,11 @@ const surfaceCopy = {
     heading: "Your drafts",
     description: "All your manuscripts and works in progress.",
     primaryActionLabel: "New ebook",
-    createDialogTitle: "New ebook",
     blankTitle: "Untitled Draft",
-    blankOptionTitle: "Start blank",
-    blankOptionDescription: "Open the editor with an empty document.",
     emptyTitle: "No drafts yet",
     emptyDescription: "Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.",
     emptyAction: "Create first ebook",
+    loadingLabel: "Loading drafts...",
     statTotal: "Total drafts",
     statActive: "In progress",
     statExported: "Print opened",
@@ -40,13 +37,11 @@ const surfaceCopy = {
     heading: "Document editor",
     description: "Standalone writing and formatting drafts live here.",
     primaryActionLabel: "New document",
-    createDialogTitle: "New document",
     blankTitle: "Untitled Document",
-    blankOptionTitle: "Blank document",
-    blankOptionDescription: "Open the document editor without the product-generation flow.",
     emptyTitle: "No documents yet",
     emptyDescription: "Create a blank document when you want a direct writing and formatting workspace.",
     emptyAction: "Create document",
+    loadingLabel: "Loading documents...",
     statTotal: "Total documents",
     statActive: "Editing",
     statExported: "Exported",
@@ -83,7 +78,6 @@ export function DashboardShell({
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
-  const [showCreateChoices, setShowCreateChoices] = useState(false);
   const [creatingBlank, setCreatingBlank] = useState(false);
   const showLoading = loading || (authPending && !hasVerifier);
   const copy = surfaceCopy[surface];
@@ -197,7 +191,7 @@ export function DashboardShell({
   ).length;
 
   async function deleteProject(project: ProjectRecord) {
-    const label = project.title || "Untitled Draft";
+    const label = project.title || copy.blankTitle;
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
 
     const previousProjects = projects;
@@ -262,21 +256,22 @@ export function DashboardShell({
         | { project?: ProjectRecord; message?: string }
         | null;
       if (!response.ok || !payload?.project) {
-        throw new Error(payload?.message ?? "Could not create a blank draft.");
+        throw new Error(
+          payload?.message ??
+            `Could not create ${surface === "documents" ? "a blank document" : "a draft"}.`,
+        );
       }
 
-      setShowCreateChoices(false);
       router.push(`/editor/${payload.project.id}`);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not create a blank draft.");
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : `Could not create ${surface === "documents" ? "a blank document" : "a draft"}.`,
+      );
     } finally {
       setCreatingBlank(false);
     }
-  }
-
-  function openCreateChoices() {
-    if (!resolvedSignedIn) return;
-    setShowCreateChoices(true);
   }
 
   return (
@@ -295,10 +290,10 @@ export function DashboardShell({
         initialUserName={resolvedUserName}
         initialUserEmail={resolvedUserEmail}
         primaryAction={{
-        href: "/new",
-        label: copy.primaryActionLabel,
-        onClick: surface === "documents" ? createBlankProject : openCreateChoices,
-      }}
+          href: "/new",
+          label: copy.primaryActionLabel,
+          onClick: surface === "documents" ? createBlankProject : undefined,
+        }}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -441,7 +436,7 @@ export function DashboardShell({
                     fontFamily: "'Geist', sans-serif",
                   }}
                 >
-                  Loading drafts...
+                  {copy.loadingLabel}
                 </p>
               </div>
             ) : null}
@@ -574,7 +569,7 @@ export function DashboardShell({
                 </p>
                 <button
                   type="button"
-                  onClick={surface === "documents" ? createBlankProject : openCreateChoices}
+                  onClick={surface === "documents" ? createBlankProject : () => router.push("/new")}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -599,161 +594,6 @@ export function DashboardShell({
           </div>
         </main>
       </div>
-      {showCreateChoices ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={copy.createDialogTitle}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 50,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(22, 18, 14, 0.28)",
-            padding: "24px",
-          }}
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !creatingBlank) {
-              setShowCreateChoices(false);
-            }
-          }}
-        >
-          <div
-            style={{
-              width: "min(520px, 100%)",
-              background: "#fff",
-              border: "1px solid #e3e5e8",
-              borderRadius: "10px",
-              boxShadow: "0 24px 80px rgba(24, 27, 31, 0.16)",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                height: "54px",
-                padding: "0 18px 0 20px",
-                borderBottom: "1px solid #ECEAE5",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span style={{ fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600, color: "#111" }}>
-                {copy.createDialogTitle}
-              </span>
-              <button
-                type="button"
-                disabled={creatingBlank}
-                aria-label="Close"
-                onClick={() => setShowCreateChoices(false)}
-                style={{
-                  width: "30px",
-                  height: "30px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "1px solid #ECEAE5",
-                  borderRadius: "6px",
-                  background: "#fff",
-                  color: "#8E877D",
-                  cursor: creatingBlank ? "not-allowed" : "pointer",
-                }}
-              >
-                <X size={14} strokeWidth={1.8} />
-              </button>
-            </div>
-
-            <div style={{ padding: "18px", display: "grid", gap: "10px" }}>
-              {surface === "workspace" ? (
-                <Link
-                  href={"/new" as Route}
-                  onClick={() => setShowCreateChoices(false)}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "36px 1fr 18px",
-                    gap: "14px",
-                    alignItems: "center",
-                    padding: "16px",
-                    border: "1px solid #ECEAE5",
-                    borderRadius: "8px",
-                    textDecorationLine: "none",
-                    color: "#111",
-                    background: "#fff",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "8px",
-                      background: "#F0EEE9",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Wand2 size={16} strokeWidth={1.8} />
-                  </span>
-                  <span>
-                    <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
-                      Start with wizard
-                    </span>
-                    <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
-                      Add source material and generate a draft.
-                    </span>
-                  </span>
-                  <ChevronRight size={16} color="#B9B2A8" />
-                </Link>
-              ) : null}
-
-              <button
-                type="button"
-                disabled={creatingBlank}
-                onClick={createBlankProject}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "36px 1fr 18px",
-                  gap: "14px",
-                  alignItems: "center",
-                  padding: "16px",
-                  border: "1px solid #ECEAE5",
-                  borderRadius: "8px",
-                  textAlign: "left",
-                  background: creatingBlank ? "#F7F6F3" : "#fff",
-                  color: "#111",
-                  cursor: creatingBlank ? "wait" : "pointer",
-                }}
-              >
-                <span
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "8px",
-                    background: "#111",
-                    color: "#fff",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <PenLine size={16} strokeWidth={1.8} />
-                </span>
-                <span>
-                  <span style={{ display: "block", fontFamily: "'Geist', sans-serif", fontSize: "14px", fontWeight: 600 }}>
-                    {copy.blankOptionTitle}
-                  </span>
-                  <span style={{ display: "block", marginTop: "3px", fontSize: "12.5px", color: "#71717A" }}>
-                    {copy.blankOptionDescription}
-                  </span>
-                </span>
-                <ChevronRight size={16} color="#B9B2A8" />
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

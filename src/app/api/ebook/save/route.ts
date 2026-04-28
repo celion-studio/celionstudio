@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRouteSession } from "@/lib/session";
+import { sanitizeEbookHtmlForCanvas } from "@/lib/ebook-html";
 import { updateProjectEbookHtml } from "@/lib/projects";
 
 const schema = z.object({
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   const result = await updateProjectEbookHtml(
     session.user.id,
     parsed.data.projectId,
-    parsed.data.html,
+    sanitizeEbookHtmlForCanvas(parsed.data.html),
   );
 
   if (!result) {

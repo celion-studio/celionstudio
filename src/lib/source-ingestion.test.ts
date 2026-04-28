@@ -17,12 +17,19 @@ function textFile(name: string, content: string, type = "text/plain") {
 }
 
 test("source ingestion accepts markdown and plain text files", async () => {
-  assert.equal(SOURCE_FILE_ACCEPT, ".md,.txt");
+  assert.equal(SOURCE_FILE_ACCEPT, ".md,.markdown,.txt,.csv,.json,.html,.htm,.xml,.pdf,.docx");
   assert.equal(isSupportedSourceFile({ name: "brief.md" }), true);
+  assert.equal(isSupportedSourceFile({ name: "brief.markdown" }), true);
   assert.equal(isSupportedSourceFile({ name: "notes.txt" }), true);
+  assert.equal(isSupportedSourceFile({ name: "data.csv" }), true);
+  assert.equal(isSupportedSourceFile({ name: "page.html" }), true);
 
   const sources = await buildProjectSourcesFromFiles(
-    [textFile("brief.md", "  # Brief\n\nUse this source.  "), textFile("notes.txt", "Plain notes")],
+    [
+      textFile("brief.md", "  # Brief\n\nUse this source.  "),
+      textFile("notes.txt", "Plain notes"),
+      textFile("data.csv", "name,value\nA,1"),
+    ],
     { createId: (index) => `source-${index + 1}` },
   );
 
@@ -48,6 +55,13 @@ test("source ingestion accepts markdown and plain text files", async () => {
         name: "notes.txt",
         content: "Plain notes",
         excerpt: "Plain notes",
+      },
+      {
+        id: "source-3",
+        kind: "txt",
+        name: "data.csv",
+        content: "name,value\nA,1",
+        excerpt: "name,value\nA,1",
       },
     ],
   );
