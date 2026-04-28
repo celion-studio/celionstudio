@@ -34,7 +34,7 @@ async function grantAppPrivileges(sql: SqlClientWithQuery, appRole: string) {
   await executeStatement(sql, `GRANT USAGE ON SCHEMA public TO ${role}`);
   await executeStatement(
     sql,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations TO ${role}`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations, ebook_generation_logs TO ${role}`,
   );
   await executeStatement(
     sql,
@@ -80,6 +80,33 @@ export async function applyAppSchema(
   `;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS ebook_generation_logs (
+      id text PRIMARY KEY,
+      user_id text NOT NULL,
+      project_id text REFERENCES projects(id) ON DELETE SET NULL,
+      status text NOT NULL,
+      stage text,
+      blueprint_model text NOT NULL DEFAULT '',
+      html_model text NOT NULL DEFAULT '',
+      title text NOT NULL DEFAULT '',
+      purpose text NOT NULL DEFAULT '',
+      target_audience text NOT NULL DEFAULT '',
+      ebook_style text,
+      accent_color text,
+      source_count integer NOT NULL DEFAULT 0,
+      source_text_length integer NOT NULL DEFAULT 0,
+      blueprint jsonb,
+      validation jsonb,
+      error_reason text,
+      error_message text,
+      error_status integer,
+      html_length integer,
+      slide_count integer,
+      created_at timestamp NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS project_profiles (
       project_id text PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
       target_audience text NOT NULL,
@@ -121,8 +148,31 @@ export async function applyAppSchema(
 
   await sql`
     ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS core_message text NOT NULL DEFAULT ''
+    ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT ''
   `;
+
+  await executeStatement(
+    sql,
+    `
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'project_profiles'
+            AND column_name = 'core_message'
+        ) THEN
+          UPDATE project_profiles
+          SET purpose = core_message
+          WHERE purpose = ''
+            AND core_message IS NOT NULL
+            AND core_message <> '';
+
+          ALTER TABLE project_profiles DROP COLUMN core_message;
+        END IF;
+      END $$;
+    `,
+  );
 
   await sql`
     ALTER TABLE project_profiles
@@ -340,6 +390,11 @@ export async function applyAppSchema(
   await sql`
     CREATE INDEX IF NOT EXISTS source_items_project_id_created_at_idx
     ON source_items (project_id, created_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS ebook_generation_logs_user_id_created_at_idx
+    ON ebook_generation_logs (user_id, created_at DESC)
   `;
 
   if (options.appRole) {

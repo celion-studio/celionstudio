@@ -3,8 +3,7 @@
 import { FileText, Trash2, UploadCloud } from "lucide-react";
 import {
   SOURCE_FILE_ACCEPT,
-  SourceIngestionError,
-  buildProjectSourcesFromFiles,
+  buildProjectSourcesFromFilesPartial,
 } from "@/lib/source-ingestion";
 import type { ProjectSource } from "@/types/project";
 
@@ -25,14 +24,17 @@ export function SourceStepEbook({
     if (files.length === 0) return;
 
     try {
-      const sources = await buildProjectSourcesFromFiles(files);
-      onSourceFilesChange(sources);
-    } catch (error) {
-      if (error instanceof SourceIngestionError) {
-        onError(error.note ? `${error.message} ${error.note}` : error.message);
-        return;
+      const result = await buildProjectSourcesFromFilesPartial(files);
+      if (result.sources.length > 0) {
+        onSourceFilesChange([...sources, ...result.sources]);
       }
-
+      if (result.errors.length > 0) {
+        const skipped = result.errors
+          .map(({ fileName, error }) => `${fileName}: ${error.message}`)
+          .join(" ");
+        onError(`Skipped ${result.errors.length} file${result.errors.length === 1 ? "" : "s"}. ${skipped}`);
+      }
+    } catch (error) {
       onError("Could not read these source files.");
     }
   }
@@ -53,7 +55,7 @@ export function SourceStepEbook({
               letterSpacing: "0.02em",
             }}
           >
-            MD / TXT / CSV / JSON / HTML
+            MD / TXT / DOCX / CSV / JSON / HTML
           </span>
         </div>
 
@@ -99,16 +101,7 @@ export function SourceStepEbook({
               color: "#858b93",
             }}
           >
-            Markdown, plain text, CSV, JSON, HTML, or XML
-          </span>
-          <span
-            style={{
-              fontSize: "11.5px",
-              fontFamily: "'Geist', sans-serif",
-              color: "#b6bbc2",
-            }}
-          >
-            PDF and DOCX can be selected, but extraction is not connected yet.
+            Markdown, DOCX, plain text, CSV, JSON, HTML, or XML
           </span>
           <input
             type="file"

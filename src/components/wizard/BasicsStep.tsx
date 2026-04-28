@@ -1,6 +1,6 @@
 "use client";
 
-import type { WizardTone } from "@/store/useProjectWizardStore";
+import type { WizardPurpose, WizardTone } from "@/store/useProjectWizardStore";
 
 const inputClass =
   "mt-2 w-full rounded-[9px] border border-line bg-[#fdfcf8] px-4 py-3 text-sm text-[#1a1714] outline-none transition-all duration-150 placeholder:text-[#c0bbb4] focus:border-[#1a1714] focus:bg-white focus:shadow-[0_0_0_3px_rgba(31,22,14,0.07)]";
@@ -33,6 +33,38 @@ const toneOptions: { value: WizardTone; label: string; description: string }[] =
   },
 ];
 
+const purposeOptions: {
+  value: Exclude<WizardPurpose, "">;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "sell",
+    label: "Sell or promote",
+    description: "Package the source as a persuasive sales or lead-generation publication.",
+  },
+  {
+    value: "teach",
+    label: "Teach a method",
+    description: "Turn knowledge into a clear lesson, guide, or practical learning asset.",
+  },
+  {
+    value: "organize",
+    label: "Organize expertise",
+    description: "Structure scattered knowledge into a polished reference or point of view.",
+  },
+  {
+    value: "report",
+    label: "Report or brief",
+    description: "Summarize source material into a concise report, briefing, or explainer.",
+  },
+  {
+    value: "other",
+    label: "Other",
+    description: "Describe the exact purpose in your own words.",
+  },
+];
+
 function Label({
   children,
   hint,
@@ -61,12 +93,14 @@ type BasicsStepProps = {
   title: string;
   author: string;
   targetAudience: string;
-  coreMessage: string;
+  purpose: WizardPurpose;
+  purposeDetail: string;
   tone: WizardTone;
   onFieldChange: (
-    field: "title" | "author" | "targetAudience" | "coreMessage",
+    field: "title" | "author" | "targetAudience" | "purposeDetail",
     value: string,
   ) => void;
+  onPurposeChange: (purpose: WizardPurpose) => void;
   onToneChange: (tone: WizardTone) => void;
 };
 
@@ -74,11 +108,15 @@ export function BasicsStep({
   title,
   author,
   targetAudience,
-  coreMessage,
+  purpose,
+  purposeDetail,
   tone,
   onFieldChange,
+  onPurposeChange,
   onToneChange,
 }: BasicsStepProps) {
+  const selectedPurpose = purposeOptions.find((option) => option.value === purpose);
+
   return (
     <div className="space-y-5">
       <label className="block">
@@ -96,13 +134,13 @@ export function BasicsStep({
         <input
           value={author}
           onChange={(e) => onFieldChange("author", e.target.value)}
-          placeholder="e.g. Jane Kim · Growth Studio"
+          placeholder="e.g. Jane Kim - Growth Studio"
           className={inputClass}
         />
       </label>
 
       <label className="block">
-        <Label hint="Be specific — the tighter the reader profile, the better the output.">
+        <Label hint="Be specific: the tighter the reader profile, the better the output.">
           Target reader
         </Label>
         <input
@@ -114,17 +152,42 @@ export function BasicsStep({
       </label>
 
       <label className="block">
-        <Label hint="One sentence. What is the single most important thing this book delivers?">
-          Core message
+        <Label hint="Choose the main job this publication should do.">
+          Purpose
         </Label>
-        <textarea
-          value={coreMessage}
-          onChange={(e) => onFieldChange("coreMessage", e.target.value)}
-          placeholder="e.g. You can close your first round in 90 days without a warm intro network."
-          rows={3}
-          className={`${inputClass} resize-none leading-6`}
-        />
+        <select
+          value={purpose}
+          onChange={(e) => onPurposeChange(e.target.value as WizardPurpose)}
+          className={inputClass}
+        >
+          <option value="">Select a purpose</option>
+          {purposeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {selectedPurpose ? (
+          <p className="mt-2 text-[12px] text-[#8a867e]" style={{ fontFamily: "'Geist', sans-serif" }}>
+            {selectedPurpose.description}
+          </p>
+        ) : null}
       </label>
+
+      {purpose === "other" ? (
+        <label className="block">
+          <Label hint="Write the purpose as specifically as possible.">
+            Other purpose
+          </Label>
+          <textarea
+            value={purposeDetail}
+            onChange={(e) => onFieldChange("purposeDetail", e.target.value)}
+            placeholder="e.g. Turn my workshop notes into a credibility deck for conference attendees."
+            rows={3}
+            className={`${inputClass} resize-none leading-6`}
+          />
+        </label>
+      ) : null}
 
       <div>
         <Label hint="This guides the first draft. You can still edit everything later.">

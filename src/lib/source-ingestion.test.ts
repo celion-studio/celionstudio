@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SourceIngestionError,
+  buildProjectSourcesFromFilesPartial,
   buildProjectSourcesFromFiles,
   getSourceFileSupport,
   isSupportedSourceFile,
@@ -16,8 +17,21 @@ function textFile(name: string, content: string, type = "text/plain") {
   };
 }
 
+function binaryFile(name: string, bytes: Uint8Array, type = "application/octet-stream") {
+  return {
+    name,
+    type,
+    text: async () => "",
+    arrayBuffer: async () => {
+      const buffer = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(buffer).set(bytes);
+      return buffer;
+    },
+  };
+}
+
 test("source ingestion accepts markdown and plain text files", async () => {
-  assert.equal(SOURCE_FILE_ACCEPT, ".md,.markdown,.txt,.csv,.json,.html,.htm,.xml,.pdf,.docx");
+  assert.equal(SOURCE_FILE_ACCEPT, ".md,.markdown,.txt,.csv,.json,.html,.htm,.xml,.docx");
   assert.equal(isSupportedSourceFile({ name: "brief.md" }), true);
   assert.equal(isSupportedSourceFile({ name: "brief.markdown" }), true);
   assert.equal(isSupportedSourceFile({ name: "notes.txt" }), true);
@@ -67,20 +81,104 @@ test("source ingestion accepts markdown and plain text files", async () => {
   );
 });
 
-test("source ingestion returns extraction-needed errors for future PDF and DOCX support", async () => {
-  const pdfSupport = getSourceFileSupport({ name: "deck.pdf", type: "application/pdf" });
+test("partial source ingestion keeps valid files and reports invalid files", async () => {
+  const result = await buildProjectSourcesFromFilesPartial(
+    [
+      textFile("brief.md", "Valid brief"),
+      textFile("deck.pdf", "%PDF"),
+      textFile("empty.txt", " "),
+      textFile("notes.txt", "Useful notes"),
+    ],
+    { createId: (index) => `source-${index + 1}` },
+  );
+
+  assert.deepEqual(
+    result.sources.map((source) => ({
+      id: source.id,
+      kind: source.kind,
+      name: source.name,
+      content: source.content,
+    })),
+    [
+      {
+        id: "source-1",
+        kind: "md",
+        name: "brief.md",
+        content: "Valid brief",
+      },
+      {
+        id: "source-4",
+        kind: "txt",
+        name: "notes.txt",
+        content: "Useful notes",
+      },
+    ],
+  );
+  assert.deepEqual(
+    result.errors.map((error) => ({
+      fileName: error.fileName,
+      code: error.error.code,
+    })),
+    [
+      { fileName: "deck.pdf", code: "extraction_required" },
+      { fileName: "empty.txt", code: "empty_source" },
+    ],
+  );
+});
+
+test("source ingestion extracts DOCX files through the configured extractor", async () => {
   const docxSupport = getSourceFileSupport({
     name: "draft.docx",
     type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   });
 
+  assert.equal(SOURCE_FILE_ACCEPT, ".md,.markdown,.txt,.csv,.json,.html,.htm,.xml,.docx");
+  assert.equal(docxSupport.status, "supported");
+  assert.equal(isSupportedSourceFile({ name: "draft.docx" }), true);
+
+  const sources = await buildProjectSourcesFromFiles(
+    [
+      binaryFile(
+        "draft.docx",
+        new Uint8Array([80, 75, 3, 4]),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ],
+    {
+      createId: () => "source-docx",
+      extractDocxText: async (arrayBuffer) => {
+        assert.equal(arrayBuffer.byteLength, 4);
+        return "  Extracted DOCX text.  ";
+      },
+    },
+  );
+
+  assert.deepEqual(
+    sources.map((source) => ({
+      id: source.id,
+      kind: source.kind,
+      name: source.name,
+      content: source.content,
+      excerpt: source.excerpt,
+    })),
+    [
+      {
+        id: "source-docx",
+        kind: "docx",
+        name: "draft.docx",
+        content: "Extracted DOCX text.",
+        excerpt: "Extracted DOCX text.",
+      },
+    ],
+  );
+});
+
+test("source ingestion returns extraction-needed errors for future PDF support", async () => {
+  const pdfSupport = getSourceFileSupport({ name: "deck.pdf", type: "application/pdf" });
+
   assert.equal(pdfSupport.status, "extraction_required");
   assert.match(pdfSupport.message, /PDF extraction is not connected yet/i);
   assert.match(pdfSupport.note, /unpdf/i);
-
-  assert.equal(docxSupport.status, "extraction_required");
-  assert.match(docxSupport.message, /DOCX extraction is not connected yet/i);
-  assert.match(docxSupport.note, /mammoth/i);
 
   await assert.rejects(
     () => buildProjectSourcesFromFiles([textFile("deck.pdf", "%PDF")]),

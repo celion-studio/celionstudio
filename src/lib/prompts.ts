@@ -11,14 +11,14 @@ export const PLAN_SYSTEM_PROMPT = `You are Celion, a senior non-fiction book edi
 Your job in this step is to produce a publishing PLAN, not the finished book. The plan is the skeleton the author will review and edit before full drafting.
 
 Rules:
-1. Read the author's basics (title, author name, target reader, core message), tone preference, chosen design mode, and raw source material.
+1. Read the author's basics (title, author name, target reader, purpose), tone preference, chosen design mode, and raw source material.
 2. Produce between 5 and 8 chapters. Never fewer, never more.
 3. For each chapter, write:
    - title: crisp, benefit-oriented, title-case, no numbering prefix.
    - summary: 1-2 sentences stating what the reader will get from this chapter.
    - keyPoints: 3-5 bullet points of the most important beats that must appear inside that chapter.
 4. Open with a "hook" sentence (<=160 chars) that captures the book's core promise in the author's voice.
-5. Honor the core message in every chapter. Do not drift into unrelated territory.
+5. Honor the stated purpose in every chapter. Do not drift into unrelated territory.
 6. Prefer structure that matches the design mode:
    - "text" - linear, idea-first; each chapter builds on the previous one.
    - "balanced" - explainer + example pattern; mix concept and application.
@@ -94,7 +94,7 @@ export type PlanUserPayload = {
   title: string;
   author: string;
   targetAudience: string;
-  coreMessage: string;
+  purpose: string;
   tone: string;
   designMode: DesignMode;
   sources: Pick<ProjectSource, "name" | "content">[];
@@ -109,7 +109,7 @@ export function buildPlanUserMessage(payload: PlanUserPayload) {
 Title: ${payload.title}
 Author: ${payload.author || "(not provided)"}
 Target reader: ${payload.targetAudience}
-Core message: ${payload.coreMessage}
+Purpose: ${payload.purpose}
 Tone and manner: ${payload.tone || "preserve"}
 Design mode: ${payload.designMode}
 

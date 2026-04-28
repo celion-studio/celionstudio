@@ -237,7 +237,7 @@ export function DashboardShell({
           profile: {
             author: "",
             targetAudience: "",
-            coreMessage: "",
+            purpose: "",
             designMode: "text",
             pageFormat: "ebook",
             customPageSize: { widthMm: 152, heightMm: 229 },

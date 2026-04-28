@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { EbookStyle, ProjectSource } from "@/types/project";
 
-export type WizardStep = 1 | 2 | 3 | 4 | 5;
+export type WizardStep = 1 | 2 | 3 | 4;
 
 export type WizardTone =
   | "preserve"
@@ -10,26 +10,38 @@ export type WizardTone =
   | "editorial"
   | "friendly";
 
+export type WizardPurpose =
+  | ""
+  | "sell"
+  | "teach"
+  | "organize"
+  | "report"
+  | "other";
+
 type WizardState = {
   step: WizardStep;
   // Step 1: Basics
   title: string;
   author: string;
   targetAudience: string;
-  coreMessage: string;
+  purpose: WizardPurpose;
+  purposeDetail: string;
+  tone: WizardTone;
   // Step 2: Style
   ebookStyle: EbookStyle | null;
-  // Step 3: Format
+  // Step 2: Style
   accentColor: string;
-  // Step 4: Source
+  // Step 3: Source
   sourceText: string;
   sourceFiles: ProjectSource[];
-  // Step 5: Generate
+  // Step 4: Generate
   generating: boolean;
   error: string;
 
   setStep: (step: WizardStep) => void;
-  setField: (field: "title" | "author" | "targetAudience" | "coreMessage" | "sourceText", value: string) => void;
+  setField: (field: "title" | "author" | "targetAudience" | "purposeDetail" | "sourceText", value: string) => void;
+  setPurpose: (purpose: WizardPurpose) => void;
+  setTone: (tone: WizardTone) => void;
   setSourceFiles: (sources: ProjectSource[]) => void;
   setEbookStyle: (style: EbookStyle) => void;
   setAccentColor: (color: string) => void;
@@ -43,7 +55,9 @@ const initialState = {
   title: "",
   author: "",
   targetAudience: "",
-  coreMessage: "",
+  purpose: "" as WizardPurpose,
+  purposeDetail: "",
+  tone: "preserve" as WizardTone,
   ebookStyle: null as EbookStyle | null,
   accentColor: "#6366f1",
   sourceText: "",
@@ -56,6 +70,8 @@ export const useProjectWizardStore = create<WizardState>((set) => ({
   ...initialState,
   setStep: (step) => set({ step, error: "" }),
   setField: (field, value) => set({ [field]: value, error: "" }),
+  setPurpose: (purpose) => set({ purpose, purposeDetail: purpose === "other" ? "" : "", error: "" }),
+  setTone: (tone) => set({ tone, error: "" }),
   setSourceFiles: (sourceFiles) => set({
     sourceFiles,
     sourceText: sourceFiles.map((source) => source.content).join("\n\n"),

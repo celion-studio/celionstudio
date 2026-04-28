@@ -13,6 +13,7 @@ export const CELION_A5_SLIDE_HTML_SPEC = [
 type ValidateCelionSlideHtmlOptions = {
   minSlides?: number;
   minVisibleTextLength?: number;
+  allowGenericOutlineHeadings?: boolean;
 };
 
 export type CelionSlideHtmlValidation = {
@@ -27,6 +28,19 @@ export function countCelionSlides(html: string) {
     .length;
 }
 
+export function normalizeEbookHtmlSlideContract(html: string) {
+  return html
+    .replace(/\sdata-page=(["'])([^"']+)\1/gi, ' data-slide="$2"')
+    .replace(/\.page(?![-_a-z0-9])/gi, ".slide")
+    .replace(/\bclass=(["'])([^"']*)\1/gi, (_match, quote: string, className: string) => {
+      const classes = className
+        .split(/\s+/)
+        .map((item) => (item === "page" ? "slide" : item))
+        .filter(Boolean);
+      return `class=${quote}${[...new Set(classes)].join(" ")}${quote}`;
+    });
+}
+
 function hasUnsupportedColorFunction(html: string) {
   for (let index = 0; index < html.length; index += 1) {
     if (findUnsupportedColorFunction(html, index)) return true;
@@ -36,13 +50,37 @@ function hasUnsupportedColorFunction(html: string) {
 }
 
 function visibleTextLength(html: string) {
+  return visibleText(html).length;
+}
+
+function visibleText(html: string) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&amp;/gi, "&")
     .replace(/\s+/g, " ")
-    .trim()
-    .length;
+    .trim();
+}
+
+function hasGenericOutlineHeadings(html: string) {
+  const text = visibleText(html).toLowerCase();
+  return [
+    /\bthe core idea(?:\s+\d+)?\b/,
+    /\bwhy this matters now(?:\s+\d+)?\b/,
+    /\bhow to apply it(?:\s+\d+)?\b/,
+    /\bcommon mistakes(?:\s+\d+)?\b/,
+    /\bprologue(?:\s+\d+)?\b/,
+    /\bslide\s+\d+\b/,
+  ].some((pattern) => pattern.test(text));
+}
+
+function hasPageClassToken(html: string) {
+  return [...html.matchAll(/\bclass=(["'])([^"']*)\1/gi)]
+    .some((match) => match[2]?.split(/\s+/).includes("page"));
 }
 
 export function validateCelionSlideHtml(
@@ -63,7 +101,7 @@ export function validateCelionSlideHtml(
   if (slideCount < minSlides) {
     errors.push(`Output must include at least ${minSlides} .slide elements.`);
   }
-  if (/\bclass=["'][^"']*\bpage\b/i.test(html) || /\bdata-page=/i.test(html)) {
+  if (hasPageClassToken(html) || /\bdata-page=/i.test(html)) {
     errors.push("Output must use .slide/data-slide, not .page/data-page.");
   }
   if (!/@page\s*\{[^}]*148mm\s+210mm[^}]*margin\s*:\s*0/i.test(html)) {
@@ -80,6 +118,9 @@ export function validateCelionSlideHtml(
   }
   if (hasUnsupportedColorFunction(html)) {
     errors.push("Output uses CSS color functions unsupported by html2canvas.");
+  }
+  if (!options.allowGenericOutlineHeadings && hasGenericOutlineHeadings(html)) {
+    errors.push("Output must not use repeated generic outline headings as visible slide copy.");
   }
   if (visibleTextLength(html) < minVisibleTextLength) {
     errors.push(`Output must include at least ${minVisibleTextLength} visible text characters.`);

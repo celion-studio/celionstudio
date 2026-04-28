@@ -1,45 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Zap } from "lucide-react";
 import { z } from "zod";
 import { useProjectWizardStore } from "@/store/useProjectWizardStore";
-import type { WizardStep } from "@/store/useProjectWizardStore";
+import type { WizardPurpose, WizardStep } from "@/store/useProjectWizardStore";
 import { BasicsStep } from "@/components/wizard/BasicsStep";
 import { StyleStep } from "@/components/wizard/StyleStep";
-import { FormatStepEbook } from "@/components/wizard/FormatStepEbook";
 import { SourceStepEbook } from "@/components/wizard/SourceStepEbook";
 import { GenerateStepEbook } from "@/components/wizard/GenerateStepEbook";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 
-const TOTAL_STEPS = 5;
+export const TOTAL_STEPS = 4;
 
-const STEP_LABELS = ["Basics", "Style", "Format", "Source", "Generate"] as const;
-const STEP_TITLES = [
+export const STEP_LABELS = ["Basics", "Style", "Source", "Generate"] as const;
+export const STEP_TITLES = [
   "Set up your ebook",
-  "Choose a style",
-  "Tune the visual system",
+  "Choose style and accent",
   "Add your source",
   "Generate your ebook",
 ] as const;
-const STEP_DESCRIPTIONS = [
-  "Title, author, target reader, and core message.",
-  "Pick the visual style for your ebook design.",
-  "Choose an accent. Celion will calculate slide count from the source.",
+export const STEP_DESCRIPTIONS = [
+  "Title, author, target reader, and purpose.",
+  "Pick the visual style and accent color for your ebook design.",
   "Upload source files for the AI to use.",
-  "Celion will plan and generate a full HTML/CSS sales-preview ebook in one pass.",
+  "Celion will generate a source-led A5 HTML/CSS slide publication.",
 ] as const;
 
 const basicsSchema = z.object({
   title: z.string().trim().min(1, "Add a title."),
   targetAudience: z.string().trim().min(1, "Add the target reader."),
-  coreMessage: z.string().trim().min(1, "Add the core message."),
+  purpose: z.string().trim().min(1, "Add the purpose."),
 });
+
+const PURPOSE_PROMPTS: Record<Exclude<WizardPurpose, "" | "other">, string> = {
+  sell: "Sell or promote a product, service, offer, or paid guide.",
+  teach: "Teach a method, skill, framework, or practical lesson.",
+  organize: "Organize expertise into a polished reference, guide, or point of view.",
+  report: "Turn source material into a concise report, briefing, or explainer.",
+};
+
+function resolvePurpose(purpose: WizardPurpose, purposeDetail: string) {
+  if (purpose === "other") return purposeDetail.trim();
+  if (!purpose) return "";
+  return PURPOSE_PROMPTS[purpose];
+}
 
 function getStepIssue(step: WizardStep, state: ReturnType<typeof useProjectWizardStore.getState>): string | null {
   if (step === 1) {
-    const result = basicsSchema.safeParse({ title: state.title, targetAudience: state.targetAudience, coreMessage: state.coreMessage });
+    const result = basicsSchema.safeParse({
+      title: state.title,
+      targetAudience: state.targetAudience,
+      purpose: resolvePurpose(state.purpose, state.purposeDetail),
+    });
     return result.success ? null : (result.error.issues[0]?.message ?? "Complete this step.");
   }
   if (step === 2) {
@@ -51,22 +65,30 @@ function getStepIssue(step: WizardStep, state: ReturnType<typeof useProjectWizar
 
 export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
   const router = useRouter();
+  const resetOnUnmountRef = useRef(false);
   const store = useProjectWizardStore();
   const {
-    step, title, author, targetAudience, coreMessage,
+    step, title, author, targetAudience, purpose, purposeDetail, tone,
     ebookStyle, accentColor, sourceText, sourceFiles,
     generating, error,
-    setStep, setField, setEbookStyle, setAccentColor,
+    setStep, setField, setPurpose, setTone, setEbookStyle, setAccentColor,
     setSourceFiles, setGenerating, setError, reset,
   } = store;
 
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (resetOnUnmountRef.current) reset();
+    };
+  }, [reset]);
 
   const currentIssue = getStepIssue(step, store);
   const busy = submitting || generating;
   const canAdvance = currentIssue == null && !busy;
   const currentStepIndex = step - 1;
   const promptSourceText = formatSourcesForPrompt(sourceFiles, sourceText);
+  const resolvedPurpose = resolvePurpose(purpose, purposeDetail);
 
   const handlePrevious = () => {
     if (step === 1 || busy) return;
@@ -81,7 +103,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
       return;
     }
 
-    // Step 5: generate ebook
+    // Step 4: generate ebook
     if (!isSignedIn) {
       setError("Sign in before generating so Celion can save your ebook.");
       return;
@@ -93,18 +115,21 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
       const res = await fetch("/api/ebook/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, author, coreMessage, targetAudience, sourceText: promptSourceText, sources: sourceFiles, ebookStyle, accentColor }),
+        body: JSON.stringify({ title, author, purpose: resolvedPurpose, targetAudience, tone, sourceText: promptSourceText, sources: sourceFiles, ebookStyle, accentColor }),
       });
       const data = await res.json() as { projectId?: string; message?: string };
       if (!res.ok || !data.projectId) throw new Error(data.message ?? "Could not generate ebook.");
-      reset();
+      resetOnUnmountRef.current = true;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.push(`/builder/${data.projectId}` as any);
+      router.replace(`/builder/${data.projectId}` as any);
+      return;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
-      setSubmitting(false);
-      setGenerating(false);
+      if (!resetOnUnmountRef.current) {
+        setSubmitting(false);
+        setGenerating(false);
+      }
     }
   };
 
@@ -180,22 +205,23 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
               title={title}
               author={author}
               targetAudience={targetAudience}
-              coreMessage={coreMessage}
-              tone="preserve"
+              purpose={purpose}
+              purposeDetail={purposeDetail}
+              tone={tone}
               onFieldChange={setField}
-              onToneChange={() => {}}
+              onPurposeChange={setPurpose}
+              onToneChange={setTone}
             />
           )}
           {step === 2 && (
-            <StyleStep ebookStyle={ebookStyle} onStyleChange={setEbookStyle} />
-          )}
-          {step === 3 && (
-            <FormatStepEbook
+            <StyleStep
+              ebookStyle={ebookStyle}
+              onStyleChange={setEbookStyle}
               accentColor={accentColor}
               onAccentColorChange={setAccentColor}
             />
           )}
-          {step === 4 && (
+          {step === 3 && (
             <SourceStepEbook
               sources={sourceFiles}
               sourceTextLength={promptSourceText.length}
@@ -203,7 +229,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
               onError={setError}
             />
           )}
-          {step === 5 && (
+          {step === 4 && (
             <GenerateStepEbook
               title={title}
               author={author}

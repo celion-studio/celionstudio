@@ -54,12 +54,12 @@ export function buildDraftPlan(input: {
   title: string;
   author: string;
   targetAudience: string;
-  coreMessage: string;
+  purpose: string;
   designMode: DesignMode;
   sources: ProjectSource[];
 }): ProjectPlan {
   const hook =
-    `${input.coreMessage || input.title}, written for ${input.targetAudience}.`.slice(0, 160);
+    `${input.purpose || input.title}, written for ${input.targetAudience}.`.slice(0, 160);
 
   const sourceSentences = input.sources.flatMap((source) => sentences(source.content, 4));
   const seed = sourceSentences.length > 0 ? sourceSentences : [`${input.title} content`];

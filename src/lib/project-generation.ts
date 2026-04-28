@@ -39,7 +39,7 @@ function ensureProjectPlan(project: ProjectRecord): ProjectPlan {
     title: project.title,
     author: project.profile.author,
     targetAudience: project.profile.targetAudience,
-    coreMessage: project.profile.coreMessage,
+    purpose: project.profile.purpose,
     designMode: project.profile.designMode || "balanced",
     sources: project.sources,
   });
@@ -108,7 +108,7 @@ export async function generateProjectDocument(
           title: project.title,
           author: project.profile.author,
           targetAudience: project.profile.targetAudience,
-          coreMessage: project.profile.coreMessage,
+          purpose: project.profile.purpose,
           tone: project.profile.tone || "preserve",
           designMode: project.profile.designMode || "balanced",
           sources: project.sources.map((source) => ({
@@ -193,7 +193,7 @@ export async function withRevisedProject(
       title: project.title,
       author: project.profile.author,
       targetAudience: project.profile.targetAudience,
-      coreMessage: project.profile.coreMessage,
+      purpose: project.profile.purpose,
       tone: project.profile.tone || "preserve",
       designMode: project.profile.designMode || "balanced",
       sources: project.sources.map((source) => ({

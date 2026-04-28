@@ -1,5 +1,6 @@
 ﻿import { createProjectRecord } from "@/lib/project-planning";
 import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
+import { countCelionSlides } from "@/lib/ebook-html";
 import { ensureAppSchema, getSql } from "@/lib/db";
 import {
   normalizePageFormat,
@@ -40,7 +41,7 @@ type ProfileRow = {
   targetAudience: string;
   tone: string;
   author: string;
-  coreMessage: string;
+  purpose: string;
   designMode: string;
   pageFormat: string;
   pageWidthMm: number | string | null;
@@ -112,7 +113,7 @@ function emptyProfile(): ProjectProfile {
   return {
     author: "",
     targetAudience: "",
-    coreMessage: "",
+    purpose: "",
     designMode: "balanced",
     pageFormat: "ebook",
     customPageSize: normalizePageSize(null),
@@ -136,7 +137,7 @@ function profileFromRow(row: ProfileRow): ProjectProfile {
   return {
     author: row.author ?? "",
     targetAudience: row.targetAudience,
-    coreMessage: row.coreMessage ?? "",
+    purpose: row.purpose ?? "",
     designMode: (row.designMode as DesignMode) || "balanced",
     pageFormat: normalizePageFormat(row.pageFormat),
     customPageSize,
@@ -187,7 +188,7 @@ export async function listProjectRecordsForUser(
       SELECT project_id::text AS "projectId",
         target_audience AS "targetAudience", tone,
         COALESCE(author, '') AS author,
-        COALESCE(core_message, '') AS "coreMessage",
+        COALESCE(purpose, '') AS purpose,
         COALESCE(design_mode, 'balanced') AS "designMode",
         COALESCE(page_format, 'ebook') AS "pageFormat",
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
@@ -251,7 +252,7 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
       SELECT project_id::text AS "projectId",
         target_audience AS "targetAudience", tone,
         COALESCE(author, '') AS author,
-        COALESCE(core_message, '') AS "coreMessage",
+        COALESCE(purpose, '') AS purpose,
         COALESCE(design_mode, 'balanced') AS "designMode",
         COALESCE(page_format, 'ebook') AS "pageFormat",
         COALESCE(page_width_mm, 152) AS "pageWidthMm",
@@ -320,13 +321,13 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
       sql`
         INSERT INTO project_profiles (
           project_id, target_audience, tone,
-          author, core_message, design_mode, page_format, page_width_mm, page_height_mm,
+          author, purpose, design_mode, page_format, page_width_mm, page_height_mm,
           plan, document, ebook_style, ebook_html, ebook_page_count, accent_color,
           created_at, updated_at
         ) VALUES (
           ${projectId},
           ${p.targetAudience}, ${p.tone},
-          ${p.author}, ${p.coreMessage}, ${p.designMode}, ${p.pageFormat},
+          ${p.author}, ${p.purpose}, ${p.designMode}, ${p.pageFormat},
           ${p.customPageSize.widthMm}, ${p.customPageSize.heightMm},
           ${p.plan ? JSON.stringify(p.plan) : null}::jsonb,
           ${JSON.stringify(p.document ?? [])}::jsonb,
@@ -366,6 +367,10 @@ export function withSavedProjectDocument(project: ProjectRecord, document: unkno
       document: normalizedDocument,
     },
   };
+}
+
+export function getEbookPageCountForHtml(ebookHtml: string) {
+  return Math.max(1, countCelionSlides(ebookHtml));
 }
 
 export async function updateProjectPageFormat(
@@ -457,10 +462,13 @@ export async function updateProjectEbookHtml(
 
   const sql = getSql();
   const updatedAt = new Date();
+  const ebookPageCount = getEbookPageCountForHtml(ebookHtml);
   const [profileRows, projectRows] = await sql.transaction([
     sql`
       UPDATE project_profiles
-      SET ebook_html = ${ebookHtml}, updated_at = ${updatedAt}
+      SET ebook_html = ${ebookHtml},
+          ebook_page_count = ${ebookPageCount},
+          updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
         AND EXISTS (
           SELECT 1 FROM projects

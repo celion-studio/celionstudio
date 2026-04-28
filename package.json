@@ -8,7 +8,7 @@
         "build:deploy": "npm run db:init && npm run build",
         "start": "next start",
         "db:init": "tsx scripts/init-db.ts",
-        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/page-format.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/ebook-html.test.ts && node --import tsx src/lib/ebook-generation.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/document-validation.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
+        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/lib/page-format.test.ts && node --import tsx src/lib/tiptap-document.test.ts && node --import tsx src/components/editor/pagination/page-breaks.test.ts && node --import tsx src/components/builder/export-cleanup.test.ts && node --import tsx src/components/wizard/wizard-flow.test.tsx && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/ebook-html.test.ts && node --import tsx src/lib/ebook-generation.test.ts && node --import tsx src/lib/image-storage.test.ts && node --import tsx src/lib/document-validation.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
@@ -25,10 +25,10 @@
         "@tiptap/react": "^3.22.4",
         "@tiptap/starter-kit": "^3.22.4",
         "@vercel/blob": "^2.3.3",
-        "dotenv": "^17.4.2",
         "html2canvas": "^1.4.1",
         "jspdf": "^4.2.1",
         "lucide-react": "^0.542.0",
+        "mammoth": "^1.12.0",
         "next": "^16.2.4",
         "react": "^19.2.5",
         "react-dom": "^19.2.5",
@@ -43,6 +43,7 @@
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "autoprefixer": "^10.4.21",
+        "dotenv": "^17.4.2",
         "postcss": "^8.5.6",
         "tailwindcss": "^3.4.17",
         "tsx": "^4.20.6",

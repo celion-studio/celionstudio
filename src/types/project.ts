@@ -61,7 +61,7 @@ export type ProjectDocumentPayload = unknown;
 export type ProjectProfile = {
   author: string;
   targetAudience: string;
-  coreMessage: string;
+  purpose: string;
   designMode: DesignMode;
   tone: string;
   pageFormat: PageFormat;

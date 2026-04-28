@@ -1,6 +1,7 @@
 import { AiJsonExtractionError, extractJsonObjectFromText } from "./json";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const EBOOK_BLUEPRINT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 export const EBOOK_GEMINI_MODEL = "gemini-3.1-pro-preview";
 const DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 

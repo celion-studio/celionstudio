@@ -13,7 +13,7 @@ const createProjectSchema = z.object({
   profile: z.object({
     author: z.string().default(""),
     targetAudience: z.string().default(""),
-    coreMessage: z.string().default(""),
+    purpose: z.string().default(""),
     designMode: z.enum(["text", "balanced", "visual"]).default("balanced"),
     pageFormat: z
       .enum(["ebook", "kindle", "tablet", "mobile", "a5", "a4", "a3", "a2", "custom"])
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       profile: {
         author: p.author,
         targetAudience: p.targetAudience,
-        coreMessage: p.coreMessage,
+        purpose: p.purpose,
         designMode: p.designMode,
         pageFormat: p.pageFormat,
         customPageSize: p.customPageSize,

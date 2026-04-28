@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isTiptapBookDocument, textFromDoc } from "./tiptap-document";
-import { withSavedProjectDocument } from "./projects";
+import { getEbookPageCountForHtml, withSavedProjectDocument } from "./projects";
 import { withGeneratedProject, withRevisedProject } from "./project-generation";
 import type { ProjectRecord } from "@/types/project";
 
@@ -17,7 +17,7 @@ function projectFixture(): ProjectRecord {
     profile: {
       author: "",
       targetAudience: "Founders",
-      coreMessage: "Message",
+      purpose: "Message",
       designMode: "balanced",
       pageFormat: "ebook",
       customPageSize: { widthMm: 152, heightMm: 229 },
@@ -46,6 +46,18 @@ test("withSavedProjectDocument preserves normalized Tiptap document JSON", () =>
   assert.equal(project.status, "ready");
   assert.equal(firstDoc(project).content?.[0]?.type, "heading");
   assert.equal(textFromDoc(firstDoc(project)), "Updated <copy>");
+});
+
+test("getEbookPageCountForHtml reflects current Celion slide count", () => {
+  assert.equal(getEbookPageCountForHtml("<div>No slides yet</div>"), 1);
+  assert.equal(
+    getEbookPageCountForHtml(`
+      <div class="slide" data-slide="1"></div>
+      <div class="slide" data-slide="2"></div>
+      <div class="slide-footer"></div>
+    `),
+    2,
+  );
 });
 
 test("withSavedProjectDocument preserves an intentionally empty Tiptap document", () => {

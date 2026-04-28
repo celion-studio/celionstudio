@@ -37,6 +37,13 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("CREATE TABLE IF NOT EXISTS ebook_generation_logs") &&
+      statement.includes("blueprint jsonb") &&
+      statement.includes("validation jsonb"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("CREATE INDEX IF NOT EXISTS projects_user_id_updated_at_idx"),
     ),
   );
@@ -53,6 +60,17 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   assert.ok(
     statements.some((statement) =>
       statement.includes("ADD COLUMN IF NOT EXISTS page_format"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS purpose"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("SET purpose = core_message") &&
+      statement.includes("ALTER TABLE project_profiles DROP COLUMN core_message"),
     ),
   );
   assert.ok(
@@ -83,6 +101,11 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   assert.ok(
     statements.some((statement) =>
       statement.includes("CREATE INDEX IF NOT EXISTS source_items_project_id_created_at_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX IF NOT EXISTS ebook_generation_logs_user_id_created_at_idx"),
     ),
   );
   assert.ok(
@@ -155,7 +178,7 @@ test("applyAppSchema grants app table privileges when an app role is provided", 
   );
   assert.ok(
     statements.includes(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations TO "app""user"',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations, ebook_generation_logs TO "app""user"',
     ),
   );
   assert.ok(

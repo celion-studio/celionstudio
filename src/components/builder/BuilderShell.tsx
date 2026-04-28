@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { ArrowLeft, Download, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { countCelionSlides, sanitizeEbookHtmlForCanvas } from "@/lib/ebook-html";
+import { clearBuilderSelectionFromDocument } from "./export-cleanup";
 
 const PREVIEW_WIDTH = 640;
 const PAGE_HEIGHT = 794;
@@ -35,6 +36,9 @@ function normalizeBuilderHtml(html: string) {
 export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
+  const iframeClickCleanupRef = useRef<(() => void) | null>(null);
+  const measureTimeoutRef = useRef<number | null>(null);
+  const measureFrameRef = useRef<number | null>(null);
   const [html, setHtml] = useState(() => normalizeBuilderHtml(initialHtml));
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideCount, setSlideCount] = useState(0);
@@ -47,6 +51,7 @@ export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
   const [saveError, setSaveError] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   // Count pages from html
   useEffect(() => {
@@ -70,7 +75,26 @@ export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
     setIframeHeight(Math.max(PAGE_HEIGHT, Math.ceil(measuredHeight), deterministicHeight));
   }, []);
 
+  const cleanupIframeEffects = useCallback(() => {
+    iframeClickCleanupRef.current?.();
+    iframeClickCleanupRef.current = null;
+
+    if (measureTimeoutRef.current !== null) {
+      window.clearTimeout(measureTimeoutRef.current);
+      measureTimeoutRef.current = null;
+    }
+
+    if (measureFrameRef.current !== null) {
+      window.cancelAnimationFrame(measureFrameRef.current);
+      measureFrameRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cleanupIframeEffects, [cleanupIframeEffects]);
+
   const handleIframeLoad = useCallback(() => {
+    cleanupIframeEffects();
+
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument) return;
 
@@ -149,10 +173,19 @@ export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
     };
 
     doc.addEventListener("click", handleClick);
+    iframeClickCleanupRef.current = () => {
+      doc.removeEventListener("click", handleClick);
+    };
 
-    requestAnimationFrame(measurePreview);
-    window.setTimeout(measurePreview, 250);
-  }, [measurePreview]);
+    measureFrameRef.current = window.requestAnimationFrame(() => {
+      measureFrameRef.current = null;
+      measurePreview();
+    });
+    measureTimeoutRef.current = window.setTimeout(() => {
+      measureTimeoutRef.current = null;
+      measurePreview();
+    }, 250);
+  }, [cleanupIframeEffects, measurePreview]);
 
   const scrollToPage = useCallback((index: number) => {
     setCurrentSlide(index);
@@ -236,33 +269,48 @@ export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
   const exportAs = async (format: "pdf" | "png" | "jpg") => {
     setExportOpen(false);
     setExporting(true);
+    setExportError("");
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf"),
-      ]);
-
       const iframe = iframeRef.current;
-      if (!iframe?.contentDocument) return;
-      const pages = iframe.contentDocument.querySelectorAll(".slide");
-
-      if (format === "pdf") {
-        const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a5" });
-        for (let i = 0; i < pages.length; i++) {
-          const canvas = await html2canvas(pages[i] as HTMLElement, { scale: 2, useCORS: true });
-          if (i > 0) pdf.addPage("a5", "portrait");
-          pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
-        }
-        pdf.save(`${projectTitle}.pdf`);
-      } else {
-        for (let i = 0; i < pages.length; i++) {
-          const canvas = await html2canvas(pages[i] as HTMLElement, { scale: 2, useCORS: true });
-          const link = document.createElement("a");
-          link.download = `${projectTitle}-page-${i + 1}.${format}`;
-          link.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
-          link.click();
-        }
+      const doc = iframe?.contentDocument;
+      if (!doc) {
+        throw new Error("Preview is not ready. Try again after it finishes loading.");
       }
+
+      const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
+      if (pages.length === 0) {
+        throw new Error("No pages were found to export.");
+      }
+
+      const restoreSelection = clearBuilderSelectionFromDocument(doc);
+      try {
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
+
+        if (format === "pdf") {
+          const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a5" });
+          for (let i = 0; i < pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
+            if (i > 0) pdf.addPage("a5", "portrait");
+            pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
+          }
+          pdf.save(`${projectTitle}.pdf`);
+        } else {
+          for (let i = 0; i < pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
+            const link = document.createElement("a");
+            link.download = `${projectTitle}-page-${i + 1}.${format}`;
+            link.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
+            link.click();
+          }
+        }
+      } finally {
+        restoreSelection();
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export ebook.");
     } finally {
       setExporting(false);
     }
@@ -280,6 +328,7 @@ export function BuilderShell({ projectId, projectTitle, initialHtml }: Props) {
         <span style={{ fontSize: "13.5px", fontWeight: 500, color: "#18181b", flex: 1 }}>{projectTitle}</span>
         {saving && <span style={{ fontSize: "12px", color: "#a1a1aa" }}>Saving...</span>}
         {saveError && <span style={{ fontSize: "12px", color: "#b45309" }}>{saveError}</span>}
+        {exportError && <span style={{ fontSize: "12px", color: "#b45309" }}>{exportError}</span>}
 
         {/* Export dropdown */}
         <div style={{ position: "relative" }}>
