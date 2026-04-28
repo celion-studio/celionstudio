@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { Trash2 } from "lucide-react";
 import type { ProjectRecord } from "@/types/project";
 
@@ -109,7 +110,7 @@ export function ProjectList({
           >
             <div className="flex sm:hidden" style={{ padding: "14px 16px", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
               <Link
-                href={`/editor/${project.id}`}
+                href={(isDocuments ? `/editor/${project.id}` : `/builder/${project.id}`) as Route}
                 style={{ flex: 1, minWidth: 0, textDecorationLine: "none" }}
               >
                 <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, fontFamily: "'Geist', sans-serif", color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -129,7 +130,7 @@ export function ProjectList({
 
             <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", alignItems: "center", padding: "14px 20px" }}>
               <Link
-                href={`/editor/${project.id}`}
+                href={(isDocuments ? `/editor/${project.id}` : `/builder/${project.id}`) as Route}
                 style={{ minWidth: 0, textDecorationLine: "none" }}
               >
                 <p style={{ margin: 0, fontSize: "13.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "340px" }}>

@@ -294,7 +294,11 @@ export function DashboardShell({
         isSignedIn={resolvedSignedIn}
         initialUserName={resolvedUserName}
         initialUserEmail={resolvedUserEmail}
-        primaryAction={{ href: "/new", label: copy.primaryActionLabel, onClick: openCreateChoices }}
+        primaryAction={{
+        href: "/new",
+        label: copy.primaryActionLabel,
+        onClick: surface === "documents" ? createBlankProject : openCreateChoices,
+      }}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -570,7 +574,7 @@ export function DashboardShell({
                 </p>
                 <button
                   type="button"
-                  onClick={openCreateChoices}
+                  onClick={surface === "documents" ? createBlankProject : openCreateChoices}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
