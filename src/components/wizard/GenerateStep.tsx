@@ -109,7 +109,7 @@ export function GenerateStep({
   return (
     <div
       style={{
-        border: "1px solid #ebe7dd",
+        border: "1px solid #e1e4e8",
         borderRadius: "8px",
         overflow: "hidden",
       }}
@@ -122,7 +122,7 @@ export function GenerateStep({
             alignItems: "center",
             gap: "12px",
             padding: "13px 18px",
-            borderBottom: index < rows.length - 1 ? "1px solid #f0ece3" : "none",
+            borderBottom: index < rows.length - 1 ? "1px solid #eef0f2" : "none",
             background: "#ffffff",
           }}
         >

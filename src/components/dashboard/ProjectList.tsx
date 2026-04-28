@@ -13,14 +13,25 @@ const statusLabel: Record<string, string> = {
   exported: "Print opened",
 };
 
-const statusColor: Record<string, { bg: string; text: string }> = {
-  draft: { bg: "#F0EEE9", text: "#71717A" },
-  processing_sources: { bg: "#EEF3FF", text: "#3461D1" },
-  generating: { bg: "#EEF3FF", text: "#3461D1" },
-  ready: { bg: "#ECFDF5", text: "#059669" },
-  revising: { bg: "#FFFBEB", text: "#D97706" },
-  exported: { bg: "#F0FDF4", text: "#16A34A" },
+const statusTone: Record<string, { dot: string }> = {
+  draft: { dot: "#b8b4aa" },
+  processing_sources: { dot: "#8f969f" },
+  generating: { dot: "#8f969f" },
+  ready: { dot: "#5f6670" },
+  revising: { dot: "#8f969f" },
+  exported: { dot: "#5f6670" },
 };
+
+function StatusBadge({ status }: { status: string }) {
+  const tone = statusTone[status] ?? statusTone.draft;
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 9px", borderRadius: "5px", fontSize: "11.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", background: "#f7f6f3", color: "#5f6670", border: "1px solid #e5e2dc" }}>
+      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: tone.dot, flexShrink: 0 }} />
+      {statusLabel[status] ?? status}
+    </span>
+  );
+}
 
 type ProjectListProps = {
   projects: ProjectRecord[];
@@ -46,7 +57,6 @@ export function ProjectList({
       </div>
 
       {projects.map((project, i) => {
-        const badge = statusColor[project.status] ?? statusColor.draft;
         const isLast = i === projects.length - 1;
         const isDeleting = deletingProjectId === project.id;
         const title = project.title || "Untitled Draft";
@@ -101,9 +111,7 @@ export function ProjectList({
                 </p>
               </Link>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: "5px", fontSize: "11.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", background: badge.bg, color: badge.text }}>
-                  {statusLabel[project.status] ?? project.status}
-                </span>
+                <StatusBadge status={project.status} />
                 {deleteButton}
               </div>
             </div>
@@ -127,9 +135,7 @@ export function ProjectList({
                 {project.profile.tone.slice(0, 18)}
               </span>
               <div>
-                <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 9px", borderRadius: "5px", fontSize: "11.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", background: badge.bg, color: badge.text }}>
-                  {statusLabel[project.status] ?? project.status}
-                </span>
+                <StatusBadge status={project.status} />
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 {deleteButton}

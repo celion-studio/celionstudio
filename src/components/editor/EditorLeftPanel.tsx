@@ -1,13 +1,10 @@
 "use client";
 
 import { FileText } from "lucide-react";
-import { getPageFormatSpec, type PageFormat, type PageSize } from "@/lib/page-format";
 import type { TiptapBookDocument } from "@/lib/tiptap-document";
 
 type EditorLeftPanelProps = {
   document: TiptapBookDocument;
-  pageFormat: PageFormat;
-  customPageSize: PageSize;
   visualPageCount?: number;
 };
 
@@ -15,24 +12,17 @@ const panelFont = "'Geist', sans-serif";
 
 export function EditorLeftPanel({
   document,
-  pageFormat,
-  customPageSize,
   visualPageCount,
 }: EditorLeftPanelProps) {
   const pageCount = Math.max(1, visualPageCount ?? document.pages.length);
   const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
-  const pageSpec = getPageFormatSpec(pageFormat, customPageSize);
-  const thumbnailWidth = 126;
-  const thumbnailHeight = Math.round((thumbnailWidth * pageSpec.heightMm) / pageSpec.widthMm);
-  const previewHeight = Math.max(150, Math.min(thumbnailHeight, 176));
 
   return (
     <aside
       style={{
         height: "100%",
-        borderRight: "1px solid #e4ded4",
-        background: "#f7f4ee",
-        padding: "20px 18px 24px",
+        background: "#f6f7f8",
+        padding: "22px 20px 24px",
         overflowY: "auto",
       }}
     >
@@ -61,7 +51,7 @@ export function EditorLeftPanel({
         </div>
         <span
           style={{
-            color: "#8d8579",
+            color: "#858b93",
             fontFamily: panelFont,
             fontSize: "11px",
             fontWeight: 560,
@@ -71,7 +61,7 @@ export function EditorLeftPanel({
         </span>
       </div>
 
-      <div style={{ display: "grid", gap: "18px" }}>
+      <div style={{ display: "grid", gap: "4px" }}>
         {pages.map((pageNumber, index) => {
           const isActive = index === 0;
           return (
@@ -81,8 +71,9 @@ export function EditorLeftPanel({
               style={{
                 width: "100%",
                 border: 0,
-                background: "transparent",
-                padding: 0,
+                borderRadius: "6px",
+                background: isActive ? "rgba(255, 255, 255, 0.72)" : "transparent",
+                padding: "9px 10px",
                 textAlign: "left",
                 cursor: "default",
               }}
@@ -90,81 +81,33 @@ export function EditorLeftPanel({
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 8px 12px",
-                  border: isActive ? "1px solid #b9ae9f" : "1px solid #e9e3da",
-                  borderRadius: "8px",
-                  background: isActive ? "#fffdf8" : "#f9f6f0",
-                  boxShadow: isActive ? "0 14px 30px rgba(39, 29, 18, 0.07)" : "none",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                  minHeight: "28px",
                 }}
               >
-                <div
+                <span
                   style={{
-                    position: "relative",
-                    width: `${thumbnailWidth}px`,
-                    height: `${previewHeight}px`,
-                    border: "1px solid #ded7cb",
-                    borderRadius: "3px",
-                    background: "#fffefa",
-                    boxShadow: "0 10px 22px rgba(40, 31, 22, 0.06)",
-                    padding: "18px 15px",
-                    boxSizing: "border-box",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "8px",
-                      left: "50%",
-                      transform: "translateX(-50%)",
-                      color: "#b8afa4",
-                      fontFamily: panelFont,
-                      fontSize: "8px",
-                      fontWeight: 650,
-                    }}
-                  >
-                    {pageNumber}
-                  </div>
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: "38px",
-                      left: "16px",
-                      right: "16px",
-                      display: "grid",
-                      gap: "8px",
-                    }}
-                  >
-                    {[74, 58, 84, 45, 67].map((width, lineIndex) => (
-                      <div
-                        key={`${pageNumber}-line-${lineIndex}`}
-                        style={{
-                          height: lineIndex === 0 ? "6px" : "4px",
-                          width: `${width}%`,
-                          borderRadius: "999px",
-                          background: lineIndex === 0 ? "#312c26" : "#ddd6cc",
-                          opacity: pageNumber === 1 ? 1 : 0.42,
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    color: isActive ? "#17130f" : "#8f877d",
+                    color: isActive ? "#17191d" : "#858b93",
                     fontFamily: panelFont,
-                    fontSize: "11px",
-                    fontWeight: 620,
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
+                    fontSize: "12px",
+                    fontWeight: isActive ? 620 : 520,
+                    letterSpacing: "0.02em",
                   }}
                 >
                   Page {pageNumber}
-                </div>
+                </span>
+                <span
+                  style={{
+                    color: isActive ? "#17191d" : "#b6bbc2",
+                    fontFamily: panelFont,
+                    fontSize: "11px",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {String(pageNumber).padStart(2, "0")}
+                </span>
               </div>
             </button>
           );

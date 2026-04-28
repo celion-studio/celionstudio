@@ -177,7 +177,7 @@ export function AuthModal({ onClose }: Props) {
               : "Start turning your knowledge into ebooks."}
           </p>
 
-          <div className="mt-6 flex rounded-full border border-black/[0.06] bg-[#FAF9F5] p-[3px]">
+          <div className="mt-6 flex rounded-full border border-black/[0.06] bg-[#f1f2f4] p-[3px]">
             {(["sign-up", "sign-in"] as const).map((value) => (
               <button
                 key={value}
@@ -198,7 +198,7 @@ export function AuthModal({ onClose }: Props) {
             type="button"
             onClick={handleGoogle}
             disabled={loading !== null}
-            className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-black/[0.08] bg-white py-[11px] text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#FAF9F5] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-black/[0.08] bg-white py-[11px] text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#f1f2f4] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <GoogleIcon />
             {loading === "google" ? "Redirecting..." : "Continue with Google"}
@@ -219,7 +219,7 @@ export function AuthModal({ onClose }: Props) {
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Full name"
                 autoComplete="name"
-                className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
+                className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
               />
             ) : null}
 
@@ -229,7 +229,7 @@ export function AuthModal({ onClose }: Props) {
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Email address"
               autoComplete="email"
-              className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
+              className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
             />
 
             <input
@@ -238,7 +238,7 @@ export function AuthModal({ onClose }: Props) {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
               autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-              className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#C4622D]/50 focus:bg-white focus:ring-2 focus:ring-[#C4622D]/10"
+              className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
             />
           </div>
 

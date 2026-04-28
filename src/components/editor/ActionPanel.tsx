@@ -30,7 +30,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
         fontWeight: 650,
         letterSpacing: "0.14em",
         textTransform: "uppercase",
-        color: "#9d9589",
+        color: "#8f969f",
       }}
     >
       {children}
@@ -46,7 +46,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
         fontFamily: panelFont,
         fontSize: "11px",
         fontWeight: 560,
-        color: "#6f675d",
+        color: "#5f6670",
       }}
     >
       {children}
@@ -58,15 +58,15 @@ const selectStyle: React.CSSProperties = {
   width: "100%",
   height: "34px",
   padding: "0 30px 0 10px",
-  border: "1px solid #e7e1d7",
+  border: "1px solid #e1e4e8",
   borderRadius: "6px",
-  background: "#fffdf9",
-  color: "#17130f",
+  background: "#ffffff",
+  color: "#17191d",
   fontFamily: panelFont,
   fontSize: "12.5px",
   outline: "none",
   appearance: "none",
-  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23746d63' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666d78' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: "no-repeat",
   backgroundPosition: "right 10px center",
 };
@@ -75,10 +75,10 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   height: "34px",
   padding: "0 10px",
-  border: "1px solid #e7e1d7",
+  border: "1px solid #e1e4e8",
   borderRadius: "6px",
-  background: "#fffdf9",
-  color: "#17130f",
+  background: "#ffffff",
+  color: "#17191d",
   fontFamily: panelFont,
   fontSize: "12.5px",
   outline: "none",
@@ -102,9 +102,9 @@ function AlignControl({
         gap: "1px",
         height: "34px",
         overflow: "hidden",
-        border: "1px solid #e7e1d7",
+        border: "1px solid #e1e4e8",
         borderRadius: "6px",
-        background: "#e7e1d7",
+        background: "#e1e4e8",
         opacity: disabled ? 0.44 : 1,
       }}
     >
@@ -122,8 +122,8 @@ function AlignControl({
               alignItems: "center",
               justifyContent: "center",
               border: 0,
-              background: active ? "#17130f" : "#fffdf9",
-              color: active ? "#f7f4ee" : "#6f675d",
+              background: active ? "#17191d" : "#ffffff",
+              color: active ? "#ffffff" : "#5f6670",
               cursor: disabled ? "not-allowed" : "pointer",
             }}
           >
@@ -148,7 +148,6 @@ function ChromeSection({
     <section
       style={{
         padding: "18px 0",
-        borderTop: "1px solid #ebe5da",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
@@ -170,8 +169,7 @@ export function ActionPanel({ layout, onLayoutChange }: ActionPanelProps) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        borderLeft: "1px solid #e4ded4",
-        background: "#fbfaf6",
+        background: "#f8f9fa",
         overflowY: "auto",
       }}
     >
@@ -199,7 +197,7 @@ export function ActionPanel({ layout, onLayoutChange }: ActionPanelProps) {
             fontFamily: panelFont,
             fontSize: "12.5px",
             lineHeight: 1.55,
-            color: "#746d63",
+            color: "#666d78",
           }}
         >
           Set the quiet furniture around the manuscript.
@@ -300,14 +298,13 @@ export function ActionPanel({ layout, onLayoutChange }: ActionPanelProps) {
         <ChromeSection title="Preview" icon={<Type size={15} strokeWidth={1.8} />}>
           <div
             style={{
-              border: "1px solid #e7e1d7",
               borderRadius: "6px",
-              background: "#fffdf9",
+              background: "rgba(255, 255, 255, 0.68)",
               padding: "14px 14px 12px",
             }}
           >
             <div style={{ display: "grid", gap: "8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#a69d91" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#9aa0a8" }}>
                 <Minus size={14} strokeWidth={1.8} />
                 <span style={{ fontFamily: panelFont, fontSize: "11px" }}>
                   {layout.headerType === "none"
@@ -317,8 +314,8 @@ export function ActionPanel({ layout, onLayoutChange }: ActionPanelProps) {
                       : layout.headerText || "Custom header"}
                 </span>
               </div>
-              <div style={{ height: "68px", borderLeft: "1px solid #eee8df", marginLeft: "6px" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#a69d91" }}>
+              <div style={{ height: "68px", marginLeft: "6px" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#9aa0a8" }}>
                 <Minus size={14} strokeWidth={1.8} />
                 <span style={{ fontFamily: panelFont, fontSize: "11px" }}>
                   {layout.footerType === "none"

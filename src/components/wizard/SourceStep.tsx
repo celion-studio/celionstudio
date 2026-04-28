@@ -47,15 +47,15 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
           onMouseEnter={(e) => {
             const el = e.currentTarget as HTMLLabelElement;
             el.style.borderColor = "#1a1714";
-            el.style.background = "#fffaf2";
+            el.style.background = "#f7f8fa";
           }}
           onMouseLeave={(e) => {
             const el = e.currentTarget as HTMLLabelElement;
-            el.style.borderColor = "#dbd7cf";
-            el.style.background = "#fdfcf8";
+            el.style.borderColor = "#dfe3e7";
+            el.style.background = "#ffffff";
           }}
         >
-          <UploadCloud size={24} style={{ color: "#a59d91" }} strokeWidth={1.7} />
+          <UploadCloud size={24} style={{ color: "#8f969f" }} strokeWidth={1.7} />
           <span
             style={{
               fontSize: "14px",
@@ -70,7 +70,7 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
             style={{
               fontSize: "12.5px",
               fontFamily: "'Geist', sans-serif",
-              color: "#9b948a",
+              color: "#858b93",
             }}
           >
             or drag and drop files here
@@ -79,7 +79,7 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
             style={{
               fontSize: "11.5px",
               fontFamily: "'Geist', sans-serif",
-              color: "#b8b4aa",
+              color: "#b6bbc2",
             }}
           >
             PDF/DOCX extraction needs the next file-ingestion slice
@@ -107,13 +107,13 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "5px",
-                border: "1px solid #ebe7dd",
+                border: "1px solid #e1e4e8",
                 borderRadius: "4px",
                 background: "#fff",
                 padding: "5px 8px",
                 fontSize: "11.5px",
                 fontFamily: "'Geist', sans-serif",
-                color: "#8a867e",
+                color: "#858b93",
                 cursor: "pointer",
               }}
             >
@@ -130,15 +130,15 @@ export function SourceStep({ fileNames, onFilesChange }: SourceStepProps) {
                   alignItems: "center",
                   gap: "10px",
                   padding: "10px 14px",
-                  border: "1px solid #ebe7dd",
+                  border: "1px solid #e1e4e8",
                   borderRadius: "6px",
                   background: "#ffffff",
                   fontSize: "13px",
-                  color: "#4a443d",
+                  color: "#4b515a",
                   fontFamily: "'Geist', sans-serif",
                 }}
               >
-                <FileText size={14} style={{ color: "#8a867e", flexShrink: 0 }} />
+                <FileText size={14} style={{ color: "#858b93", flexShrink: 0 }} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {name}
                 </span>

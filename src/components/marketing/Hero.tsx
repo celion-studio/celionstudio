@@ -290,7 +290,7 @@ export function Hero({
         <div className="container">
           <div className="footer-grid fade-up">
             <div className="footer-brand">
-              <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f7f4ee', fontFamily: 'Geist', fontSize: '14px', fontWeight: 500 }}>
+              <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f6f7f8', fontFamily: 'Geist', fontSize: '14px', fontWeight: 500 }}>
                 <svg className="brand-spark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32"/>
                 </svg>

@@ -140,9 +140,9 @@ export function BasicsStep({
                 onClick={() => onToneChange(option.value)}
                 style={{
                   minHeight: "76px",
-                  border: active ? "1px solid #1a1714" : "1px solid #ebe7dd",
+                  border: active ? "1px solid #17191d" : "1px solid #e1e4e8",
                   borderRadius: "7px",
-                  background: active ? "#fffdf8" : "#ffffff",
+                  background: active ? "#f7f8fa" : "#ffffff",
                   boxShadow: active ? "0 0 0 2px rgba(26,23,20,0.05)" : "none",
                   padding: "12px 14px",
                   textAlign: "left",

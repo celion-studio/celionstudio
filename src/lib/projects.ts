@@ -351,25 +351,27 @@ export async function updateProjectDocument(userId: string, projectId: string, d
   await ensureAppSchema();
 
   const sql = getSql();
-  const current = await getProjectRecordForUser(userId, projectId);
-  if (!current) return null;
-
-  const nextProject = withSavedProjectDocument(current, document);
-  const updatedAt = new Date(nextProject.updatedAt);
-  await sql.transaction([
+  const normalizedDocument = normalizeTiptapBookDocument(document);
+  const updatedAt = new Date();
+  const [profileRows, projectRows] = await sql.transaction([
     sql`
       UPDATE project_profiles
-      SET document = ${JSON.stringify(nextProject.profile.document)}::jsonb, updated_at = ${updatedAt}
+      SET document = ${JSON.stringify(normalizedDocument)}::jsonb, updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
         AND EXISTS (SELECT 1 FROM projects WHERE id::text = ${projectId} AND user_id = ${userId})
+      RETURNING project_id::text AS id
     `,
     sql`
       UPDATE projects
-      SET title = ${nextProject.title}, status = ${nextProject.status}, updated_at = ${updatedAt}
+      SET status = 'ready', updated_at = ${updatedAt}
       WHERE id::text = ${projectId} AND user_id = ${userId}
+      RETURNING id::text AS id
     `,
-  ]);
-  return getProjectRecordForUser(userId, projectId);
+  ]) as [{ id: string }[], { id: string }[]];
+
+  if (profileRows.length === 0 || projectRows.length === 0) return null;
+
+  return { updatedAt: updatedAt.toISOString() };
 }
 
 export async function deleteProjectForUser(userId: string, projectId: string) {

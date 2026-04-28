@@ -40,9 +40,9 @@ export function FormatStep({
                 onClick={() => onPageFormatChange(format.id, customSize)}
                 style={{
                   minHeight: "92px",
-                  border: active ? "1px solid #1a1714" : "1px solid #ebe7dd",
+                  border: active ? "1px solid #17191d" : "1px solid #e1e4e8",
                   borderRadius: "7px",
-                  background: active ? "#fffdf8" : "#ffffff",
+                  background: active ? "#f7f8fa" : "#ffffff",
                   boxShadow: active ? "0 0 0 2px rgba(26,23,20,0.05)" : "none",
                   padding: "13px 14px",
                   textAlign: "left",
@@ -59,7 +59,7 @@ export function FormatStep({
                   }}
                 >
                   <strong style={{ fontSize: "13px", color: "#1a1714" }}>{format.label}</strong>
-                  <span style={{ fontSize: "11px", color: "#a59d91" }}>
+                  <span style={{ fontSize: "11px", color: "#8f969f" }}>
                     {format.widthMm} x {format.heightMm}
                   </span>
                 </span>
@@ -95,10 +95,10 @@ export function FormatStep({
                 onClick={() => onPageFormatChange(format.id, customSize)}
                 style={{
                   height: "38px",
-                  border: active ? "1px solid #1a1714" : "1px solid #ebe7dd",
+              border: active ? "1px solid #17191d" : "1px solid #e1e4e8",
                   borderRadius: "5px",
-                  background: active ? "#1a1714" : "#ffffff",
-                  color: active ? "#fffdf8" : "#4a443d",
+              background: active ? "#17191d" : "#ffffff",
+              color: active ? "#ffffff" : "#4b515a",
                   fontSize: "12px",
                   fontWeight: 650,
                   fontFamily: "'Geist', sans-serif",
@@ -114,7 +114,7 @@ export function FormatStep({
 
       <div
         style={{
-          border: selected.id === "custom" ? "1px solid #1a1714" : "1px solid #ebe7dd",
+          border: selected.id === "custom" ? "1px solid #17191d" : "1px solid #e1e4e8",
           borderRadius: "7px",
           background: "#ffffff",
           padding: "14px",
@@ -128,10 +128,10 @@ export function FormatStep({
             type="button"
             onClick={() => onPageFormatChange("custom", customSize)}
             style={{
-              border: "1px solid #e2ded5",
+              border: "1px solid #e1e4e8",
               borderRadius: "4px",
-              background: selected.id === "custom" ? "#1a1714" : "#fffdf8",
-              color: selected.id === "custom" ? "#fffdf8" : "#1a1714",
+              background: selected.id === "custom" ? "#17191d" : "#ffffff",
+              color: selected.id === "custom" ? "#ffffff" : "#17191d",
               padding: "5px 9px",
               fontSize: "11.5px",
               fontWeight: 650,
@@ -143,7 +143,7 @@ export function FormatStep({
           </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="grid gap-1 text-[12px] text-[#8a867e]">
+          <label className="grid gap-1 text-[12px] text-[#858b93]">
             Width (mm)
             <input
               type="number"
@@ -159,10 +159,10 @@ export function FormatStep({
                   }),
                 )
               }
-              className="h-9 rounded-[5px] border border-[#ebe7dd] bg-[#fdfcf8] px-3 text-[13px] text-[#1a1714] outline-none focus:border-[#1a1714]"
+              className="h-9 rounded-[5px] border border-[#e1e4e8] bg-[#ffffff] px-3 text-[13px] text-[#17191d] outline-none focus:border-[#17191d]"
             />
           </label>
-          <label className="grid gap-1 text-[12px] text-[#8a867e]">
+          <label className="grid gap-1 text-[12px] text-[#858b93]">
             Height (mm)
             <input
               type="number"
@@ -178,7 +178,7 @@ export function FormatStep({
                   }),
                 )
               }
-              className="h-9 rounded-[5px] border border-[#ebe7dd] bg-[#fdfcf8] px-3 text-[13px] text-[#1a1714] outline-none focus:border-[#1a1714]"
+              className="h-9 rounded-[5px] border border-[#e1e4e8] bg-[#ffffff] px-3 text-[13px] text-[#17191d] outline-none focus:border-[#17191d]"
             />
           </label>
         </div>

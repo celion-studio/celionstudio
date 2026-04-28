@@ -1,10 +1,10 @@
 :root {
-      --bg: #f7f4ee;
-      --bg-soft: #eee9e1;
+      --bg: #f6f7f8;
+      --bg-soft: #eceef1;
       --surface: #ffffff;
       --ink: #11110f;
-      --ink-soft: #4d4943;
-      --ink-muted: #8c877e;
+      --ink-soft: #4b515a;
+      --ink-muted: #858b93;
       --line: rgba(17, 17, 15, 0.1);
       --line-soft: rgba(17, 17, 15, 0.05);
       --radius-xs: 4px;
@@ -94,7 +94,7 @@
       padding: 8px 8px 8px 20px;
       background: #151412;
       border-radius: var(--radius-sm); /* Reduced rounding here */
-      color: #f7f4ee;
+      color: #f6f7f8;
       box-shadow: 0 12px 30px rgba(0,0,0,0.1);
     }
     .brand {
@@ -114,12 +114,12 @@
     .nav-link {
       font-family: "Inter", sans-serif;
       font-size: 13px;
-      color: rgba(247, 244, 238, 0.7);
+      color: rgba(246, 247, 248, 0.72);
       transition: color 0.2s ease;
     }
-    .nav-link:hover { color: #f7f4ee; }
+    .nav-link:hover { color: #f6f7f8; }
     .nav-actions .btn-light {
-      background: #f7f4ee;
+      background: #f6f7f8;
       color: #151412;
       border: none;
       border-radius: 6px;
@@ -257,7 +257,7 @@
     }
     /* Ebook 3 */
     .cover-3 {
-      background: #eb5e28;
+      background: #767d86;
       color: #fff;
     }
     /* Ebook 4 */
@@ -548,7 +548,7 @@
       margin-top: 0;
       border-top: 0;
       background: #151412;
-      color: #f7f4ee;
+      color: #f6f7f8;
       padding: 60px 0 46px;
     }
 
@@ -584,7 +584,7 @@
     }
 
     .footer-col a:hover {
-      color: #f7f4ee;
+      color: #f6f7f8;
     }
 
     .footer-bottom {
@@ -654,7 +654,7 @@
       display: block !important;
       width: 100%;
       aspect-ratio: 4/5;
-      background: #eee9e1;
+      background: #eceef1;
       border-radius: 2px;
       position: relative;
       overflow: hidden;
@@ -750,4 +750,164 @@
     .fade-up.in-view {
       opacity: 1;
       transform: translateY(0);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SELECTION BUBBLE MENU
+       ═══════════════════════════════════════════════════════════════ */
+
+    .celion-selection-menu {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 5px 6px;
+      background: #1a1916;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.14);
+    }
+
+    .celion-selection-menu .celion-toolbar-btn {
+      width: 30px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.65);
+      cursor: pointer;
+      transition: background 0.12s ease, color 0.12s ease;
+      flex-shrink: 0;
+    }
+
+    .celion-selection-menu .celion-toolbar-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+
+    .celion-selection-menu .celion-toolbar-btn[data-active="true"] {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+    }
+
+    .celion-selection-menu .celion-toolbar-btn[data-label="Revise with AI"]:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+    }
+
+    .celion-selection-menu .celion-toolbar-divider {
+      width: 1px;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.12);
+      margin: 0 3px;
+    }
+
+    .celion-selection-menu-ai {
+      display: block;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       AI REVISION CARD
+       ═══════════════════════════════════════════════════════════════ */
+
+    .celion-ai-card {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: min(340px, calc(100vw - 32px));
+      padding: 0;
+      background: #ffffff;
+      border: 1px solid rgba(17, 17, 15, 0.12);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 10px 24px rgba(17, 17, 15, 0.1);
+      animation: celion-ai-card-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes celion-ai-card-in {
+      from { opacity: 0; transform: translateY(6px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .celion-ai-card-input {
+      width: 100%;
+      height: 38px;
+      font-family: "Geist", sans-serif;
+      font-size: 14px;
+      line-height: 38px;
+      padding: 0 44px 0 15px;
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: #11110f;
+      outline: none;
+    }
+
+    .celion-ai-card-input::placeholder {
+      color: #858b93;
+    }
+
+    .celion-ai-card-input:focus {
+      box-shadow: none;
+    }
+
+    .celion-ai-card-input:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      background: transparent;
+    }
+
+    .celion-ai-card:focus-within {
+      border-color: rgba(17, 17, 15, 0.26);
+      box-shadow: 0 0 0 3px rgba(17, 17, 15, 0.06), 0 10px 24px rgba(17, 17, 15, 0.1);
+    }
+
+    .celion-ai-card-error {
+      margin: 0;
+      padding: 9px 12px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: #a62e2e;
+      background: rgba(166, 46, 46, 0.07);
+      border-radius: var(--radius-xs);
+      border-left: 2px solid #a62e2e;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+    }
+
+    .celion-ai-card-send {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: var(--radius-xs);
+      background: #11110f;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .celion-ai-card-send:hover:not(:disabled) {
+      background: #000000;
+      transform: translateY(-1px);
+    }
+
+    .celion-ai-card-send:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
     }

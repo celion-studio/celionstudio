@@ -103,13 +103,13 @@ export async function PATCH(
         { status: 400 },
       );
     }
-    const project = await updateProjectDocument(
+    const saved = await updateProjectDocument(
       session.user.id,
       projectId,
       validation.document,
     );
-    if (!project) return NextResponse.json({ message: "Not found" }, { status: 404 });
-    return NextResponse.json({ project });
+    if (!saved) return NextResponse.json({ message: "Not found" }, { status: 404 });
+    return NextResponse.json({ ok: true, updatedAt: saved.updatedAt });
   }
 
   if (parsed.data.action === "save-page-format") {

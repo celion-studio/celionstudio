@@ -3,20 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #faf9f5;
+  --color-bg: #f6f7f8;
   --color-surface: #ffffff;
-  --color-surface-subtle: #f4f2ec;
-  --color-paper: #f2ede6;
-  --color-muted: #8a867e;
-  --color-muted-soft: #b8b4aa;
+  --color-surface-subtle: #f1f2f4;
+  --color-paper: #f4f5f6;
+  --color-muted: #858b93;
+  --color-muted-soft: #b6bbc2;
   --color-text: #1f1f1f;
-  --color-ink: #2b2723;
-  --color-ink-soft: #4a443d;
-  --color-accent: #c4622d;
-  --color-accent-deep: #9a4a1f;
-  --color-accent-soft: #fbf0e8;
-  --color-line: #ebe7dd;
-  --color-line-soft: #f0ece3;
+  --color-ink: #24272c;
+  --color-ink-soft: #4b515a;
+  --color-accent: #34373d;
+  --color-accent-deep: #17191d;
+  --color-accent-soft: #eef0f3;
+  --color-line: #e3e5e8;
+  --color-line-soft: #eef0f2;
 }
 
 * {
@@ -53,7 +53,7 @@ textarea {
 }
 
 ::selection {
-  background: rgba(196, 98, 45, 0.2);
+  background: rgba(36, 39, 44, 0.14);
   color: var(--color-ink);
 }
 
@@ -119,11 +119,11 @@ textarea {
   animation: glow 3.2s ease-in-out infinite;
 }
 
-/* Soft radial warmth overlay */
+/* Soft radial neutral overlay */
 .warm-glow {
   background: radial-gradient(
     ellipse 60% 40% at 50% 0%,
-    rgba(196, 98, 45, 0.06) 0%,
+    rgba(36, 39, 44, 0.05) 0%,
     transparent 60%
   );
 }

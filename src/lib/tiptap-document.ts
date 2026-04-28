@@ -360,10 +360,10 @@ export function tiptapDocumentToHtml(input: {
     <style>
       @page { size: ${pageCssSize}; margin: 18mm 16mm; }
       * { box-sizing: border-box; }
-      html { background: #f7f4ee; }
-      body { margin: 0; background: #f7f4ee; color: #17130f; font-family: Georgia, 'Times New Roman', serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html { background: #f6f7f8; }
+      body { margin: 0; background: #f6f7f8; color: #17191d; font-family: Georgia, 'Times New Roman', serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       main { max-width: ${Math.max(pageSpec.previewWidth, 720)}px; margin: 0 auto; padding: 32px 24px; }
-      .page { width: ${pageSpec.widthMm}mm; min-height: ${pageSpec.heightMm}mm; max-width: 100%; margin: 0 auto 28px; padding: 18mm 16mm; background: #ffffff; box-shadow: 0 18px 50px rgba(31, 22, 14, 0.12); break-after: page; display: flex; flex-direction: column; gap: 10mm; }
+      .page { width: ${pageSpec.widthMm}mm; min-height: ${pageSpec.heightMm}mm; max-width: 100%; margin: 0 auto 28px; padding: 18mm 16mm; background: #ffffff; box-shadow: 0 18px 50px rgba(24, 27, 31, 0.1); break-after: page; display: flex; flex-direction: column; gap: 10mm; }
       .page:last-child { break-after: auto; }
       .page-body { flex: 1; }
       @media print {
@@ -374,7 +374,7 @@ export function tiptapDocumentToHtml(input: {
         h1, h2, h3, h4, h5, h6, figure, table, blockquote { break-inside: avoid; }
         p, li { orphans: 3; widows: 3; }
       }
-      h1, h2, h3, h4, h5, h6 { font-family: system-ui, sans-serif; letter-spacing: -0.02em; line-height: 1.12; color: #17130f; }
+      h1, h2, h3, h4, h5, h6 { font-family: system-ui, sans-serif; letter-spacing: -0.02em; line-height: 1.12; color: #17191d; }
       h1 { font-size: 32px; margin: 0 0 22px; }
       h2 { font-size: 24px; margin: 30px 0 14px; }
       h3, h4, h5, h6 { margin: 24px 0 12px; }
@@ -382,10 +382,10 @@ export function tiptapDocumentToHtml(input: {
       p { margin: 0 0 13px; }
       ul, ol { padding-left: 1.35em; margin: 12px 0 16px; }
       li + li { margin-top: 6px; }
-      blockquote { border-left: 3px solid #c6a36b; margin-left: 0; padding-left: 18px; color: #5f5347; }
-      pre { margin: 18px 0; padding: 14px 16px; overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid #e8dfd1; border-radius: 6px; background: #faf7f1; color: #2f2a24; font-size: 13px; line-height: 1.55; }
+      blockquote { border-left: 3px solid #c5cad1; margin-left: 0; padding-left: 18px; color: #4b515a; }
+      pre { margin: 18px 0; padding: 14px 16px; overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid #e1e4e8; border-radius: 6px; background: #f6f7f8; color: #24272c; font-size: 13px; line-height: 1.55; }
       code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
-      hr { border: 0; border-top: 1px solid #e4dbcd; margin: 32px 0; }
+      hr { border: 0; border-top: 1px solid #e1e4e8; margin: 32px 0; }
       figure { margin: 24px 0; }
       figure[data-align='left'] { text-align: left; }
       figure[data-align='center'] { text-align: center; }

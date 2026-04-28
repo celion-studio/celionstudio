@@ -13,6 +13,7 @@ type DocumentEditorPanelProps = {
   onChange(document: TiptapBookDocument): void;
   onPageCountChange?(pageCount: number): void;
   onLayoutChange?(layout: TiptapBookLayout): void;
+  onSelectionAiRevise?(input: { selectedText: string; instruction: string }): Promise<string>;
   onImageUploadStateChange?(uploading: boolean): void;
 };
 

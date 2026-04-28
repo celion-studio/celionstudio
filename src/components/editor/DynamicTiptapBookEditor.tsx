@@ -12,8 +12,8 @@ export const DynamicTiptapBookEditor = dynamic(
           display: "grid",
           placeItems: "center",
           height: "100%",
-          background: "#faf9f5",
-          color: "#8a867e",
+          background: "#f6f7f8",
+          color: "#858b93",
           fontSize: "13px",
           fontFamily: "'Geist', sans-serif",
         }}

@@ -59,7 +59,7 @@ export function AuthButtons() {
             Sign in before your work moves to the cloud
           </h2>
         </div>
-        <div className="flex rounded-full border border-black/[0.08] bg-[#FAF9F5] p-1">
+        <div className="flex rounded-full border border-black/[0.08] bg-[#f1f2f4] p-1">
           <button
             type="button"
             onClick={() => setMode("sign-up")}
@@ -91,7 +91,7 @@ export function AuthButtons() {
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="Your name"
-              className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
+              className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
             />
           </label>
         ) : null}
@@ -105,7 +105,7 @@ export function AuthButtons() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="you@example.com"
-            className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
+            className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
           />
         </label>
 
@@ -118,7 +118,7 @@ export function AuthButtons() {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="At least 8 characters"
-            className="w-full rounded-2xl border border-black/[0.08] bg-[#FAF9F5] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
+            className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-3 text-sm text-[#1F1F1F] outline-none"
           />
         </label>
       </div>
@@ -169,7 +169,7 @@ export function AuthButtons() {
       </p>
 
       {message ? (
-        <p className="mt-4 rounded-2xl bg-[#F4F2EC] px-4 py-3 text-sm leading-6 text-[#1F1F1F]">
+        <p className="mt-4 rounded-2xl bg-[#eef0f3] px-4 py-3 text-sm leading-6 text-[#1F1F1F]">
           {message}
         </p>
       ) : null}

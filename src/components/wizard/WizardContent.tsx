@@ -247,7 +247,7 @@ export function WizardContent({
                 height: "2px",
                 flex: 1,
                 borderRadius: "2px",
-                background: step > index ? "#1a1714" : "#ebe7dd",
+                background: step > index ? "#17191d" : "#e1e4e8",
                 transition: "background 0.3s ease",
               }}
             />
@@ -255,7 +255,7 @@ export function WizardContent({
         </div>
       </section>
 
-      <section style={{ borderRadius: "10px", border: "1px solid #ebe7dd", background: "linear-gradient(180deg, #ffffff 0%, #fefcf9 100%)", boxShadow: "0 4px 32px rgba(31,22,14,0.06), 0 1px 2px rgba(0,0,0,0.03)", overflow: "hidden" }}>
+      <section style={{ borderRadius: "10px", border: "1px solid #e1e4e8", background: "linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%)", boxShadow: "0 4px 32px rgba(24,27,31,0.05), 0 1px 2px rgba(0,0,0,0.03)", overflow: "hidden" }}>
         <div key={step} className="step-in px-6 pt-7 pb-2 md:px-8 md:pt-8">
           {step === 1 && (
             <BasicsStep
@@ -295,10 +295,10 @@ export function WizardContent({
           )}
         </div>
 
-        <div style={{ margin: "28px 0 0", padding: "20px 32px 24px", borderTop: "1px solid #f0ece3", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+        <div style={{ margin: "28px 0 0", padding: "20px 32px 24px", borderTop: "1px solid #eef0f2", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
           <div>
             {error ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#7a3b1a", fontFamily: "'Geist', sans-serif", background: "rgba(180,80,30,0.07)", border: "1px solid rgba(180,80,30,0.18)", borderRadius: "6px", padding: "5px 10px" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#5f6670", fontFamily: "'Geist', sans-serif", background: "#f7f6f3", border: "1px solid #e5e2dc", borderRadius: "6px", padding: "5px 10px" }}>
                 {error}
               </span>
             ) : null}
@@ -310,7 +310,7 @@ export function WizardContent({
                 type="button"
                 disabled={busy}
                 onClick={handlePrevious}
-                className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#e8e4dd] bg-white px-4 py-2.5 text-[13px] font-medium text-[#4a443d] transition-all duration-150 hover:border-[#c8c4bb] hover:text-[#1a1714] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#e1e4e8] bg-white px-4 py-2.5 text-[13px] font-medium text-[#4b515a] transition-all duration-150 hover:border-[#c5cad1] hover:text-[#17191d] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ fontFamily: "'Geist', sans-serif" }}
               >
                 <ArrowLeft size={12} />

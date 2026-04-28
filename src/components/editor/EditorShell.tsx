@@ -25,7 +25,8 @@ import type { ProjectRecord } from "@/types/project";
 
 type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
 
-const AUTO_SAVE_DELAY_MS = 1200;
+const AUTO_SAVE_DELAY_MS = 2500;
+const AUTO_SAVE_MAX_WAIT_MS = 15000;
 
 function cloneBookDocument(document: unknown) {
   return JSON.parse(
@@ -54,12 +55,14 @@ export function EditorShell({ projectId }: { projectId: string }) {
   const savedDocumentSignatureRef = useRef(normalizedDocumentSignature(cloneBookDocument([])));
   const activeSavePromiseRef = useRef<Promise<void> | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveFirstDirtyAtRef = useRef<number | null>(null);
   const [saveStatus, setSaveStatusState] = useState<SaveStatus>("idle");
   const saveStatusRef = useRef<SaveStatus>("idle");
   const [feedback, setFeedback] = useState("");
   const [visualPageCount, setVisualPageCount] = useState<number | undefined>();
   const [imageUploadPending, setImageUploadPending] = useState(false);
   const imageUploadPendingRef = useRef(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const [editorLayout, setEditorLayout] = useState<TiptapBookLayout>({
     headerType: "none",
     headerText: "",
@@ -110,23 +113,13 @@ export function EditorShell({ projectId }: { projectId: string }) {
     return normalizeTiptapBookDocument(sourceDocument ?? []);
   }, [project?.profile.document]);
 
-  const exportHtml = useMemo(() => {
-    if (!project) return "";
-
-    return tiptapDocumentToHtml({
-      title: project.title,
-      document: bookDocument,
-      pageFormat: project.profile.pageFormat,
-      customPageSize: project.profile.customPageSize,
-    });
-  }, [bookDocument, project]);
-  const hasDraft = bookDocument.pages.some((page) => docNodeCount(page.doc) > 0);
   useEffect(() => {
     setVisualPageCount(undefined);
   }, [projectId, pageFormat, customPageSize.widthMm, customPageSize.heightMm]);
 
   useEffect(() => {
     latestDocumentRef.current = bookDocument;
+    setHasDraft(bookDocument.pages.some((page) => docNodeCount(page.doc) > 0));
   }, [bookDocument]);
 
   useEffect(() => {
@@ -180,18 +173,26 @@ export function EditorShell({ projectId }: { projectId: string }) {
     clearAutoSaveTimer();
     if (imageUploadPendingRef.current || saveStatusRef.current === "saving") return;
 
+    const now = Date.now();
+    if (autoSaveFirstDirtyAtRef.current === null) {
+      autoSaveFirstDirtyAtRef.current = now;
+    }
+    const elapsed = now - autoSaveFirstDirtyAtRef.current;
+    const delay = Math.max(0, Math.min(AUTO_SAVE_DELAY_MS, AUTO_SAVE_MAX_WAIT_MS - elapsed));
+
     autoSaveTimerRef.current = window.setTimeout(() => {
       autoSaveTimerRef.current = null;
       requestSaveDocument({ silent: true }).catch((error) => {
         setFeedback(error instanceof Error ? error.message : "Auto-save failed.");
       });
-    }, AUTO_SAVE_DELAY_MS);
+    }, delay);
   }
 
   function markDocumentSavedFromProject(nextProject: ProjectRecord) {
     const nextDocument = normalizeTiptapBookDocument(nextProject.profile.document ?? []);
     latestDocumentRef.current = nextDocument;
     savedDocumentSignatureRef.current = normalizedDocumentSignature(nextDocument);
+    autoSaveFirstDirtyAtRef.current = null;
   }
 
   function confirmNavigationWithUnsavedChanges(event: MouseEvent<HTMLAnchorElement>) {
@@ -227,11 +228,13 @@ export function EditorShell({ projectId }: { projectId: string }) {
     setFeedback(successMessage);
   }
 
-  function setProjectDocument(nextDocument: TiptapBookDocument) {
+  function setProjectDocument(nextDocument: TiptapBookDocument, updatedAt?: string) {
     setProject((current) =>
       current
         ? {
             ...current,
+            status: "ready",
+            updatedAt: updatedAt ?? current.updatedAt,
             profile: {
               ...current.profile,
               document: nextDocument,
@@ -242,8 +245,8 @@ export function EditorShell({ projectId }: { projectId: string }) {
   }
 
   function updateLocalDocument(nextDocument: TiptapBookDocument) {
-    setProjectDocument(nextDocument);
     latestDocumentRef.current = nextDocument;
+    setHasDraft(nextDocument.pages.some((page) => docNodeCount(page.doc) > 0));
     setLocalDocumentEdits(true);
     setSaveStatus("dirty");
     if (saveStatusRef.current === "error") setFeedback("");
@@ -270,6 +273,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
       if (signatureToSave === savedDocumentSignatureRef.current) {
         setLocalDocumentEdits(false);
         setSaveStatus("saved");
+        autoSaveFirstDirtyAtRef.current = null;
         if (!silent) setFeedback("All edits saved.");
         return;
       }
@@ -284,23 +288,25 @@ export function EditorShell({ projectId }: { projectId: string }) {
           body: JSON.stringify(saveDocumentPayload(documentToSave)),
         });
         const payload = (await res.json().catch(() => null)) as {
-          project?: ProjectRecord;
+          ok?: boolean;
+          updatedAt?: string;
           message?: string;
           note?: string;
         } | null;
 
-        if (!res.ok || !payload?.project) {
+        if (!res.ok || !payload?.ok || !payload.updatedAt) {
           throw new Error(apiErrorMessage(payload, "Could not save document edits."));
         }
 
         savedDocumentSignatureRef.current = signatureToSave;
         if (normalizedDocumentSignature(latestDocumentRef.current) === signatureToSave) {
-          latestDocumentRef.current = normalizeTiptapBookDocument(payload.project.profile.document ?? []);
-          setProject(payload.project);
+          setProjectDocument(documentToSave, payload.updatedAt);
           setLocalDocumentEdits(false);
           setSaveStatus("saved");
+          autoSaveFirstDirtyAtRef.current = null;
           if (!silent) setFeedback("Document edits saved.");
         } else {
+          autoSaveFirstDirtyAtRef.current = Date.now();
           setLocalDocumentEdits(true);
           setSaveStatus("dirty");
           if (!silent) setFeedback("Saved earlier edits. Saving the latest edits now...");
@@ -381,13 +387,20 @@ export function EditorShell({ projectId }: { projectId: string }) {
       }
     }
 
+    if (!project) return;
+
     const popup = window.open("", "_blank", "noopener,noreferrer");
     if (!popup) {
       setFeedback("Print window was blocked.");
       return;
     }
     popup.document.open();
-    popup.document.write(exportHtml);
+    popup.document.write(tiptapDocumentToHtml({
+      title: project.title,
+      document: latestDocumentRef.current,
+      pageFormat: project.profile.pageFormat,
+      customPageSize: project.profile.customPageSize,
+    }));
     popup.document.close();
     popup.focus();
     popup.print();
@@ -408,8 +421,8 @@ export function EditorShell({ projectId }: { projectId: string }) {
 
   if (loading) {
     return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#faf9f5" }}>
-        <p style={{ margin: 0, fontSize: "13px", color: "#b8b4aa", fontFamily: "'Geist', sans-serif" }}>
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f6f7f8" }}>
+        <p style={{ margin: 0, fontSize: "13px", color: "#b6bbc2", fontFamily: "'Geist', sans-serif" }}>
           Loading...
         </p>
       </main>
@@ -418,15 +431,15 @@ export function EditorShell({ projectId }: { projectId: string }) {
 
   if (!project) {
     return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#faf9f5", padding: "24px" }}>
-        <div style={{ maxWidth: "440px", textAlign: "center", background: "#fff", border: "1px solid #ebe7dd", borderRadius: "6px", padding: "40px 32px" }}>
-          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#b8b4aa", fontFamily: "'Geist', sans-serif" }}>
+      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f6f7f8", padding: "24px" }}>
+        <div style={{ maxWidth: "440px", textAlign: "center", background: "#fff", border: "1px solid #e1e4e8", borderRadius: "6px", padding: "40px 32px" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#b6bbc2", fontFamily: "'Geist', sans-serif" }}>
             Not found
           </p>
           <h1 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: 600, color: "#1a1714", fontFamily: "'Geist', sans-serif", letterSpacing: "-0.02em" }}>
             Draft unavailable
           </h1>
-          <p style={{ margin: "0 0 20px", fontSize: "13.5px", lineHeight: 1.6, color: "#8a867e", fontFamily: "'Geist', sans-serif" }}>
+          <p style={{ margin: "0 0 20px", fontSize: "13.5px", lineHeight: 1.6, color: "#858b93", fontFamily: "'Geist', sans-serif" }}>
             {feedback || "Sign in and try again from your dashboard."}
           </p>
           <Link
@@ -443,7 +456,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
   }
 
   return (
-    <main style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: "100vh", overflow: "hidden", background: "#faf9f5" }}>
+    <main style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: "100vh", overflow: "hidden", background: "#f6f7f8" }}>
       <header
         style={{
           display: "flex",
@@ -451,7 +464,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           justifyContent: "space-between",
           height: "52px",
           padding: "0 20px",
-          borderBottom: "1px solid #e8e4dd",
+          borderBottom: "1px solid #e1e4e8",
           background: "#fff",
           flexShrink: 0,
         }}
@@ -460,12 +473,12 @@ export function EditorShell({ projectId }: { projectId: string }) {
           <Link
             href="/dashboard"
             onClick={confirmNavigationWithUnsavedChanges}
-            style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#8a867e", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
+            style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#858b93", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
           >
             <ArrowLeft size={14} />
             Dashboard
           </Link>
-          <span style={{ color: "#d8d4cc", fontSize: "13px" }}>/</span>
+          <span style={{ color: "#d6dbe1", fontSize: "13px" }}>/</span>
           <span style={{ fontSize: "13px", fontWeight: 500, color: "#1a1714", fontFamily: "'Geist', sans-serif", maxWidth: "360px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {project.title}
           </span>
@@ -475,7 +488,7 @@ export function EditorShell({ projectId }: { projectId: string }) {
           <span
             style={{
               minWidth: "72px",
-              color: imageUploadPending || saveStatus === "saving" || saveStatus === "dirty" ? "#8a5f1f" : saveStatus === "error" ? "#9a3b30" : "#8a867e",
+              color: imageUploadPending || saveStatus === "saving" || saveStatus === "dirty" || saveStatus === "error" ? "#5f6670" : "#858b93",
               fontFamily: "'Geist', sans-serif",
               fontSize: "11.5px",
               fontWeight: 560,
@@ -497,10 +510,10 @@ export function EditorShell({ projectId }: { projectId: string }) {
                 display: "inline-flex",
                 alignItems: "center",
                 height: "30px",
-                border: "1px solid #ead6d1",
+                border: "1px solid #e1e4e8",
                 borderRadius: "4px",
-                background: "#fff8f6",
-                color: "#9a3b30",
+                background: "#ffffff",
+                color: "#5f6670",
                 padding: "0 12px",
                 fontFamily: "'Geist', sans-serif",
                 fontSize: "12px",
@@ -529,10 +542,10 @@ export function EditorShell({ projectId }: { projectId: string }) {
               alignItems: "center",
               gap: "7px",
               height: "30px",
-              border: "1px solid #e2ded5",
+              border: "1px solid #e1e4e8",
               borderRadius: "4px",
-              background: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#1a1714" : "#f7f4ee",
-              color: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#fffdf8" : "#b8b0a5",
+              background: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#17191d" : "#f1f2f4",
+              color: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#ffffff" : "#9aa0a8",
               padding: "0 12px",
               fontFamily: "'Geist', sans-serif",
               fontSize: "12px",
@@ -557,21 +570,24 @@ export function EditorShell({ projectId }: { projectId: string }) {
       >
         <EditorLeftPanel
           document={bookDocument}
-          pageFormat={pageFormat}
-          customPageSize={customPageSize}
           visualPageCount={visualPageCount}
         />
-        <div style={{ display: "flex", minWidth: 0, minHeight: 0, flexDirection: "column" }}>
+        <div style={{ position: "relative", display: "flex", minWidth: 0, minHeight: 0, flexDirection: "column" }}>
           <div
             id="editor-toolbar"
             style={{
+              position: "absolute",
+              top: "14px",
+              left: 0,
+              right: 0,
               height: "42px",
-              borderBottom: "1px solid #e8e4dd",
-              background: "#fff",
-              flexShrink: 0,
+              background: "transparent",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
+              justifyContent: "center",
               minWidth: 0,
+              pointerEvents: "none",
+              zIndex: 10,
             }}
           />
           <div style={{ flex: 1, minHeight: 0 }}>
@@ -580,10 +596,10 @@ export function EditorShell({ projectId }: { projectId: string }) {
                 role={saveStatus === "error" ? "alert" : "status"}
                 style={{
                   margin: "10px 14px 0",
-                  border: saveStatus === "error" ? "1px solid #ead6d1" : "1px solid #e5dcc7",
+                  border: "1px solid #e1e4e8",
                   borderRadius: "6px",
-                  background: saveStatus === "error" ? "#fff8f6" : "#fffaf0",
-                  color: saveStatus === "error" ? "#9a3b30" : "#765d2f",
+                  background: "#ffffff",
+                  color: "#5f6670",
                   fontFamily: "'Geist', sans-serif",
                   fontSize: "12px",
                   lineHeight: 1.45,
@@ -603,6 +619,16 @@ export function EditorShell({ projectId }: { projectId: string }) {
               onChange={updateLocalDocument}
               onPageCountChange={setVisualPageCount}
               onLayoutChange={setEditorLayout}
+              onSelectionAiRevise={async ({ selectedText, instruction }) => {
+                const res = await fetch("/api/ai/revise-text", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ selectedText, instruction }),
+                });
+                const data = (await res.json()) as { revisedText?: string; message?: string };
+                if (!res.ok || !data.revisedText) throw new Error(data.message ?? "Revision failed.");
+                return data.revisedText;
+              }}
               onImageUploadStateChange={setImageUploadPendingState}
             />
           </div>

@@ -572,9 +572,9 @@ export function DashboardShell({
             style={{
               width: "min(520px, 100%)",
               background: "#fff",
-              border: "1px solid #E7E1D8",
+              border: "1px solid #e3e5e8",
               borderRadius: "10px",
-              boxShadow: "0 24px 80px rgba(31, 22, 14, 0.18)",
+              boxShadow: "0 24px 80px rgba(24, 27, 31, 0.16)",
               overflow: "hidden",
             }}
           >

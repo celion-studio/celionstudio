@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -28,6 +28,7 @@ import {
   AlignJustify,
   AlignLeft,
   AlignRight,
+  ArrowUp,
   Bold,
   CheckSquare,
   Code,
@@ -44,6 +45,7 @@ import {
   Pilcrow,
   Quote,
   Redo2,
+  Sparkles,
   Strikethrough,
   Trash2,
   Underline,
@@ -57,6 +59,7 @@ type TiptapPageEditorProps = {
   pagination?: CelionPaginationOptions;
   onFocus?: () => void;
   onChange(doc: TiptapDocJson): void;
+  onSelectionAiRevise?(input: { selectedText: string; instruction: string }): Promise<string>;
   onImageUploadStateChange?(uploading: boolean): void;
 };
 
@@ -393,15 +396,15 @@ function ToolbarButton({ label, active = false, disabled = false, onClick, child
         if (!disabled) onClick();
       }}
       style={{
-        width: "30px",
-        height: "30px",
+        width: "31px",
+        height: "31px",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         border: "1px solid transparent",
         borderRadius: "6px",
-        background: active ? "#F0ECFF" : "transparent",
-        color: disabled ? "#c8c2ba" : active ? "#5B3EEB" : "#34302b",
+        background: active ? "#eef0f3" : "transparent",
+        color: disabled ? "#b6bbc2" : active ? "#17191d" : "#34373d",
         cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
@@ -426,8 +429,8 @@ function MenuTextButton({ label, active = false, onClick }: MenuTextButtonProps)
         padding: "0 8px",
         border: "1px solid transparent",
         borderRadius: "6px",
-        background: active ? "#F0ECFF" : "transparent",
-        color: active ? "#5B3EEB" : "#34302b",
+        background: active ? "#eef0f3" : "transparent",
+        color: active ? "#17191d" : "#34373d",
         cursor: "pointer",
         fontFamily: "'Geist', sans-serif",
         fontSize: "11px",
@@ -460,8 +463,8 @@ function MenuIconButton({ label, active = false, onClick, children }: ToolbarBut
         justifyContent: "center",
         border: "1px solid transparent",
         borderRadius: "5px",
-        background: active ? "#ebe7ff" : "transparent",
-        color: active ? "#4f38d8" : "#342f2a",
+        background: active ? "#eef0f3" : "transparent",
+        color: active ? "#17191d" : "#34373d",
         cursor: "pointer",
       }}
     >
@@ -471,7 +474,7 @@ function MenuIconButton({ label, active = false, onClick, children }: ToolbarBut
 }
 
 function Divider() {
-  return <span style={{ width: "1px", height: "20px", background: "#E8E2DA", margin: "0 3px" }} />;
+  return <span style={{ width: "1px", height: "20px", background: "#e1e4e8", margin: "0 3px" }} />;
 }
 
 export function TiptapToolbar({
@@ -489,17 +492,24 @@ export function TiptapToolbar({
     <div
       className="celion-tiptap-toolbar"
       style={{
-        height: "42px",
+        height: "40px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: "2px",
-        width: "100%",
+        width: "max-content",
+        maxWidth: "calc(100% - 32px)",
         minWidth: 0,
-        padding: "5px 14px",
-        background: "transparent",
+        padding: "4px 13px",
+        border: "1px solid #e1e4e8",
+        borderRadius: "8px",
+        background: "rgba(255, 255, 255, 0.96)",
+        boxShadow: "0 1px 2px rgba(24, 27, 31, 0.05)",
         boxSizing: "border-box",
         overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        pointerEvents: "auto",
       }}
     >
       <ToolbarButton label="Undo" disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>
@@ -570,8 +580,76 @@ export function TiptapToolbar({
   );
 }
 
-export function SelectionBubbleMenu({ editor }: { editor: Editor | null }) {
+export function SelectionBubbleMenu({
+  editor,
+  onSelectionAiRevise,
+}: {
+  editor: Editor | null;
+  onSelectionAiRevise?(input: { selectedText: string; instruction: string }): Promise<string>;
+}) {
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
+  const revisionRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!promptOpen) return;
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(".celion-ai-card")) return;
+      revisionRequestIdRef.current += 1;
+      setPromptOpen(false);
+      setInstruction("");
+      setError("");
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePress, true);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePress, true);
+  }, [promptOpen]);
+
   if (!editor) return null;
+
+  const selectedText = editor.state.selection.empty
+    ? ""
+    : editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to, "\n").trim();
+
+  const handleRevise = () => {
+    const trimmed = instruction.trim();
+    const { from, to, empty } = editor.state.selection;
+    const originalSelectedText = empty ? "" : editor.state.doc.textBetween(from, to, "\n").trim();
+    if (!originalSelectedText || !trimmed || isPending || !onSelectionAiRevise) return;
+    const requestId = revisionRequestIdRef.current + 1;
+    revisionRequestIdRef.current = requestId;
+    setError("");
+    setIsPending(true);
+    onSelectionAiRevise({ selectedText: originalSelectedText, instruction: trimmed })
+      .then((revisedText) => {
+        if (revisionRequestIdRef.current !== requestId) return;
+        if (to > editor.state.doc.content.size) {
+          throw new Error("The selected text changed. Select the text and try again.");
+        }
+        const currentSelectedText = editor.state.doc.textBetween(from, to, "\n").trim();
+        if (currentSelectedText !== originalSelectedText) {
+          throw new Error("The selected text changed. Select the text and try again.");
+        }
+        editor.view.focus();
+        editor.view.dispatch(editor.state.tr.insertText(revisedText, from, to).scrollIntoView());
+        setPromptOpen(false);
+        setInstruction("");
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      })
+      .finally(() => setIsPending(false));
+  };
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleRevise();
+  };
 
   return (
     <BubbleMenu
@@ -584,30 +662,65 @@ export function SelectionBubbleMenu({ editor }: { editor: Editor | null }) {
       appendTo={() => document.body}
       updateDelay={0}
       options={{ placement: "top", offset: 8, shift: { padding: 8 } }}
-      className="celion-selection-menu"
+      className={promptOpen ? "celion-selection-menu-ai" : "celion-selection-menu"}
     >
-      <ToolbarButton label="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
-        <Bold size={14} strokeWidth={2} />
-      </ToolbarButton>
-      <ToolbarButton label="Italic" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
-        <Italic size={14} strokeWidth={2} />
-      </ToolbarButton>
-      <ToolbarButton label="Underline" active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
-        <Underline size={14} strokeWidth={2} />
-      </ToolbarButton>
-      <ToolbarButton label="Strike" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
-        <Strikethrough size={14} strokeWidth={2} />
-      </ToolbarButton>
-      <Divider />
-      <ToolbarButton label="Highlight" active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff1a8" }).run()}>
-        <Highlighter size={14} strokeWidth={1.8} />
-      </ToolbarButton>
-      <ToolbarButton label="Heading 2" active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-        <Heading2 size={14} strokeWidth={1.8} />
-      </ToolbarButton>
-      <ToolbarButton label="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
-        <Quote size={14} strokeWidth={1.8} />
-      </ToolbarButton>
+      {promptOpen ? (
+        <form className="celion-ai-card" onSubmit={handleSubmit}>
+          <input
+            className="celion-ai-card-input"
+            value={instruction}
+            placeholder="How should this change?"
+            disabled={isPending}
+            autoFocus
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { revisionRequestIdRef.current += 1; setPromptOpen(false); setInstruction(""); setError(""); }
+            }}
+          />
+          <button
+            type="submit"
+            className="celion-ai-card-send"
+            disabled={!selectedText || !instruction.trim() || isPending}
+            aria-label="Apply AI revision"
+          >
+            <ArrowUp size={14} strokeWidth={2.1} />
+          </button>
+          {error && <p className="celion-ai-card-error">{error}</p>}
+        </form>
+      ) : (
+        <>
+          <ToolbarButton label="Bold" active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()}>
+            <Bold size={14} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton label="Italic" active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            <Italic size={14} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton label="Underline" active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            <Underline size={14} strokeWidth={2} />
+          </ToolbarButton>
+          <ToolbarButton label="Strike" active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            <Strikethrough size={14} strokeWidth={2} />
+          </ToolbarButton>
+          <Divider />
+          <ToolbarButton label="Highlight" active={editor.isActive("highlight")} onClick={() => editor.chain().focus().toggleHighlight({ color: "#fff1a8" }).run()}>
+            <Highlighter size={14} strokeWidth={1.8} />
+          </ToolbarButton>
+          <ToolbarButton label="Heading 2" active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+            <Heading2 size={14} strokeWidth={1.8} />
+          </ToolbarButton>
+          <ToolbarButton label="Quote" active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+            <Quote size={14} strokeWidth={1.8} />
+          </ToolbarButton>
+          {onSelectionAiRevise && (
+            <>
+              <Divider />
+              <ToolbarButton label="Revise with AI" active={false} onClick={() => { setError(""); setPromptOpen(true); }}>
+                <Sparkles size={14} strokeWidth={1.8} />
+              </ToolbarButton>
+            </>
+          )}
+        </>
+      )}
     </BubbleMenu>
   );
 }
@@ -731,6 +844,7 @@ export function TiptapPageEditor({
   pagination,
   onFocus,
   onChange,
+  onSelectionAiRevise,
   onImageUploadStateChange,
 }: TiptapPageEditorProps) {
   const suppressChangeRef = useRef(false);
@@ -997,10 +1111,10 @@ export function TiptapPageEditor({
             role="status"
             style={{
               margin: "0 0 12px",
-              border: "1px solid #ead6d1",
+              border: "1px solid #e1e4e8",
               borderRadius: "4px",
-              background: "#fff8f6",
-              color: "#9a3b30",
+              background: "#ffffff",
+              color: "#5f6670",
               fontFamily: "'Geist', sans-serif",
               fontSize: "12px",
               lineHeight: 1.5,
@@ -1014,10 +1128,10 @@ export function TiptapPageEditor({
                 onClick={() => void insertImageFile(lastFailedImageFile)}
                 style={{
                   marginLeft: "8px",
-                  border: "1px solid rgba(154,59,48,0.25)",
+                  border: "1px solid #d6dbe1",
                   borderRadius: "4px",
                   background: "#fff",
-                  color: "#7a2f27",
+                  color: "#5f6670",
                   cursor: "pointer",
                   fontFamily: "'Geist', sans-serif",
                   fontSize: "11px",
@@ -1043,7 +1157,7 @@ export function TiptapPageEditor({
             event.currentTarget.value = "";
           }}
         />
-        <SelectionBubbleMenu editor={editor} />
+        <SelectionBubbleMenu editor={editor} onSelectionAiRevise={onSelectionAiRevise} />
         <ImageBubbleMenu editor={editor} />
         <EditorContent editor={editor} />
       </div>

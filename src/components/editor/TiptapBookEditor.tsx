@@ -21,6 +21,7 @@ type TiptapBookEditorProps = {
   onChange(document: TiptapBookDocument): void;
   onPageCountChange?(pageCount: number): void;
   onLayoutChange?(layout: TiptapBookLayout): void;
+  onSelectionAiRevise?(input: { selectedText: string; instruction: string }): Promise<string>;
   onImageUploadStateChange?(uploading: boolean): void;
 };
 
@@ -63,6 +64,7 @@ export function TiptapBookEditor({
   onChange,
   onPageCountChange,
   onLayoutChange,
+  onSelectionAiRevise,
   onImageUploadStateChange,
 }: TiptapBookEditorProps) {
   const initialBook = useMemo(
@@ -231,9 +233,9 @@ export function TiptapBookEditor({
       style={{
         height: "100%",
         overflow: "auto",
-        background: "#faf9f5",
-        color: "#1d1712",
-        padding: "36px 48px 64px",
+        background: "#f6f7f8",
+        color: "#24272c",
+        padding: "84px 48px 64px",
         boxSizing: "border-box",
       }}
     >
@@ -262,12 +264,17 @@ export function TiptapBookEditor({
           placeholder="Start writing, or generate a draft from the right panel."
           pagination={pagination}
           onChange={updateDoc}
+          onSelectionAiRevise={onSelectionAiRevise}
           onImageUploadStateChange={onImageUploadStateChange}
         />
       </div>
       <style>{`
         .celion-book-editor-page {
           position: relative;
+        }
+
+        .celion-tiptap-toolbar::-webkit-scrollbar {
+          display: none;
         }
 
         .celion-tiptap-editor {
@@ -283,7 +290,7 @@ export function TiptapBookEditor({
           top: calc(var(--celion-page-padding-top) + var(--celion-header-height));
           left: var(--celion-page-padding-left);
           max-width: min(420px, calc(100% - var(--celion-page-padding-left) - var(--celion-page-padding-right)));
-          color: #aaa39a;
+          color: #9aa0a8;
           font-family: 'Geist', sans-serif;
           font-size: 16px;
           line-height: 1.52;
@@ -297,19 +304,29 @@ export function TiptapBookEditor({
           align-items: center;
           gap: 5px;
           padding: 5px;
-          border: 1px solid rgba(36, 28, 20, 0.1);
+          border: 1px solid rgba(36, 39, 44, 0.1);
           border-radius: 8px;
           background: rgba(255, 255, 255, 0.98);
-          box-shadow: 0 10px 24px rgba(31, 22, 14, 0.12);
+          box-shadow: 0 10px 24px rgba(24, 27, 31, 0.1);
           backdrop-filter: blur(8px);
           pointer-events: auto;
           z-index: 1000;
         }
 
+        .celion-selection-menu-ai {
+          display: block;
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          box-shadow: none;
+          backdrop-filter: none;
+        }
+
         .celion-image-menu {
           padding: 6px;
           border-radius: 9px;
-          box-shadow: 0 12px 28px rgba(31, 22, 14, 0.14);
+          box-shadow: 0 12px 28px rgba(24, 27, 31, 0.12);
         }
 
         .celion-menu-group {
@@ -317,9 +334,9 @@ export function TiptapBookEditor({
           align-items: center;
           gap: 1px;
           padding: 2px;
-          border: 1px solid #eee8df;
+          border: 1px solid #e4e6e9;
           border-radius: 7px;
-          background: #faf8f5;
+          background: #f6f7f8;
         }
 
         .celion-tiptap-content {
@@ -353,6 +370,9 @@ export function TiptapBookEditor({
           height: var(--celion-page-height);
           pointer-events: none;
           z-index: 2;
+          border: 1px solid rgba(44, 50, 58, 0.2);
+          box-shadow: 0 18px 38px rgba(24, 27, 31, 0.06);
+          box-sizing: border-box;
         }
 
         .celion-pagination-header,
@@ -371,7 +391,7 @@ export function TiptapBookEditor({
         .celion-pagination-header {
           top: 14px;
           height: 24px;
-          color: #b8afa4;
+          color: #b6bbc2;
           font-size: 10px;
           font-weight: 650;
           letter-spacing: 0.12em;
@@ -381,7 +401,7 @@ export function TiptapBookEditor({
         .celion-pagination-footer {
           top: calc(var(--celion-page-height) - var(--celion-page-padding-bottom) - 28px);
           height: 28px;
-          color: #8f887f;
+          color: #858b93;
           font-size: 12px;
         }
 
@@ -417,7 +437,21 @@ export function TiptapBookEditor({
           right: 0;
           top: var(--celion-break-gap-top);
           height: var(--celion-page-gap);
-          background: #faf9f5;
+          background: #f6f7f8;
+          z-index: 0;
+        }
+
+        .celion-pagination-break::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: calc(var(--celion-break-gap-top) + var(--celion-page-gap));
+          height: var(--celion-page-height);
+          border: 1px solid rgba(44, 50, 58, 0.2);
+          box-shadow: 0 18px 38px rgba(24, 27, 31, 0.06);
+          box-sizing: border-box;
+          pointer-events: none;
           z-index: 0;
         }
 
@@ -478,14 +512,14 @@ export function TiptapBookEditor({
         }
 
         .celion-tiptap-content blockquote {
-          border-left: 3px solid #d5c2a8;
-          color: #5b5248;
+          border-left: 3px solid #c5cad1;
+          color: #4b515a;
           padding-left: 14px;
         }
 
         .celion-tiptap-content hr {
           border: 0;
-          border-top: 1px solid #e1d8ca;
+          border-top: 1px solid #e1e4e8;
           margin: 24px 0;
         }
 
@@ -563,7 +597,7 @@ export function TiptapBookEditor({
           border: 1px solid rgba(255, 255, 255, 0.92);
           border-radius: 999px;
           background: rgba(91, 62, 235, 0.88);
-          box-shadow: 0 2px 8px rgba(31, 22, 14, 0.22);
+          box-shadow: 0 2px 8px rgba(24, 27, 31, 0.18);
           z-index: 2;
           cursor: ew-resize;
           opacity: 0;
@@ -601,9 +635,9 @@ export function TiptapBookEditor({
           gap: 18px;
           margin: 20px 0;
           padding: 10px;
-          border: 1px solid #eee8df;
+          border: 1px solid #e4e6e9;
           border-radius: 8px;
-          background: #fffdf9;
+          background: #fafbfc;
           position: relative;
         }
 
@@ -649,7 +683,7 @@ export function TiptapBookEditor({
           width: 8px;
           border-radius: 999px;
           background: rgba(91, 62, 235, 0.82);
-          box-shadow: 0 2px 8px rgba(31, 22, 14, 0.2);
+          box-shadow: 0 2px 8px rgba(24, 27, 31, 0.16);
           cursor: ew-resize;
           opacity: 0;
           transform: translateX(-50%);
