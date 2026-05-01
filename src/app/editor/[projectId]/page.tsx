@@ -1,8 +1,7 @@
-import type { Route } from "next";
 import { notFound, redirect } from "next/navigation";
-import { EditorShell } from "@/components/editor/EditorShell";
-import { getProjectRecordForUser } from "@/lib/projects";
 import { getPageSession } from "@/lib/session";
+import { getProjectRecordForUser } from "@/lib/projects";
+import { EditorShell } from "@/components/editor/EditorShell";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +16,13 @@ export default async function EditorPage({
   const { projectId } = await params;
   const project = await getProjectRecordForUser(session.user.id, projectId);
   if (!project) notFound();
-  if (project.kind === "product") redirect(`/builder/${project.id}` as Route);
 
-  return <EditorShell projectId={project.id} />;
+  return (
+    <EditorShell
+      projectId={project.id}
+      projectTitle={project.title}
+      initialHtml={project.profile.ebookHtml ?? ""}
+      initialDocument={project.profile.ebookDocument}
+    />
+  );
 }

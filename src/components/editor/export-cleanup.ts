@@ -15,7 +15,7 @@ type SelectionSnapshot = {
   outlineOffset: string;
 };
 
-export function clearBuilderSelectionForExport(elements: Iterable<SelectionCleanupTarget>) {
+export function clearEditorSelectionForExport(elements: Iterable<SelectionCleanupTarget>) {
   const snapshots: SelectionSnapshot[] = Array.from(elements, (element) => ({
     element,
     selected: element.getAttribute("data-selected"),
@@ -42,6 +42,6 @@ export function clearBuilderSelectionForExport(elements: Iterable<SelectionClean
   };
 }
 
-export function clearBuilderSelectionFromDocument(doc: Document) {
-  return clearBuilderSelectionForExport(doc.querySelectorAll<HTMLElement>("[data-selected]"));
+export function clearEditorSelectionFromDocument(doc: Document) {
+  return clearEditorSelectionForExport(doc.querySelectorAll<HTMLElement>("[data-selected]"));
 }

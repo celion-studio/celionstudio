@@ -1,15 +1,8 @@
 "use client";
 
 import { Loader2, Sparkles } from "lucide-react";
+import { EBOOK_STYLE_LABELS } from "@/lib/ebook-style";
 import type { EbookStyle } from "@/types/project";
-
-const STYLE_LABELS: Record<EbookStyle, string> = {
-  minimal: "Minimal",
-  editorial: "Editorial",
-  "neo-brutalism": "Neo Brutalism",
-  bold: "Bold",
-  elegant: "Elegant",
-};
 
 type Props = {
   title: string;
@@ -30,7 +23,7 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
           {[
             ["Title", title || "-"],
             ["Author", author || "-"],
-            ["Style", ebookStyle ? STYLE_LABELS[ebookStyle] : "-"],
+            ["Style", ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "-"],
             ["Format", "A5 sales preview"],
             ["Accent", accentColor],
           ].map(([label, value]) => (
@@ -60,7 +53,7 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
         <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", borderRadius: "8px", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
           <Sparkles size={15} style={{ color: "#16a34a", marginTop: "1px", flexShrink: 0 }} />
           <p style={{ fontFamily: "'Geist', sans-serif", fontSize: "12.5px", color: "#166534", lineHeight: 1.5 }}>
-            Celion will render the approved plan into a fixed A5 HTML/CSS sales-preview ebook in the {ebookStyle ? STYLE_LABELS[ebookStyle] : "selected"} style. You can edit the text after generation.
+            Celion will render the approved plan into a fixed A5 HTML/CSS sales-preview ebook in the {ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "selected"} style. You can edit the text after generation.
           </p>
         </div>
       )}

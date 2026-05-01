@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { authClient } from '@/lib/auth-client';

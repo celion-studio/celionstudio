@@ -1,653 +1,519 @@
 "use client";
 
-import type { Route } from "next";
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent } from "react";
-import { ArrowLeft, Download } from "lucide-react";
-import { EditorLeftPanel } from "@/components/editor/EditorLeftPanel";
-import { DocumentEditorPanel } from "@/components/editor/DocumentEditorPanel";
-import { PageFormatControl } from "@/components/editor/PageFormatControl";
-import { ActionPanel } from "@/components/editor/ActionPanel";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { EBOOK_PAGE_SIZE_PX, EBOOK_PDF_A5_SIZE_PT } from "@/lib/ebook-format";
+import { countCelionSlides } from "@/lib/ebook-html";
 import {
-  docNodeCount,
-  normalizeTiptapBookDocument,
-  tiptapDocumentToHtml,
-  type TiptapBookDocument,
-  type TiptapBookLayout,
-} from "@/lib/tiptap-document";
+  compileEbookDocumentToHtml,
+  normalizeEbookDocument,
+  type CelionEbookDocument,
+} from "@/lib/ebook-document";
 import {
-  normalizePageFormat,
-  normalizePageSize,
-  type PageFormat,
-  type PageSize,
-} from "@/lib/page-format";
-import type { ProjectRecord } from "@/types/project";
+  buildPageSummariesFromDocument,
+  estimatePreviewIframeHeight,
+  normalizeEditorHtml,
+  pickSelectableElement,
+  pickRuntimeTextElement,
+  runtimeTextIndexFromElement,
+  type PageSummary,
+} from "./editor-preview";
+import {
+  appendScopedStyleToDocument,
+  applyDocumentTextEdit,
+  applyLegacyHtmlTextEdit,
+} from "./editor-document-edits";
+import {
+  measurePreviewFrameHeight,
+  preparePreviewFrame,
+} from "./editor-preview-frame";
+import {
+  EditorInspectorPanel,
+  EditorPageList,
+  EditorPreviewPane,
+  EditorTopBar,
+} from "./editor-shell-panels";
+import { clearEditorSelectionFromDocument } from "./export-cleanup";
+import { useEditorSave } from "./use-editor-save";
+import { useEditorSelection } from "./use-editor-selection";
 
-type SaveStatus = "idle" | "dirty" | "saving" | "saved" | "error";
+const PREVIEW_WIDTH = 640;
+const PAGE_HEIGHT: number = EBOOK_PAGE_SIZE_PX.height;
+const PAGE_GAP = 28;
+const PDF_A5_WIDTH_PT = EBOOK_PDF_A5_SIZE_PT.width;
+const PDF_A5_HEIGHT_PT = EBOOK_PDF_A5_SIZE_PT.height;
+const EDITOR_TOP_RAIL_HEIGHT = 56;
+const EDITOR_EDGE_GAP = 16;
 
-const AUTO_SAVE_DELAY_MS = 2500;
-const AUTO_SAVE_MAX_WAIT_MS = 15000;
-const DOCUMENTS_ROUTE = "/documents" as Route;
+type Props = {
+  projectId: string;
+  projectTitle: string;
+  initialHtml: string;
+  initialDocument: CelionEbookDocument | null;
+};
 
-function cloneBookDocument(document: unknown) {
-  return JSON.parse(
-    JSON.stringify(normalizeTiptapBookDocument(document)),
-  ) as TiptapBookDocument;
-}
+export function EditorShell({
+  projectId,
+  projectTitle,
+  initialHtml,
+  initialDocument,
+}: Props) {
+  const initialEbookDocument = initialDocument ? normalizeEbookDocument(initialDocument) : null;
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+  const iframeClickCleanupRef = useRef<(() => void) | null>(null);
+  const measureTimeoutRef = useRef<number | null>(null);
+  const measureFrameRef = useRef<number | null>(null);
+  const {
+    latestDocumentRef,
+    saving,
+    saveError,
+    setSaveError,
+    saveHtml,
+    queueDocumentSave,
+  } = useEditorSave(projectId, initialEbookDocument);
+  const [ebookDocument, setEbookDocument] = useState<CelionEbookDocument | null>(initialEbookDocument);
+  const [html, setHtml] = useState(() => initialEbookDocument ? compileEbookDocumentToHtml(initialEbookDocument) : normalizeEditorHtml(initialHtml));
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [slideCount, setSlideCount] = useState(0);
+  const [iframeHeight, setIframeHeight] = useState(PAGE_HEIGHT);
+  const [pageSummaries, setPageSummaries] = useState<PageSummary[]>([]);
+  const selection = useEditorSelection();
+  const { selectElement } = selection;
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
-function normalizedDocumentSignature(document: TiptapBookDocument) {
-  return JSON.stringify(document);
-}
-
-function saveDocumentPayload(document: unknown) {
-  return { action: "save-document", document } as const;
-}
-
-function apiErrorMessage(payload: { message?: string; note?: string } | null, fallback: string) {
-  const message = payload?.message ?? fallback;
-  return payload?.note ? `${message} ${payload.note}` : message;
-}
-
-export function EditorShell({ projectId }: { projectId: string }) {
-  const [project, setProject] = useState<ProjectRecord | null>(null);
-  const [hasLocalDocumentEdits, setHasLocalDocumentEdits] = useState(false);
-  const hasLocalDocumentEditsRef = useRef(false);
-  const latestDocumentRef = useRef<TiptapBookDocument>(cloneBookDocument([]));
-  const savedDocumentSignatureRef = useRef(normalizedDocumentSignature(cloneBookDocument([])));
-  const activeSavePromiseRef = useRef<Promise<void> | null>(null);
-  const autoSaveTimerRef = useRef<number | null>(null);
-  const autoSaveFirstDirtyAtRef = useRef<number | null>(null);
-  const [saveStatus, setSaveStatusState] = useState<SaveStatus>("idle");
-  const saveStatusRef = useRef<SaveStatus>("idle");
-  const [feedback, setFeedback] = useState("");
-  const [visualPageCount, setVisualPageCount] = useState<number | undefined>();
-  const [imageUploadPending, setImageUploadPending] = useState(false);
-  const imageUploadPendingRef = useRef(false);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [editorLayout, setEditorLayout] = useState<TiptapBookLayout>({
-    headerType: "none",
-    headerText: "",
-    headerAlign: "center",
-    footerType: "page",
-    footerText: "{page}",
-    footerAlign: "center",
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setFeedback("");
-    setLocalDocumentEdits(false);
-    setSaveStatus("idle");
-    clearAutoSaveTimer();
-    setImageUploadPendingState(false);
-
-    fetch(`/api/projects/${projectId}`, { method: "GET", cache: "no-store" })
-      .then((r) => r.json())
-      .then((payload: { project?: ProjectRecord; message?: string }) => {
-        if (!active) return;
-        if (payload.project) {
-          markDocumentSavedFromProject(payload.project);
-          setProject(payload.project);
-        }
-        else setFeedback(payload.message ?? "Could not load this draft.");
-      })
-      .catch(() => {
-        if (active) setFeedback("Could not load this draft.");
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-      clearAutoSaveTimer();
-    };
-  }, [projectId]);
-
-  const pageFormat = normalizePageFormat(project?.profile.pageFormat);
-  const customPageSize = normalizePageSize(project?.profile.customPageSize);
-  const bookDocument = useMemo(() => {
-    const sourceDocument = project?.profile.document;
-    if (sourceDocument === latestDocumentRef.current) return latestDocumentRef.current;
-    return normalizeTiptapBookDocument(sourceDocument ?? []);
-  }, [project?.profile.document]);
-
-  useEffect(() => {
-    setVisualPageCount(undefined);
-  }, [projectId, pageFormat, customPageSize.widthMm, customPageSize.heightMm]);
-
-  useEffect(() => {
-    latestDocumentRef.current = bookDocument;
-    setHasDraft(bookDocument.pages.some((page) => docNodeCount(page.doc) > 0));
-  }, [bookDocument]);
-
-  useEffect(() => {
-    if (!imageUploadPending && hasLocalDocumentEdits && saveStatus !== "saving") {
-      scheduleAutoSave();
-    }
-  }, [hasLocalDocumentEdits, imageUploadPending, saveStatus]);
-
-  useEffect(() => () => clearAutoSaveTimer(), []);
-
-  useEffect(() => {
-    const shouldWarn =
-      hasLocalDocumentEdits ||
-      saveStatus === "saving" ||
-      saveStatus === "error" ||
-      imageUploadPending;
-    if (!shouldWarn) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasLocalDocumentEdits, imageUploadPending, saveStatus]);
-
-  function setLocalDocumentEdits(value: boolean) {
-    hasLocalDocumentEditsRef.current = value;
-    setHasLocalDocumentEdits(value);
-  }
-
-  function setSaveStatus(value: SaveStatus) {
-    saveStatusRef.current = value;
-    setSaveStatusState(value);
-  }
-
-  const setImageUploadPendingState = useCallback((value: boolean) => {
-    imageUploadPendingRef.current = value;
-    setImageUploadPending(value);
-    if (value) setFeedback("Uploading image. Save will be available when it finishes.");
+  const measurePreview = useCallback(() => {
+    const height = measurePreviewFrameHeight(iframeRef.current, {
+      pageHeight: PAGE_HEIGHT,
+      pageGap: PAGE_GAP,
+    });
+    if (height !== null) setIframeHeight(height);
   }, []);
 
-  function clearAutoSaveTimer() {
-    if (autoSaveTimerRef.current === null) return;
-    window.clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = null;
-  }
+  const cleanupIframeEffects = useCallback(() => {
+    iframeClickCleanupRef.current?.();
+    iframeClickCleanupRef.current = null;
 
-  function scheduleAutoSave() {
-    clearAutoSaveTimer();
-    if (imageUploadPendingRef.current || saveStatusRef.current === "saving") return;
-
-    const now = Date.now();
-    if (autoSaveFirstDirtyAtRef.current === null) {
-      autoSaveFirstDirtyAtRef.current = now;
+    if (measureTimeoutRef.current !== null) {
+      window.clearTimeout(measureTimeoutRef.current);
+      measureTimeoutRef.current = null;
     }
-    const elapsed = now - autoSaveFirstDirtyAtRef.current;
-    const delay = Math.max(0, Math.min(AUTO_SAVE_DELAY_MS, AUTO_SAVE_MAX_WAIT_MS - elapsed));
 
-    autoSaveTimerRef.current = window.setTimeout(() => {
-      autoSaveTimerRef.current = null;
-      requestSaveDocument({ silent: true }).catch((error) => {
-        setFeedback(error instanceof Error ? error.message : "Auto-save failed.");
+    if (measureFrameRef.current !== null) {
+      window.cancelAnimationFrame(measureFrameRef.current);
+      measureFrameRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cleanupIframeEffects, [cleanupIframeEffects]);
+
+  const handleIframeLoad = useCallback(() => {
+    cleanupIframeEffects();
+
+    const previewFrame = preparePreviewFrame(iframeRef.current, {
+      previewWidth: PREVIEW_WIDTH,
+      pageGap: PAGE_GAP,
+    });
+    if (!previewFrame) return;
+
+    const { doc, pages } = previewFrame;
+    setSlideCount(pages.length);
+    setPageSummaries(ebookDocument
+      ? buildPageSummariesFromDocument(ebookDocument)
+      : pages.map((page, i) => {
+          const title =
+            page.querySelector("h1, h2, h3")?.textContent?.trim() ||
+            page.querySelector("[data-text-editable]")?.textContent?.trim() ||
+            `Page ${i + 1}`;
+          const eyebrow =
+            page.querySelector(".eyebrow, .kicker")?.textContent?.trim() ||
+            (i === 0 ? "Cover" : `Page ${i + 1}`);
+
+          return {
+            title: title.slice(0, 42),
+            eyebrow: eyebrow.slice(0, 24),
+          };
+        }));
+
+    const selectPreviewElement = (textEl: Element) => {
+      doc.querySelectorAll("[data-selected]").forEach((el) => {
+        el.removeAttribute("data-selected");
+        (el as HTMLElement).style.outline = "";
+        (el as HTMLElement).style.outlineOffset = "";
       });
-    }, delay);
-  }
+      textEl.setAttribute("data-selected", "true");
+      (textEl as HTMLElement).style.outline = "2px solid #6366f1";
+      (textEl as HTMLElement).style.outlineOffset = "2px";
+    };
 
-  function markDocumentSavedFromProject(nextProject: ProjectRecord) {
-    const nextDocument = normalizeTiptapBookDocument(nextProject.profile.document ?? []);
-    latestDocumentRef.current = nextDocument;
-    savedDocumentSignatureRef.current = normalizedDocumentSignature(nextDocument);
-    autoSaveFirstDirtyAtRef.current = null;
-  }
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const pointedElements = typeof doc.elementsFromPoint === "function"
+        ? doc.elementsFromPoint(e.clientX, e.clientY)
+        : [target];
 
-  function confirmNavigationWithUnsavedChanges(event: MouseEvent<HTMLAnchorElement>) {
-    const shouldWarn =
-      hasLocalDocumentEditsRef.current ||
-      saveStatusRef.current === "saving" ||
-      saveStatusRef.current === "error" ||
-      imageUploadPendingRef.current;
-    if (!shouldWarn) return;
+      if (ebookDocument) {
+        const pageEl = (pointedElements.find((element) => element.closest("[data-celion-page]")) ?? target)
+          .closest<HTMLElement>("[data-celion-page]");
+        const pageId = pageEl?.getAttribute("data-celion-page");
+        if (!pageId) return;
 
-    if (!window.confirm("You have unsaved editor changes. Leave this page?")) {
-      event.preventDefault();
-    }
-  }
+        const pageIndex = ebookDocument.pages.findIndex((page) => page.id === pageId);
+        const page = pageIndex >= 0 ? ebookDocument.pages[pageIndex] : null;
+        if (!page) return;
 
-  async function applyMutation(
-    body:
-      | { action: "generate" | "regenerate" | "mark-exported" }
-      | { action: "revise"; revisionPrompt: string },
-    successMessage: string,
-  ) {
-    const res = await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const payload = (await res.json().catch(() => null)) as { project?: ProjectRecord; message?: string; note?: string } | null;
-    if (!res.ok || !payload?.project) throw new Error(apiErrorMessage(payload, "Could not update this draft."));
-    markDocumentSavedFromProject(payload.project);
-    setProject(payload.project);
-    setLocalDocumentEdits(false);
-    setSaveStatus("saved");
-    setFeedback(successMessage);
-  }
+        const candidateIds = pointedElements
+          .map((element) => element.closest<HTMLElement>("[data-celion-id]")?.getAttribute("data-celion-id") ?? "")
+          .filter((id, index, ids) => id && ids.indexOf(id) === index);
+        const manifestElement = pickSelectableElement(page, candidateIds);
+        const runtimeTextEl = pickRuntimeTextElement(pointedElements, target);
+        const runtimeTextIndex = runtimeTextIndexFromElement(runtimeTextEl);
 
-  function setProjectDocument(nextDocument: TiptapBookDocument, updatedAt?: string) {
-    setProject((current) =>
-      current
-        ? {
-            ...current,
-            status: "ready",
-            updatedAt: updatedAt ?? current.updatedAt,
-            profile: {
-              ...current.profile,
-              document: nextDocument,
+        if (
+          runtimeTextEl &&
+          runtimeTextIndex !== null &&
+          (!manifestElement || (manifestElement.type !== "text" && !manifestElement.editableProps.includes("text")))
+        ) {
+          const text = runtimeTextEl.textContent?.trim() ?? "";
+          if (!text) return;
+
+          selectPreviewElement(runtimeTextEl);
+          selectElement({
+            text,
+            pageId,
+            selector: "",
+            runtimeText: { mode: "document", pageId, pageIndex, textIndex: runtimeTextIndex },
+            element: {
+              id: `runtime-text-${pageId}-${runtimeTextIndex}`,
+              role: "text",
+              type: "text",
+              selector: `runtime-text:${runtimeTextIndex}`,
+              label: "Text",
+              editableProps: ["text"],
             },
-          }
-        : current,
-    );
-  }
+          });
+          setCurrentSlide(pageIndex);
+          return;
+        }
 
-  function updateLocalDocument(nextDocument: TiptapBookDocument) {
-    latestDocumentRef.current = nextDocument;
-    setHasDraft(nextDocument.pages.some((page) => docNodeCount(page.doc) > 0));
-    setLocalDocumentEdits(true);
-    setSaveStatus("dirty");
-    if (saveStatusRef.current === "error") setFeedback("");
-    scheduleAutoSave();
-  }
+        if (!manifestElement) return;
 
-  async function requestSaveDocument({ silent = false } = {}) {
-    clearAutoSaveTimer();
+        const celionEl = doc.querySelector<HTMLElement>(manifestElement.selector);
+        if (!celionEl) return;
 
-    while (true) {
-      if (imageUploadPendingRef.current) {
-        if (!silent) setFeedback("Wait for the image upload to finish before saving.");
-        return;
-      }
+        const text = celionEl.textContent?.trim() ?? "";
 
-      const activeSave = activeSavePromiseRef.current;
-      if (activeSave) {
-        await activeSave;
-        continue;
-      }
-
-      const documentToSave = cloneBookDocument(latestDocumentRef.current);
-      const signatureToSave = normalizedDocumentSignature(documentToSave);
-      if (signatureToSave === savedDocumentSignatureRef.current) {
-        setLocalDocumentEdits(false);
-        setSaveStatus("saved");
-        autoSaveFirstDirtyAtRef.current = null;
-        if (!silent) setFeedback("All edits saved.");
-        return;
-      }
-
-      setSaveStatus("saving");
-      if (!silent) setFeedback("Saving edits...");
-
-      const savePromise = (async () => {
-        const res = await fetch(`/api/projects/${projectId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveDocumentPayload(documentToSave)),
+        selectPreviewElement(celionEl);
+        selectElement({
+          text,
+          pageId,
+          element: manifestElement,
+          selector: "",
+          runtimeText: null,
         });
-        const payload = (await res.json().catch(() => null)) as {
-          ok?: boolean;
-          updatedAt?: string;
-          message?: string;
-          note?: string;
-        } | null;
-
-        if (!res.ok || !payload?.ok || !payload.updatedAt) {
-          throw new Error(apiErrorMessage(payload, "Could not save document edits."));
-        }
-
-        savedDocumentSignatureRef.current = signatureToSave;
-        if (normalizedDocumentSignature(latestDocumentRef.current) === signatureToSave) {
-          setProjectDocument(documentToSave, payload.updatedAt);
-          setLocalDocumentEdits(false);
-          setSaveStatus("saved");
-          autoSaveFirstDirtyAtRef.current = null;
-          if (!silent) setFeedback("Document edits saved.");
-        } else {
-          autoSaveFirstDirtyAtRef.current = Date.now();
-          setLocalDocumentEdits(true);
-          setSaveStatus("dirty");
-          if (!silent) setFeedback("Saved earlier edits. Saving the latest edits now...");
-        }
-      })();
-
-      activeSavePromiseRef.current = savePromise;
-
-      try {
-        await savePromise;
-      } catch (e) {
-        setLocalDocumentEdits(true);
-        setSaveStatus("error");
-        throw e;
-      } finally {
-        if (activeSavePromiseRef.current === savePromise) {
-          activeSavePromiseRef.current = null;
-        }
-      }
-    }
-  }
-
-  async function updatePageFormat(nextFormat: PageFormat, nextPageSize: PageSize) {
-    if (!project) return;
-    const normalizedPageSize = normalizePageSize(nextPageSize);
-
-    const previousProject = project;
-    setProject({
-      ...project,
-      profile: {
-        ...project.profile,
-        pageFormat: nextFormat,
-        customPageSize: normalizedPageSize,
-      },
-    });
-    setFeedback(`Page format set to ${nextFormat}.`);
-
-    const res = await fetch(`/api/projects/${projectId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save-page-format",
-        pageFormat: nextFormat,
-        customPageSize: normalizedPageSize,
-      }),
-    });
-    const payload = (await res.json().catch(() => null)) as {
-      project?: ProjectRecord;
-      message?: string;
-      note?: string;
-    } | null;
-
-    if (!res.ok || !payload?.project) {
-      setProject(previousProject);
-      throw new Error(apiErrorMessage(payload, "Could not save page format."));
-    }
-
-    setProject(payload.project);
-  }
-
-  async function exportPdf() {
-    if (imageUploadPendingRef.current) {
-      setFeedback("Wait for the image upload to finish before exporting.");
-      return;
-    }
-
-    if (!hasDraft) {
-      setFeedback("No document to export.");
-      return;
-    }
-
-    if (hasLocalDocumentEditsRef.current || saveStatusRef.current === "error") {
-      try {
-        await requestSaveDocument();
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Save failed. Export stopped.");
+        setCurrentSlide(pageIndex);
         return;
       }
-    }
 
-    if (!project) return;
+      const runtimeTextEl = pickRuntimeTextElement(pointedElements, target);
+      const textEl = runtimeTextEl ?? target.closest("[data-text-editable]") ?? (target.textContent?.trim() ? target : null);
+      if (!textEl) return;
 
-    const popup = window.open("", "_blank", "noopener,noreferrer");
-    if (!popup) {
-      setFeedback("Print window was blocked.");
+      const text = textEl.textContent?.trim() ?? "";
+      if (!text) return;
+
+      selectPreviewElement(textEl);
+
+      const tag = textEl.tagName.toLowerCase();
+      const pageEl = textEl.closest(".slide");
+      const pageIdx = pageEl?.getAttribute("data-slide-index") ?? "0";
+      const editableIndex = pageEl
+        ? Array.from(pageEl.querySelectorAll("[data-text-editable]")).indexOf(textEl)
+        : -1;
+      const runtimeTextIndex = runtimeTextIndexFromElement(textEl);
+      setCurrentSlide(Number(pageIdx));
+      if (runtimeTextIndex !== null) {
+        selectElement({
+          text,
+          pageId: "",
+          element: null,
+          selector: `runtime:${pageIdx}:${runtimeTextIndex}`,
+          runtimeText: {
+            mode: "legacy",
+            pageId: pageIdx,
+            pageIndex: Number(pageIdx),
+            textIndex: runtimeTextIndex,
+          },
+        });
+      } else {
+        selectElement({
+          text,
+          pageId: "",
+          element: null,
+          selector: editableIndex >= 0 ? `${pageIdx}:${editableIndex}` : `[data-slide-index="${pageIdx}"] ${tag}`,
+          runtimeText: null,
+        });
+      }
+    };
+
+    doc.addEventListener("click", handleClick);
+    iframeClickCleanupRef.current = () => {
+      doc.removeEventListener("click", handleClick);
+    };
+
+    measureFrameRef.current = window.requestAnimationFrame(() => {
+      measureFrameRef.current = null;
+      measurePreview();
+    });
+    measureTimeoutRef.current = window.setTimeout(() => {
+      measureTimeoutRef.current = null;
+      measurePreview();
+    }, 250);
+  }, [cleanupIframeEffects, ebookDocument, measurePreview, selectElement]);
+
+  useEffect(() => {
+    if (!html) return;
+
+    let cancelled = false;
+    const applyWhenReady = () => {
+      if (!cancelled) handleIframeLoad();
+    };
+
+    const frameId = window.requestAnimationFrame(applyWhenReady);
+    const earlyTimeoutId = window.setTimeout(applyWhenReady, 80);
+    const lateTimeoutId = window.setTimeout(applyWhenReady, 450);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(earlyTimeoutId);
+      window.clearTimeout(lateTimeoutId);
+    };
+  }, [handleIframeLoad, html]);
+
+  useEffect(() => {
+    const count = ebookDocument ? ebookDocument.pages.length : countCelionSlides(html);
+    setSlideCount(count);
+    setIframeHeight(estimatePreviewIframeHeight(count, PAGE_HEIGHT, PAGE_GAP));
+    setPageSummaries(ebookDocument ? buildPageSummariesFromDocument(ebookDocument) : []);
+  }, [ebookDocument, html]);
+
+  const scrollToPage = useCallback((index: number) => {
+    setCurrentSlide(index);
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    const scroller = previewScrollRef.current;
+    if (!doc || !scroller) return;
+
+    const page = doc.querySelectorAll<HTMLElement>(".slide")[index];
+    if (!page) return;
+
+    scroller.scrollTo({
+      top: Math.max(0, page.offsetTop - 8),
+      behavior: "smooth",
+    });
+  }, []);
+
+  const handlePreviewScroll = useCallback(() => {
+    const iframe = iframeRef.current;
+    const doc = iframe?.contentDocument;
+    const scroller = previewScrollRef.current;
+    if (!doc || !scroller) return;
+
+    const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
+    if (pages.length === 0) return;
+
+    const viewportAnchor = scroller.scrollTop + 140;
+    const nearest = pages.reduce((best, page, index) => {
+      const distance = Math.abs(page.offsetTop - viewportAnchor);
+      return distance < best.distance ? { index, distance } : best;
+    }, { index: 0, distance: Number.POSITIVE_INFINITY });
+
+    setCurrentSlide(nearest.index);
+  }, []);
+
+  const applyEdit = () => {
+    if (!selection.editValue.trim()) return;
+
+    const documentEdit = applyDocumentTextEdit({
+      document: latestDocumentRef.current ?? ebookDocument,
+      selectedPageId: selection.selectedPageId,
+      selectedElement: selection.selectedElement,
+      selectedRuntimeText: selection.selectedRuntimeText,
+      editValue: selection.editValue,
+    });
+    if (documentEdit.ok) {
+      const newHtml = compileEbookDocumentToHtml(documentEdit.value);
+      setEbookDocument(documentEdit.value);
+      setHtml(newHtml);
+      selection.clearSelection();
+      latestDocumentRef.current = documentEdit.value;
+      void queueDocumentSave(documentEdit.value);
       return;
     }
-    popup.document.open();
-    popup.document.write(tiptapDocumentToHtml({
-      title: project.title,
-      document: latestDocumentRef.current,
-      pageFormat: project.profile.pageFormat,
-      customPageSize: project.profile.customPageSize,
-    }));
-    popup.document.close();
-    popup.focus();
-    popup.print();
-    if (project.kind === "document") {
-      setFeedback("Print dialog opened. Save as PDF.");
+    if (documentEdit.reason === "target-missing") {
+      setSaveError("Could not find the selected text. Click it again and retry.");
       return;
     }
 
+    if (!selection.selectedText || !selection.selectedSelector) return;
+
+    const legacyEdit = applyLegacyHtmlTextEdit({
+      html,
+      selectedSelector: selection.selectedSelector,
+      editValue: selection.editValue,
+    });
+    if (!legacyEdit.ok) {
+      if (legacyEdit.reason !== "not-applicable") {
+        setSaveError("Could not find the selected text. Click it again and retry.");
+      }
+      return;
+    }
+
+    const newHtml = legacyEdit.value;
+    setHtml(newHtml);
+    selection.clearSelection();
+    void saveHtml(newHtml);
+  };
+
+  const applyStyleToSelectedElement = (prop: string, value: string) => {
+    const styleEdit = appendScopedStyleToDocument({
+      document: latestDocumentRef.current ?? ebookDocument,
+      selectedPageId: selection.selectedPageId,
+      selectedElement: selection.selectedElement,
+      prop,
+      value,
+    });
+    if (!styleEdit.ok) {
+      if (styleEdit.reason === "target-missing") {
+        setSaveError("Could not find the selected text. Click it again and retry.");
+      }
+      return;
+    }
+
+    const newHtml = compileEbookDocumentToHtml(styleEdit.value);
+    latestDocumentRef.current = styleEdit.value;
+    setEbookDocument(styleEdit.value);
+    setHtml(newHtml);
+    void queueDocumentSave(styleEdit.value);
+  };
+
+  const exportAs = async (format: "pdf" | "png" | "jpg") => {
+    setExportOpen(false);
+    setExporting(true);
+    setExportError("");
     try {
-      await applyMutation({ action: "mark-exported" }, "Print dialog opened. Save as PDF.");
-    } catch {
-      setFeedback("Print opened, but export status could not be saved.");
+      const iframe = iframeRef.current;
+      const doc = iframe?.contentDocument;
+      if (!doc) {
+        throw new Error("Preview is not ready. Try again after it finishes loading.");
+      }
+
+      const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
+      if (pages.length === 0) {
+        throw new Error("No pages were found to export.");
+      }
+
+      const restoreSelection = clearEditorSelectionFromDocument(doc);
+      const frameStyle = doc.getElementById("celion-preview-frame-style");
+      const originalFrameStyle = frameStyle?.textContent ?? "";
+      if (frameStyle) frameStyle.textContent = "";
+      try {
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
+
+        if (format === "pdf") {
+          const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a5" });
+          for (let i = 0; i < pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
+            if (i > 0) pdf.addPage("a5", "portrait");
+            pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
+          }
+          pdf.save(`${projectTitle}.pdf`);
+        } else {
+          for (let i = 0; i < pages.length; i++) {
+            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
+            const link = document.createElement("a");
+            link.download = `${projectTitle}-page-${i + 1}.${format}`;
+            link.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
+            link.click();
+          }
+        }
+      } finally {
+        if (frameStyle) frameStyle.textContent = originalFrameStyle;
+        restoreSelection();
+      }
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Could not export ebook.");
+    } finally {
+      setExporting(false);
     }
-  }
+  };
 
-  const saveStatusLabel = imageUploadPending
-    ? "Uploading"
-    : saveStatus === "saving" || saveStatus === "dirty"
-      ? "Saving"
-      : saveStatus === "error"
-        ? "Save failed"
-        : "Saved";
-
-  if (loading) {
-    return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f6f7f8" }}>
-        <p style={{ margin: 0, fontSize: "13px", color: "#b6bbc2", fontFamily: "'Geist', sans-serif" }}>
-          Loading...
-        </p>
-      </main>
-    );
-  }
-
-  if (!project) {
-    return (
-      <main style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#f6f7f8", padding: "24px" }}>
-        <div style={{ maxWidth: "440px", textAlign: "center", background: "#fff", border: "1px solid #e1e4e8", borderRadius: "6px", padding: "40px 32px" }}>
-          <p style={{ margin: "0 0 8px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#b6bbc2", fontFamily: "'Geist', sans-serif" }}>
-            Not found
-          </p>
-          <h1 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: 600, color: "#1a1714", fontFamily: "'Geist', sans-serif", letterSpacing: "-0.02em" }}>
-            Draft unavailable
-          </h1>
-          <p style={{ margin: "0 0 20px", fontSize: "13.5px", lineHeight: 1.6, color: "#858b93", fontFamily: "'Geist', sans-serif" }}>
-            {feedback || "Sign in and try again from your documents."}
-          </p>
-          <Link
-            href={DOCUMENTS_ROUTE}
-            onClick={confirmNavigationWithUnsavedChanges}
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", background: "#1a1714", color: "#fff", borderRadius: "6px", textDecorationLine: "none", fontSize: "13px", fontWeight: 500, fontFamily: "'Geist', sans-serif" }}
-          >
-            <ArrowLeft size={13} />
-            Back to documents
-          </Link>
-        </div>
-      </main>
-    );
-  }
+  const handlePageSelect = useCallback((index: number) => {
+    scrollToPage(index);
+  }, [scrollToPage]);
 
   return (
-    <main style={{ display: "flex", flexDirection: "column", height: "100vh", minHeight: "100vh", overflow: "hidden", background: "#f6f7f8" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          height: "52px",
-          padding: "0 20px",
-          borderBottom: "1px solid #e1e4e8",
-          background: "#fff",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-          <Link
-            href={DOCUMENTS_ROUTE}
-            onClick={confirmNavigationWithUnsavedChanges}
-            style={{ display: "flex", alignItems: "center", gap: "5px", textDecorationLine: "none", color: "#858b93", fontSize: "13px", fontFamily: "'Geist', sans-serif" }}
-          >
-            <ArrowLeft size={14} />
-            Documents
-          </Link>
-          <span style={{ color: "#d6dbe1", fontSize: "13px" }}>/</span>
-          <span style={{ fontSize: "13px", fontWeight: 500, color: "#1a1714", fontFamily: "'Geist', sans-serif", maxWidth: "360px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {project.title}
-          </span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f3f2ef", fontFamily: "'Geist', sans-serif", overflow: "hidden" }}>
+      <EditorTopBar
+        projectTitle={projectTitle}
+        saving={saving}
+        saveError={saveError}
+        exportError={exportError}
+        exporting={exporting}
+        exportOpen={exportOpen}
+        edgeGap={EDITOR_EDGE_GAP}
+        topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
+        onToggleExport={() => setExportOpen((open) => !open)}
+        onExport={exportAs}
+      />
+
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: "10px", padding: `0 ${EDITOR_EDGE_GAP}px ${EDITOR_EDGE_GAP}px`, boxSizing: "border-box" }}>
+        <EditorPageList
+          slideCount={slideCount}
+          currentSlide={currentSlide}
+          pageSummaries={pageSummaries}
+          onSelectPage={handlePageSelect}
+        />
+
+        <div
+          style={{
+            display: "flex",
+            flex: 1,
+            minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
+            background: "#fff",
+            border: "1px solid rgba(28,25,23,0.08)",
+            borderRadius: "12px",
+            boxShadow: "none",
+            overflow: "hidden",
+          }}
+        >
+          <EditorPreviewPane
+            html={html}
+            width={PREVIEW_WIDTH}
+            iframeHeight={iframeHeight}
+            iframeRef={iframeRef}
+            previewScrollRef={previewScrollRef}
+            onIframeLoad={handleIframeLoad}
+            onPreviewScroll={handlePreviewScroll}
+          />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span
-            style={{
-              minWidth: "72px",
-              color: imageUploadPending || saveStatus === "saving" || saveStatus === "dirty" || saveStatus === "error" ? "#5f6670" : "#858b93",
-              fontFamily: "'Geist', sans-serif",
-              fontSize: "11.5px",
-              fontWeight: 560,
-              textAlign: "right",
-            }}
-          >
-            {saveStatusLabel}
-          </span>
-          {saveStatus === "error" ? (
-            <button
-              type="button"
-              disabled={imageUploadPending}
-              onClick={() => {
-                requestSaveDocument().catch((error) => {
-                  setFeedback(error instanceof Error ? error.message : "Could not save document edits.");
-                });
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                height: "30px",
-                border: "1px solid #e1e4e8",
-                borderRadius: "4px",
-                background: "#ffffff",
-                color: "#5f6670",
-                padding: "0 12px",
-                fontFamily: "'Geist', sans-serif",
-                fontSize: "12px",
-                fontWeight: 550,
-                cursor: imageUploadPending ? "not-allowed" : "pointer",
-              }}
-            >
-              Retry save
-            </button>
-          ) : null}
-          <PageFormatControl
-            value={pageFormat}
-            customPageSize={customPageSize}
-            onChange={(nextFormat, nextPageSize) => {
-              updatePageFormat(nextFormat, nextPageSize).catch((e) => {
-                setFeedback(e instanceof Error ? e.message : "Could not save page format.");
-              });
-            }}
-          />
-          <button
-            type="button"
-            disabled={!hasDraft || imageUploadPending || saveStatus === "saving"}
-            onClick={exportPdf}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "7px",
-              height: "30px",
-              border: "1px solid #e1e4e8",
-              borderRadius: "4px",
-              background: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#17191d" : "#f1f2f4",
-              color: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "#ffffff" : "#9aa0a8",
-              padding: "0 12px",
-              fontFamily: "'Geist', sans-serif",
-              fontSize: "12px",
-              fontWeight: 550,
-              cursor: hasDraft && !imageUploadPending && saveStatus !== "saving" ? "pointer" : "not-allowed",
-            }}
-          >
-            <Download size={13} strokeWidth={1.9} />
-            Export
-          </button>
-        </div>
-      </header>
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          gridTemplateColumns: "272px minmax(0, 1fr) 320px",
-          height: "calc(100vh - 52px)",
-          minHeight: "calc(100vh - 52px)",
-          overflow: "hidden",
-        }}
-      >
-        <EditorLeftPanel
-          document={bookDocument}
-          visualPageCount={visualPageCount}
-        />
-        <div style={{ position: "relative", display: "flex", minWidth: 0, minHeight: 0, flexDirection: "column" }}>
-          <div
-            id="editor-toolbar"
-            style={{
-              position: "absolute",
-              top: "14px",
-              left: 0,
-              right: 0,
-              height: "42px",
-              background: "transparent",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "center",
-              minWidth: 0,
-              pointerEvents: "none",
-              zIndex: 10,
-            }}
-          />
-          <div style={{ flex: 1, minHeight: 0 }}>
-            {feedback && (saveStatus === "error" || imageUploadPending) ? (
-              <div
-                role={saveStatus === "error" ? "alert" : "status"}
-                style={{
-                  margin: "10px 14px 0",
-                  border: "1px solid #e1e4e8",
-                  borderRadius: "6px",
-                  background: "#ffffff",
-                  color: "#5f6670",
-                  fontFamily: "'Geist', sans-serif",
-                  fontSize: "12px",
-                  lineHeight: 1.45,
-                  padding: "8px 10px",
-                }}
-              >
-                {feedback}
-              </div>
-            ) : null}
-            <DocumentEditorPanel
-              key={project.id}
-              title={project.title}
-              document={bookDocument}
-              pageFormat={pageFormat}
-              customPageSize={customPageSize}
-              toolbarHostId="editor-toolbar"
-              onChange={updateLocalDocument}
-              onPageCountChange={setVisualPageCount}
-              onLayoutChange={setEditorLayout}
-              onSelectionAiRevise={async ({ selectedText, instruction }) => {
-                const res = await fetch("/api/ai/revise-text", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ selectedText, instruction }),
-                });
-                const data = (await res.json()) as { revisedText?: string; message?: string };
-                if (!res.ok || !data.revisedText) throw new Error(data.message ?? "Revision failed.");
-                return data.revisedText;
-              }}
-              onImageUploadStateChange={setImageUploadPendingState}
-            />
-          </div>
-        </div>
-        <ActionPanel
-          layout={editorLayout}
-          onLayoutChange={(nextLayout) => {
-            setEditorLayout(nextLayout);
-            updateLocalDocument({ ...latestDocumentRef.current, layout: nextLayout });
-          }}
+        <EditorInspectorPanel
+          selectedElement={selection.selectedElement}
+          inspectorElement={selection.inspectorElement}
+          editValue={selection.editValue}
+          topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
+          edgeGap={EDITOR_EDGE_GAP}
+          onTextChange={selection.setEditValue}
+          onApplyText={applyEdit}
+          onStyleChange={applyStyleToSelectedElement}
         />
       </div>
-    </main>
+    </div>
   );
 }

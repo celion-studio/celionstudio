@@ -1,11 +1,17 @@
+import {
+  EBOOK_PAGE_SIZE_CSS_MM,
+  EBOOK_PAGE_SIZE_MM,
+  EBOOK_PAGE_SIZE_PX,
+} from "./ebook-format";
+
 const UNSUPPORTED_COLOR_FUNCTIONS = ["color-mix", "oklch", "lab", "lch", "color"] as const;
 
 export const CELION_A5_SLIDE_HTML_SPEC = [
   "Single complete HTML document with one <style> block in <head>",
   'Every page is <div class="slide" data-slide="N">',
-  "Each .slide is fixed at 559px x 794px or 148mm x 210mm",
+  `Each .slide is fixed at ${EBOOK_PAGE_SIZE_PX.width}px x ${EBOOK_PAGE_SIZE_PX.height}px or ${EBOOK_PAGE_SIZE_MM.width}mm x ${EBOOK_PAGE_SIZE_MM.height}mm`,
   "Each .slide uses overflow: hidden and page-break-after/break-after",
-  "@page is 148mm 210mm with zero margin",
+  `@page is ${EBOOK_PAGE_SIZE_CSS_MM} with zero margin`,
   "CSS colors are export-safe: hex, rgb, rgba, hsl, hsla, named colors, or variables resolving to those values",
   "Unsupported CSS color functions are not part of the format: color(), color-mix(), oklch(), lab(), lch()",
 ] as const;
@@ -104,10 +110,14 @@ export function validateCelionSlideHtml(
   if (hasPageClassToken(html) || /\bdata-page=/i.test(html)) {
     errors.push("Output must use .slide/data-slide, not .page/data-page.");
   }
-  if (!/@page\s*\{[^}]*148mm\s+210mm[^}]*margin\s*:\s*0/i.test(html)) {
-    errors.push("Output must include @page { size: 148mm 210mm; margin: 0; }.");
+  const pageSizePattern = new RegExp(`@page\\s*\\{[^}]*${EBOOK_PAGE_SIZE_MM.width}mm\\s+${EBOOK_PAGE_SIZE_MM.height}mm[^}]*margin\\s*:\\s*0`, "i");
+  const fixedWidthPattern = new RegExp(`width\\s*:\\s*(${EBOOK_PAGE_SIZE_PX.width}px|${EBOOK_PAGE_SIZE_MM.width}mm)`, "i");
+  const fixedHeightPattern = new RegExp(`height\\s*:\\s*(${EBOOK_PAGE_SIZE_PX.height}px|${EBOOK_PAGE_SIZE_MM.height}mm)`, "i");
+
+  if (!pageSizePattern.test(html)) {
+    errors.push(`Output must include @page { size: ${EBOOK_PAGE_SIZE_CSS_MM}; margin: 0; }.`);
   }
-  if (!/width\s*:\s*(559px|148mm)/i.test(html) || !/height\s*:\s*(794px|210mm)/i.test(html)) {
+  if (!fixedWidthPattern.test(html) || !fixedHeightPattern.test(html)) {
     errors.push("Slides must declare fixed A5 dimensions.");
   }
   if (!/\.slide\b[\s\S]*?overflow\s*:\s*hidden/i.test(html)) {

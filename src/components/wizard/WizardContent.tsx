@@ -69,7 +69,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
   const store = useProjectWizardStore();
   const {
     step, title, author, targetAudience, purpose, purposeDetail, tone,
-    ebookStyle, accentColor, sourceText, sourceFiles,
+    ebookStyle, accentColor, sourceFiles,
     generating, error,
     setStep, setField, setPurpose, setTone, setEbookStyle, setAccentColor,
     setSourceFiles, setGenerating, setError, reset,
@@ -87,7 +87,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
   const busy = submitting || generating;
   const canAdvance = currentIssue == null && !busy;
   const currentStepIndex = step - 1;
-  const promptSourceText = formatSourcesForPrompt(sourceFiles, sourceText);
+  const promptSourceText = formatSourcesForPrompt(sourceFiles, "");
   const resolvedPurpose = resolvePurpose(purpose, purposeDetail);
 
   const handlePrevious = () => {
@@ -121,7 +121,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
       if (!res.ok || !data.projectId) throw new Error(data.message ?? "Could not generate ebook.");
       resetOnUnmountRef.current = true;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      router.replace(`/builder/${data.projectId}` as any);
+      router.replace(`/editor/${data.projectId}` as any);
       return;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");

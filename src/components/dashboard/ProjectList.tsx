@@ -36,27 +36,22 @@ function StatusBadge({ status }: { status: string }) {
 
 type ProjectListProps = {
   projects: ProjectRecord[];
-  surface?: "workspace" | "documents";
   deletingProjectId?: string;
   onDeleteProject?: (project: ProjectRecord) => void;
 };
 
 export function ProjectList({
   projects,
-  surface = "workspace",
   deletingProjectId = "",
   onDeleteProject,
 }: ProjectListProps) {
   if (projects.length === 0) return null;
 
-  const isDocuments = surface === "documents";
-  const columns = isDocuments
-    ? ["Title", "Updated", "Format", "Status", ""]
-    : ["Title", "Audience", "Tone", "Status", ""];
+  const columns = ["Title", "Audience", "Tone", "Status", ""];
 
   return (
-    <div style={{ background: "#fff", border: "1px solid #ECEAE5", borderRadius: "12px", overflow: "hidden" }}>
-      <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 20px", borderBottom: "1px solid #ECEAE5", background: "#FAFAF9" }}>
+    <div style={{ overflow: "hidden" }}>
+      <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 16px", borderBottom: "1px solid #ECEAE5", background: "#f8f7f4", borderRadius: "8px 8px 0 0" }}>
         {columns.map((col) => (
           <span key={col || "actions"} style={{ fontSize: "11px", fontWeight: 500, color: "#A1A1AA", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Geist', sans-serif" }}>
             {col}
@@ -67,7 +62,7 @@ export function ProjectList({
       {projects.map((project, i) => {
         const isLast = i === projects.length - 1;
         const isDeleting = deletingProjectId === project.id;
-        const title = project.title || (isDocuments ? "Untitled Document" : "Untitled Draft");
+        const title = project.title || "Untitled Draft";
         const updatedDate = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
         const updatedDateWithYear = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
         const deleteButton = (
@@ -103,23 +98,21 @@ export function ProjectList({
             key={project.id}
             style={{
               display: "block",
-              borderBottom: isLast ? "none" : "1px solid #ECEAE5",
+              borderBottom: isLast ? "none" : "1px solid #F0EEE9",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#FAFAF9")}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#fbfaf8")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
           >
             <div className="flex sm:hidden" style={{ padding: "14px 16px", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
               <Link
-                href={(isDocuments ? `/editor/${project.id}` : `/builder/${project.id}`) as Route}
+                href={`/editor/${project.id}` as Route}
                 style={{ flex: 1, minWidth: 0, textDecorationLine: "none" }}
               >
                 <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, fontFamily: "'Geist', sans-serif", color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {title}
                 </p>
                 <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#A1A1AA" }}>
-                  {isDocuments
-                    ? `Updated ${updatedDate}`
-                    : `${project.profile.targetAudience.slice(0, 24)} / ${updatedDate}`}
+                  {project.profile.targetAudience.slice(0, 24)} / {updatedDate}
                 </p>
               </Link>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
@@ -128,9 +121,9 @@ export function ProjectList({
               </div>
             </div>
 
-            <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", alignItems: "center", padding: "14px 20px" }}>
+            <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", alignItems: "center", padding: "14px 16px" }}>
               <Link
-                href={(isDocuments ? `/editor/${project.id}` : `/builder/${project.id}`) as Route}
+                href={`/editor/${project.id}` as Route}
                 style={{ minWidth: 0, textDecorationLine: "none" }}
               >
                 <p style={{ margin: 0, fontSize: "13.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "340px" }}>
@@ -141,10 +134,10 @@ export function ProjectList({
                 </p>
               </Link>
               <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {isDocuments ? updatedDateWithYear : project.profile.targetAudience.slice(0, 18)}
+                {project.profile.targetAudience.slice(0, 18)}
               </span>
               <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {isDocuments ? project.profile.pageFormat.toUpperCase() : project.profile.tone.slice(0, 18)}
+                {project.profile.tone.slice(0, 18)}
               </span>
               <div>
                 <StatusBadge status={project.status} />

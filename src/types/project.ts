@@ -1,4 +1,9 @@
-﻿export type ProjectStatus =
+import type { CelionEbookDocument } from "@/lib/ebook-document";
+import type { EbookStyle } from "@/lib/ebook-style";
+
+export type { EbookStyle } from "@/lib/ebook-style";
+
+export type ProjectStatus =
   | "draft"
   | "processing_sources"
   | "planning"
@@ -8,33 +13,14 @@
   | "revising"
   | "exported";
 
-export type ProjectKind = "product" | "document";
+export const PROJECT_KIND_IDS = ["product"] as const;
+export type ProjectKind = (typeof PROJECT_KIND_IDS)[number];
 
-export type EbookStyle =
-  | "minimal"
-  | "editorial"
-  | "neo-brutalism"
-  | "bold"
-  | "elegant";
+export const SOURCE_KIND_IDS = ["pasted_text", "pdf", "md", "txt", "docx"] as const;
+export type SourceKind = (typeof SOURCE_KIND_IDS)[number];
 
-export type SourceKind = "pasted_text" | "pdf" | "md" | "txt" | "docx";
-
-export type DesignMode = "text" | "balanced" | "visual";
-export type PageFormat =
-  | "ebook"
-  | "kindle"
-  | "tablet"
-  | "mobile"
-  | "a5"
-  | "a4"
-  | "a3"
-  | "a2"
-  | "custom";
-
-export type PageSize = {
-  widthMm: number;
-  heightMm: number;
-};
+export const DESIGN_MODE_IDS = ["text", "balanced", "visual"] as const;
+export type DesignMode = (typeof DESIGN_MODE_IDS)[number];
 
 export type ProjectSource = {
   id: string;
@@ -44,32 +30,15 @@ export type ProjectSource = {
   excerpt: string;
 };
 
-export type PlanChapter = {
-  id: string;
-  title: string;
-  summary: string;
-  keyPoints: string[];
-};
-
-export type ProjectPlan = {
-  hook: string;
-  chapters: PlanChapter[];
-};
-
-export type ProjectDocumentPayload = unknown;
-
 export type ProjectProfile = {
   author: string;
   targetAudience: string;
   purpose: string;
   designMode: DesignMode;
   tone: string;
-  pageFormat: PageFormat;
-  customPageSize: PageSize;
-  plan: ProjectPlan | null;
-  document: ProjectDocumentPayload;
   ebookStyle: EbookStyle | null;
   ebookHtml: string | null;
+  ebookDocument: CelionEbookDocument | null;
   ebookPageCount: number;
   accentColor: string;
 };
@@ -85,4 +54,3 @@ export type ProjectRecord = {
   profile: ProjectProfile;
   revisionPrompt?: string;
 };
-

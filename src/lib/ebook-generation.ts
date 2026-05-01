@@ -4,24 +4,19 @@ import {
   GeminiProviderError,
   generateJsonWithGemini,
 } from "@/lib/ai/gemini";
+import { validateCelionSlideHtml } from "@/lib/ebook-html";
+import { EBOOK_PAGE_SIZE_CSS_PX, EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
+import { EBOOK_STYLE_PROMPTS } from "@/lib/ebook-style";
 import {
-  normalizeEbookHtmlSlideContract,
-  sanitizeEbookHtmlForCanvas,
-  validateCelionSlideHtml,
-} from "@/lib/ebook-html";
+  compileEbookDocumentToHtml,
+  normalizeEbookDocument,
+  sanitizeEbookDocument,
+  validateEbookDocument,
+  type CelionEbookDocument,
+} from "@/lib/ebook-document";
 import type { EbookStyle } from "@/types/project";
 
-const EBOOK_WIDTH_PX = 559;
-const EBOOK_HEIGHT_PX = 794;
 const BLUEPRINT_MODEL = EBOOK_BLUEPRINT_GEMINI_MODEL;
-
-const STYLE_PROMPTS: Record<EbookStyle, string> = {
-  minimal: "quiet Swiss editorial system, white space, hairline rules, precise labels, restrained accent use",
-  editorial: "magazine/report system, confident typographic hierarchy, pull quotes, chapter rhythm, asymmetric editorial grid",
-  "neo-brutalism": "raw high-contrast system, hard borders, monospace details, sticker-like labels, practical code/prompt surfaces",
-  bold: "oversized type, decisive contrast, energetic pacing, strong color blocks, confident editorial impact",
-  elegant: "refined publishing system, serif-led hierarchy, quiet frames, warm paper, subtle proof and note components",
-};
 
 const TONE_PROMPTS: Record<string, string> = {
   preserve: "preserve the source's voice and terminology unless clarity requires light editing",
@@ -59,6 +54,15 @@ type EbookBlueprint = {
   targetAudience: string;
   readerPromise: string;
   language: string;
+  sourceAssessment: {
+    sourceScale: string;
+    detectedSections: string[];
+    essentialSections: string[];
+    compressionRisk: string;
+    recommendedSlideCount: number;
+    coveragePlan: string[];
+    rationale: string;
+  };
   cover: {
     eyebrow: string;
     title: string;
@@ -86,6 +90,7 @@ export type EbookGenerationDiagnostics = {
   blueprintModel: string;
   htmlModel: string;
   blueprint: EbookBlueprint;
+  ebookDocument: CelionEbookDocument;
   validation: ReturnType<typeof validateUsableEbookHtml>;
   htmlLength: number;
   slideCount: number;
@@ -104,14 +109,35 @@ const HTML_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designe
 You receive an approved editorial blueprint.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
 Your job is to turn the blueprint into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
-Return JSON only: { "html": "<complete html document string>" }`;
+Return JSON only: { "document": { "version": 1, "size": { "width": ${EBOOK_PAGE_SIZE_PX.width}, "height": ${EBOOK_PAGE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "pages": [] } }`;
 
 function tonePromptFor(tone?: string) {
   return TONE_PROMPTS[tone ?? ""] ?? tone ?? "use the best tone for the source and reader";
 }
 
+function estimateSlideBudgetForSource(sourceText: string) {
+  const trimmedSource = sourceText.trim();
+  const sourceChars = trimmedSource.length;
+  const detectedSections = (trimmedSource.match(/^#{1,3}\s+\S/gm) ?? []).length;
+
+  if (sourceChars >= 12000 || detectedSections >= 18) {
+    return { min: 18, max: 22, detectedSections, sourceChars };
+  }
+
+  if (sourceChars >= 7000 || detectedSections >= 10) {
+    return { min: 14, max: 18, detectedSections, sourceChars };
+  }
+
+  if (sourceChars >= 3000 || detectedSections >= 5) {
+    return { min: 12, max: 16, detectedSections, sourceChars };
+  }
+
+  return { min: 10, max: 14, detectedSections, sourceChars };
+}
+
 function buildBlueprintPrompt(args: EbookGenerationArgs): string {
-  const stylePrompt = STYLE_PROMPTS[args.ebookStyle];
+  const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
+  const slideBudget = estimateSlideBudgetForSource(args.sourceText);
 
   return `Create a source-led A5 slide publication blueprint.
 
@@ -128,7 +154,12 @@ Source material:
 ${args.sourceText.slice(0, 36000) || "(no source provided)"}
 
 Blueprint requirements:
-- Make 8-14 slides total.
+- Recommended slide budget: ${slideBudget.min}-${slideBudget.max} slides.
+- Source scale: ${slideBudget.sourceChars} characters, ${slideBudget.detectedSections} detected sections/headings.
+- First assess the source, then decide the page count. The blueprint must choose recommendedSlideCount after assessing the source, not before.
+- The slides array should contain approximately recommendedSlideCount slides. If you recommend 20 slides, do not return 10.
+- Do not compress a long source into 10 slides. If the source has many sections, examples, steps, or warnings, preserve coverage by using the higher end of the recommended budget.
+- Cover the source's major sections and methods before summarizing. It is better to make a focused 18-22 slide guide than to discard useful material for artificial brevity.
 - Every slide headline must be specific and reader-facing.
 - Do not use abstract planning labels, generic section names, or numbered duplicate titles.
 - Cover copy must be rewritten as a strong publication concept for the stated purpose, not a paste of the brief fields.
@@ -144,6 +175,15 @@ Return JSON in exactly this shape:
   "targetAudience": "specific reader",
   "readerPromise": "reader-facing purpose, promise, or outcome",
   "language": "primary visible language",
+  "sourceAssessment": {
+    "sourceScale": "short | medium | long | very_long",
+    "detectedSections": ["major source sections, chapters, topics, or methods detected"],
+    "essentialSections": ["source sections or methods that must be represented in the final publication"],
+    "compressionRisk": "low | medium | high",
+    "recommendedSlideCount": 10,
+    "coveragePlan": ["how the slides will preserve the source without over-compressing it"],
+    "rationale": "why this slide count fits the source and purpose"
+  },
   "cover": {
     "eyebrow": "short category cue",
     "title": "cover title",
@@ -179,14 +219,14 @@ Return JSON in exactly this shape:
 }
 
 function buildHtmlPrompt(args: EbookGenerationArgs, blueprint: EbookBlueprint): string {
-  const stylePrompt = STYLE_PROMPTS[args.ebookStyle];
+  const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
 
   return `Render this approved blueprint as a finished A5 HTML/CSS slide publication.
 
 Design inputs:
 - Visual mood: ${args.ebookStyle} (${stylePrompt})
 - Accent color: ${args.accentColor}
-- Page size: ${EBOOK_WIDTH_PX}px x ${EBOOK_HEIGHT_PX}px
+- Page size: ${EBOOK_PAGE_SIZE_CSS_PX}
 
 Approved blueprint:
 ${JSON.stringify(blueprint, null, 2)}
@@ -207,11 +247,20 @@ Design direction:
 - Avoid tiny text. Body copy should generally be 14px or larger, and dense notes should still remain readable.
 
 Technical contract:
-- Output only JSON with one "html" field.
-- Single complete HTML document with one <style> block in <head>.
-- Use <div class="slide" data-slide="N"> for every slide.
-- Each .slide must be exactly ${EBOOK_WIDTH_PX}px x ${EBOOK_HEIGHT_PX}px and overflow: hidden.
-- Use @page size 148mm 210mm, zero page margin, and page-break-after/break-after on every .slide.
+- Output only JSON with one "document" field.
+- Generate all pages in one response. Do not require page-by-page calls.
+- The document must have version: 1, title, size: { width: ${EBOOK_PAGE_SIZE_PX.width}, height: ${EBOOK_PAGE_SIZE_PX.height}, unit: "px" }, themeCss, and pages.
+- themeCss may be empty or contain only a single :root block with CSS custom properties such as --accent. Do not put selectors, layout rules, imports, or page styles in themeCss.
+- Each page includes id, index, title, role, html, css, manifest, and version.
+- Each page html has root <section data-celion-page="{pageId}" class="celion-page">.
+- Every editable text, shape, image, and container has data-celion-id, data-role, and data-editable="true".
+- Never put style="" attributes in HTML. Put every visual rule in the page css field.
+- Every page CSS selector starts with [data-celion-page="{pageId}"].
+- Do not use script, iframe, object, embed, form, input, textarea, button, video, audio, canvas, external JS, or external CSS.
+- Do not use url(), @import, @keyframes, animations, transitions, or markup-like tokens inside CSS.
+- Do not use global selectors like html, body, *, h1, p, div, span, section, or unscoped class selectors.
+- Manifest includes every editable element.
+- Use page CSS to make each [data-celion-page="{pageId}"] exactly ${EBOOK_PAGE_SIZE_CSS_PX} and overflow: hidden.
 - Use only browser-safe CSS colors: hex, rgb, rgba, hsl, hsla, named colors, or variables that resolve to those values.
 - Do not use color(), color-mix(), oklch(), lab(), or lch().
 - No placeholders, lorem ipsum, markdown fences, scripts, external assets, or generic filler.
@@ -239,6 +288,9 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
     : {};
   const editorialStrategy = typeof record.editorialStrategy === "object" && record.editorialStrategy !== null
     ? record.editorialStrategy as Record<string, unknown>
+    : {};
+  const sourceAssessment = typeof record.sourceAssessment === "object" && record.sourceAssessment !== null
+    ? record.sourceAssessment as Record<string, unknown>
     : {};
   const designBrief = typeof record.designBrief === "object" && record.designBrief !== null
     ? record.designBrief as Record<string, unknown>
@@ -271,6 +323,19 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
     );
   }
 
+  const promptSlideBudget = estimateSlideBudgetForSource(args.sourceText);
+  const rawRecommendedSlideCount = typeof sourceAssessment.recommendedSlideCount === "number" && Number.isFinite(sourceAssessment.recommendedSlideCount)
+    ? Math.round(sourceAssessment.recommendedSlideCount)
+    : Math.min(promptSlideBudget.max, Math.max(promptSlideBudget.min, normalizedSlides.length));
+  const recommendedSlideCount = Math.min(24, Math.max(8, rawRecommendedSlideCount));
+  if (normalizedSlides.length < recommendedSlideCount - 2) {
+    throw new EbookGenerationError(
+      "blueprint_invalid",
+      `Gemini Flash recommended ${recommendedSlideCount} slides but only returned ${normalizedSlides.length} usable slides.`,
+      { stage: "blueprint" },
+    );
+  }
+
   return {
     title: stringValue(record.title, args.title),
     subtitle: stringValue(record.subtitle),
@@ -278,6 +343,15 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
     targetAudience: stringValue(record.targetAudience, args.targetAudience),
     readerPromise: stringValue(record.readerPromise, args.purpose),
     language: stringValue(record.language, "source language"),
+    sourceAssessment: {
+      sourceScale: stringValue(sourceAssessment.sourceScale, "medium"),
+      detectedSections: stringArrayValue(sourceAssessment.detectedSections),
+      essentialSections: stringArrayValue(sourceAssessment.essentialSections),
+      compressionRisk: stringValue(sourceAssessment.compressionRisk, "medium"),
+      recommendedSlideCount,
+      coveragePlan: stringArrayValue(sourceAssessment.coveragePlan),
+      rationale: stringValue(sourceAssessment.rationale),
+    },
     cover: {
       eyebrow: stringValue(cover.eyebrow),
       title: stringValue(cover.title, stringValue(record.title, args.title)),
@@ -292,7 +366,7 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
       narrativeArc: stringValue(editorialStrategy.narrativeArc),
     },
     designBrief: {
-      mood: stringValue(designBrief.mood, STYLE_PROMPTS[args.ebookStyle]),
+      mood: stringValue(designBrief.mood, EBOOK_STYLE_PROMPTS[args.ebookStyle]),
       visualSystem: stringValue(designBrief.visualSystem),
       coverConcept: stringValue(designBrief.coverConcept),
       layoutRhythm: stringValue(designBrief.layoutRhythm),
@@ -311,16 +385,29 @@ function validateUsableEbookHtml(html: string) {
 }
 
 type EbookFailureReason = "gemini_call_failed" | "missing_html" | "invalid_html" | "blueprint_invalid";
+type EbookGenerationStage = "blueprint" | "html";
+type EbookGenerationErrorOptions = {
+  status?: number;
+  stage?: EbookGenerationStage;
+  validation?: unknown;
+  pageCount?: number;
+};
 
 export class EbookGenerationError extends Error {
   readonly reason: EbookFailureReason;
   readonly status?: number;
+  readonly stage?: EbookGenerationStage;
+  readonly validation?: unknown;
+  readonly pageCount?: number;
 
-  constructor(reason: EbookFailureReason, message: string, options: { status?: number } = {}) {
+  constructor(reason: EbookFailureReason, message: string, options: EbookGenerationErrorOptions = {}) {
     super(message);
     this.name = "EbookGenerationError";
     this.reason = reason;
     this.status = options.status;
+    this.stage = options.stage;
+    this.validation = options.validation;
+    this.pageCount = options.pageCount;
   }
 }
 
@@ -328,15 +415,11 @@ function errorDetails(error: unknown) {
   if (typeof error !== "object" || error === null) return undefined;
 
   const record = error as Record<string, unknown>;
-  const errorMessage = error instanceof Error
-    ? error.message.replace(/\s+/g, " ").slice(0, 500)
-    : undefined;
 
   return {
     errorName: error instanceof Error ? error.name : undefined,
     errorCode: typeof record.code === "string" ? record.code : undefined,
     status: typeof record.status === "number" ? record.status : undefined,
-    errorMessage,
   };
 }
 
@@ -350,7 +433,7 @@ function warnEbookGenerationFailure(reason: EbookFailureReason, details: Record<
 function failGeneration(
   reason: EbookFailureReason,
   message: string,
-  options: { status?: number } = {},
+  options: EbookGenerationErrorOptions = {},
 ): never {
   throw new EbookGenerationError(reason, message, options);
 }
@@ -378,7 +461,7 @@ async function generateEbookBlueprint(args: EbookGenerationArgs) {
       status === 429
         ? "Gemini rate limit was reached while planning the ebook. Please wait a bit and try again."
         : "AI ebook planning failed before Gemini returned a usable blueprint.",
-      { status },
+      { status, stage: "blueprint" },
     );
   }
 }
@@ -401,18 +484,41 @@ async function generateEbookHtmlFromBlueprint(args: EbookGenerationArgs, bluepri
       status === 429
         ? "Gemini rate limit was reached while designing the ebook. Please wait a bit and try again."
         : "AI ebook generation failed before Gemini returned a usable design.",
-      { status },
+      { status, stage: "html" },
     );
   }
 
-  const result = raw as { html?: unknown };
-  if (!result?.html || typeof result.html !== "string") {
-    warnEbookGenerationFailure("missing_html", { stage: "html", htmlType: typeof result?.html });
-    return failGeneration("missing_html", "Gemini did not return an HTML document.");
+  const result = raw as { document?: unknown };
+  if (!result?.document || typeof result.document !== "object") {
+    warnEbookGenerationFailure("missing_html", { stage: "html", documentType: typeof result?.document });
+    return failGeneration("missing_html", "Gemini did not return an ebook document.", { stage: "html" });
   }
 
-  const sanitizedHtml = normalizeEbookHtmlSlideContract(sanitizeEbookHtmlForCanvas(result.html));
-  const validation = validateUsableEbookHtml(sanitizedHtml);
+  const ebookDocument = sanitizeEbookDocument(normalizeEbookDocument(result.document));
+  const documentValidation = validateEbookDocument(ebookDocument);
+  if (!documentValidation.ok) {
+    warnEbookGenerationFailure("invalid_html", {
+      stage: "html",
+      documentValidationErrors: documentValidation.errors,
+      pageCount: ebookDocument.pages.length,
+    });
+    return failGeneration(
+      "invalid_html",
+      `Gemini returned an ebook document, but it did not pass Celion document validation: ${documentValidation.errors[0] ?? "Unknown document validation error."}`,
+      {
+        stage: "html",
+        validation: {
+          ok: false,
+          errors: documentValidation.errors,
+          pageCount: ebookDocument.pages.length,
+        },
+        pageCount: ebookDocument.pages.length,
+      },
+    );
+  }
+
+  const html = compileEbookDocumentToHtml(ebookDocument);
+  const validation = validateUsableEbookHtml(html);
   if (!validation.ok) {
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",
@@ -422,12 +528,18 @@ async function generateEbookHtmlFromBlueprint(args: EbookGenerationArgs, bluepri
     return failGeneration(
       "invalid_html",
       `Gemini returned HTML, but it did not pass Celion ebook validation: ${validation.errors.join(" ")}`,
+      {
+        stage: "html",
+        validation,
+        pageCount: validation.slideCount,
+      },
     );
   }
 
   return {
-    html: sanitizedHtml,
+    html,
     validation,
+    ebookDocument,
   };
 }
 
@@ -440,13 +552,14 @@ export async function generateEbookHtmlWithDiagnostics(
   args: EbookGenerationArgs,
 ): Promise<{ html: string; diagnostics: EbookGenerationDiagnostics }> {
   const blueprint = await generateEbookBlueprint(args);
-  const { html, validation } = await generateEbookHtmlFromBlueprint(args, blueprint);
+  const { html, validation, ebookDocument } = await generateEbookHtmlFromBlueprint(args, blueprint);
   return {
     html,
     diagnostics: {
       blueprintModel: BLUEPRINT_MODEL,
       htmlModel: EBOOK_GEMINI_MODEL,
       blueprint,
+      ebookDocument,
       validation,
       htmlLength: html.length,
       slideCount: validation.slideCount,

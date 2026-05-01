@@ -1,40 +1,8 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { EBOOK_STYLE_OPTIONS } from "@/lib/ebook-style";
 import type { EbookStyle } from "@/types/project";
-
-const STYLES: { id: EbookStyle; label: string; desc: string; preview: string }[] = [
-  {
-    id: "minimal",
-    label: "Minimal",
-    desc: "Clean white space, generous margins, single accent",
-    preview: "bg-white border-2 border-gray-100",
-  },
-  {
-    id: "editorial",
-    label: "Editorial",
-    desc: "Magazine-style, strong type hierarchy, bold headers",
-    preview: "bg-gray-50 border-2 border-gray-200",
-  },
-  {
-    id: "neo-brutalism",
-    label: "Neo Brutalism",
-    desc: "Thick borders, high contrast, stark typography",
-    preview: "bg-yellow-50 border-4 border-black",
-  },
-  {
-    id: "bold",
-    label: "Bold",
-    desc: "Large impactful type, vibrant color blocks",
-    preview: "bg-gray-900 border-2 border-gray-700",
-  },
-  {
-    id: "elegant",
-    label: "Elegant",
-    desc: "Serif fonts, refined spacing, classic book feel",
-    preview: "bg-stone-50 border-2 border-stone-200",
-  },
-];
 
 const ACCENT_COLORS = [
   { label: "Indigo", value: "#6366f1" },
@@ -60,7 +28,7 @@ export function StyleStep({ ebookStyle, onStyleChange, accentColor, onAccentColo
   return (
     <div className="space-y-7">
       <div className="space-y-3">
-        {STYLES.map((style) => {
+        {EBOOK_STYLE_OPTIONS.map((style) => {
           const isSelected = ebookStyle === style.id;
           return (
             <button

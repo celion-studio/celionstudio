@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateEbookHtml } from "./ebook-generation";
+import { EbookGenerationError, generateEbookHtml, generateEbookHtmlWithDiagnostics } from "./ebook-generation";
+import type { CelionEbookDocument } from "./ebook-document";
 
 function muteConsoleWarn() {
   const originalWarn = console.warn;
@@ -10,7 +11,7 @@ function muteConsoleWarn() {
   };
 }
 
-function validBlueprint() {
+function validBlueprint(slideCount = 10, recommendedSlideCount = slideCount) {
   return {
     title: "Source-led guide",
     subtitle: "A practical guide from the source",
@@ -18,6 +19,15 @@ function validBlueprint() {
     targetAudience: "founders",
     readerPromise: "Make the source useful.",
     language: "English",
+    sourceAssessment: {
+      sourceScale: slideCount >= 18 ? "long" : "medium",
+      detectedSections: ["Market", "Method", "Checklist"],
+      essentialSections: ["Problem", "Method", "Example", "Checklist"],
+      compressionRisk: slideCount >= 18 ? "high" : "low",
+      recommendedSlideCount,
+      coveragePlan: ["Cover source argument", "Preserve examples", "Close with checklist"],
+      rationale: "Use enough slides to preserve source-backed substance.",
+    },
     cover: {
       eyebrow: "Guide",
       title: "Source-led guide",
@@ -38,8 +48,8 @@ function validBlueprint() {
       layoutRhythm: "alternate text-led pages with frameworks and lists",
       avoid: ["generic section labels", "repeated cover slots"],
     },
-    slides: Array.from({ length: 10 }, (_, index) => ({
-      role: index === 0 ? "cover" : index === 9 ? "cta" : "insight",
+    slides: Array.from({ length: slideCount }, (_, index) => ({
+      role: index === 0 ? "cover" : index === slideCount - 1 ? "cta" : "insight",
       eyebrow: index === 0 ? "Guide" : `Move ${index}`,
       headline: `Source-led decision ${index + 1}`,
       body: "This slide turns one source-backed idea into a concrete reader-facing move with enough useful copy to render well.",
@@ -59,12 +69,69 @@ function geminiJsonResponse(value: unknown, init: ResponseInit = {}) {
   );
 }
 
-function validSlideHtml(titlePrefix = "Founder decision") {
-  return `<!doctype html><html><head><style>@page { size: 148mm 210mm; margin: 0; }.slide{width:559px;height:794px;overflow:hidden;page-break-after:always;}</style></head><body>${Array.from({ length: 12 }, (_, index) => `<div class="slide" data-slide="${index + 1}"><h1>${titlePrefix} ${index + 1}</h1><p>${"Useful ebook content ".repeat(12)}</p></div>`).join("")}</body></html>`;
+function validEbookDocument(titlePrefix = "Founder decision"): CelionEbookDocument {
+  return {
+    version: 1,
+    title: "Source-led guide",
+    size: { width: 559, height: 794, unit: "px" },
+    themeCss: "",
+    pages: Array.from({ length: 10 }, (_, index) => {
+      const pageId = `page-${index + 1}`;
+      const titleId = `${pageId}-title`;
+      const bodyId = `${pageId}-body`;
+      return {
+        id: pageId,
+        index,
+        title: `${titlePrefix} ${index + 1}`,
+        role: index === 0 ? "cover" : index === 9 ? "cta" : "insight",
+        version: 1,
+        html: `<section data-celion-page="${pageId}" class="celion-page">
+  <h1 data-celion-id="${titleId}" data-role="title" data-editable="true">${titlePrefix} ${index + 1}</h1>
+  <p data-celion-id="${bodyId}" data-role="body" data-editable="true">${"Useful ebook content ".repeat(14)}</p>
+</section>`,
+        css: `[data-celion-page="${pageId}"] {
+  width: 559px;
+  height: 794px;
+  overflow: hidden;
+  padding: 56px;
+  color: #111111;
+  background: #ffffff;
 }
-
-function validPageHtml() {
-  return `<!doctype html><html><head><style>@page { size: 148mm 210mm; margin: 0; }.page{width:559px;height:794px;overflow:hidden;page-break-after:always;}.page-number{color:#111}</style></head><body>${Array.from({ length: 10 }, (_, index) => `<div class="page" data-page="${index + 1}"><h1>Source-led insight ${index + 1}</h1><span class="page-number">${index + 1}</span><p>${"Useful ebook content ".repeat(14)}</p></div>`).join("")}</body></html>`;
+[data-celion-page="${pageId}"] h1 {
+  margin: 0 0 28px;
+  font-size: 42px;
+  line-height: 1.08;
+}
+[data-celion-page="${pageId}"] p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.62;
+}`,
+        manifest: {
+          editableElements: [
+            {
+              id: titleId,
+              role: "title",
+              type: "text",
+              selector: `[data-celion-id="${titleId}"]`,
+              label: `Page ${index + 1} title`,
+              editableProps: ["text", "fontSize", "color"],
+              maxLength: 90,
+            },
+            {
+              id: bodyId,
+              role: "body",
+              type: "text",
+              selector: `[data-celion-id="${bodyId}"]`,
+              label: `Page ${index + 1} body`,
+              editableProps: ["text", "fontSize", "color"],
+              maxLength: 600,
+            },
+          ],
+        },
+      };
+    }),
+  };
 }
 
 function setQueuedFetch(responses: Response[], calls: string[] = [], requestBodies: unknown[] = []) {
@@ -134,13 +201,13 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
       geminiJsonResponse(validBlueprint()),
       geminiJsonResponse({}),
     ]);
-    await assert.rejects(() => generateEbookHtml(args), /Gemini did not return an HTML document/);
+    await assert.rejects(() => generateEbookHtml(args), /Gemini did not return an ebook document/);
 
     setQueuedFetch([
       geminiJsonResponse(validBlueprint()),
-      geminiJsonResponse({ html: "<html><body>No usable slides</body></html>" }),
+      geminiJsonResponse({ document: { ...validEbookDocument(), pages: [] } }),
     ]);
-    await assert.rejects(() => generateEbookHtml(args), /did not pass Celion ebook validation/);
+    await assert.rejects(() => generateEbookHtml(args), /did not pass Celion document validation/);
 
     const warningText = JSON.stringify(warnings);
     assert.match(warningText, /gemini_call_failed/);
@@ -184,7 +251,7 @@ test("generateEbookHtml surfaces blueprint Gemini rate limits as retryable gener
   }
 });
 
-test("generateEbookHtml surfaces HTML Gemini rate limits as retryable generation errors", async () => {
+test("generateEbookHtml surfaces document Gemini rate limits as retryable generation errors", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
@@ -237,20 +304,40 @@ test("generateEbookHtml rejects invalid blueprints before HTML generation", asyn
   }
 });
 
-test("generateEbookHtml rejects structurally unusable Gemini HTML with validation details", async () => {
+test("generateEbookHtml rejects structurally unusable Gemini document with validation details", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedFetch([
     geminiJsonResponse(validBlueprint()),
-    geminiJsonResponse({ html: "<!doctype html><html><head><style>.slide{}</style></head><body><div class=\"slide\"></div></body></html>" }),
+    geminiJsonResponse({
+      document: {
+        ...validEbookDocument(),
+        pages: [
+          {
+            ...validEbookDocument().pages[0],
+            css: `.bad { color: red; }`,
+          },
+        ],
+      },
+    }),
   ]);
 
   try {
     await assert.rejects(
       () => generateEbookHtml(baseArgs),
-      /Output must include at least 8 .slide elements/,
+      (error) =>
+        error instanceof EbookGenerationError &&
+        error.stage === "html" &&
+        error.reason === "invalid_html" &&
+        typeof error.validation === "object" &&
+        error.validation !== null &&
+        "errors" in error.validation &&
+        Array.isArray(error.validation.errors) &&
+        error.validation.errors.some((message: unknown) =>
+          typeof message === "string" && message.includes('must start with [data-celion-page="page-1"]'),
+        ),
     );
   } finally {
     restoreWarn();
@@ -260,14 +347,14 @@ test("generateEbookHtml rejects structurally unusable Gemini HTML with validatio
   }
 });
 
-test("generateEbookHtml keeps structurally valid Gemini HTML even with generic heading warnings", async () => {
+test("generateEbookHtml compiles structurally valid Gemini documents into HTML", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedFetch([
     geminiJsonResponse(validBlueprint()),
-    geminiJsonResponse({ html: validSlideHtml("The core idea") }),
+    geminiJsonResponse({ document: validEbookDocument("The core idea") }),
   ]);
 
   try {
@@ -282,23 +369,103 @@ test("generateEbookHtml keeps structurally valid Gemini HTML even with generic h
   }
 });
 
-test("generateEbookHtml normalizes page/data-page HTML into Celion slide HTML", async () => {
+test("generateEbookHtml repairs missing manifest entries from Gemini page HTML", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  const document = validEbookDocument("Recovered manifest");
+  const firstPage = document.pages[0]!;
+  document.pages[0] = {
+    ...firstPage,
+    html: firstPage.html.replace(
+      "<h1",
+      `<div data-celion-id="cov-eyebrow" data-role="eyebrow" data-editable="true">TOEFL GUIDE</div>\n  <h1`,
+    ),
+    manifest: {
+      editableElements: firstPage.manifest.editableElements.filter((element) => element.id !== "cov-eyebrow"),
+    },
+  };
+
+  setQueuedFetch([
+    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse({ document }),
+  ]);
+
+  try {
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+
+    assert.match(result.html, /cov-eyebrow/);
+    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "cov-eyebrow"));
+  } finally {
+    restoreWarn();
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtml removes inline style attributes from Gemini page HTML", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  const document = validEbookDocument("Inline style repair");
+  const fourthPage = document.pages[3]!;
+  const sixthPage = document.pages[5]!;
+  document.pages[3] = {
+    ...fourthPage,
+    id: "p4",
+    html: fourthPage.html
+      .replace(/data-celion-page="page-4"/g, `data-celion-page="p4"`)
+      .replace("<h1", `<h1 style="font-size: 999px; color: red;"`),
+    css: fourthPage.css.replaceAll(`[data-celion-page="page-4"]`, `[data-celion-page="p4"]`),
+  };
+  document.pages[5] = {
+    ...sixthPage,
+    id: "p6",
+    html: sixthPage.html
+      .replace(/data-celion-page="page-6"/g, `data-celion-page="p6"`)
+      .replace("<p", `<p style='margin-top:0'`),
+    css: sixthPage.css.replaceAll(`[data-celion-page="page-6"]`, `[data-celion-page="p6"]`),
+  };
+
+  setQueuedFetch([
+    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse({ document }),
+  ]);
+
+  try {
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
+
+    assert.doesNotMatch(storedDocumentJson, /\sstyle\s*=/i);
+    assert.doesNotMatch(result.html, /\sstyle\s*=/i);
+  } finally {
+    restoreWarn();
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedFetch([
     geminiJsonResponse(validBlueprint()),
-    geminiJsonResponse({ html: validPageHtml() }),
+    geminiJsonResponse({ document: validEbookDocument("Source-led insight") }),
   ]);
 
   try {
-    const html = await generateEbookHtml(baseArgs);
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
 
-    assert.match(html, /class="slide"/);
-    assert.match(html, /data-slide="1"/);
-    assert.match(html, /\.page-number/);
-    assert.doesNotMatch(html, /data-page=/);
-    assert.doesNotMatch(html, /class="page"/);
+    assert.match(result.html, /class="slide celion-page-shell"/);
+    assert.match(result.html, /data-slide="1"/);
+    assert.equal(result.diagnostics.ebookDocument.version, 1);
+    assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
+    assert.equal(result.diagnostics.ebookDocument.pages[0]?.id, "page-1");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -306,7 +473,40 @@ test("generateEbookHtml normalizes page/data-page HTML into Celion slide HTML", 
   }
 });
 
-test("ebook generation uses Flash-Lite for blueprint and Pro for HTML", async () => {
+test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in diagnostics document", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  const document = validEbookDocument("Color-safe insight");
+  document.themeCss = `:root { --shadow-color: color-mix(in srgb, #111 30%, white); }`;
+  const firstPage = document.pages[0]!;
+  document.pages[0] = {
+    ...firstPage,
+    css: `${firstPage.css}
+[data-celion-page="page-1"] .accent {
+  background: oklch(0.72 0.12 240);
+}`,
+  };
+  setQueuedFetch([
+    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse({ document }),
+  ]);
+
+  try {
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
+
+    assert.doesNotMatch(storedDocumentJson, /color-mix|oklch/);
+    assert.doesNotMatch(result.html, /color-mix|oklch/);
+    assert.match(result.html, /Color-safe insight/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("ebook generation uses Flash-Lite for blueprint and Pro for document design", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const calls: string[] = [];
   const requestBodies: unknown[] = [];
@@ -314,7 +514,7 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for HTML", async ()
   const originalFetch = globalThis.fetch;
   setQueuedFetch([
     geminiJsonResponse(validBlueprint()),
-    geminiJsonResponse({ html: validSlideHtml() }),
+    geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
 
   try {
@@ -339,6 +539,8 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for HTML", async ()
     assert.match(blueprintPrompt, /Create a source-led A5 slide publication blueprint/);
     assert.match(blueprintPrompt, /Purpose \/ use case/);
     assert.match(blueprintPrompt, /Source material/);
+    assert.match(blueprintPrompt, /sourceAssessment/);
+    assert.match(blueprintPrompt, /recommendedSlideCount/);
     assert.match(blueprintPrompt, /sourceAnchors/);
     assert.doesNotMatch(blueprintPrompt, /Reader and product brief|sellable publication/);
     assert.match(htmlSystem, /approved editorial blueprint/);
@@ -348,11 +550,71 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for HTML", async ()
     assert.match(htmlPrompt, /24px vertical space between major content groups/);
     assert.match(htmlPrompt, /line-height 1\.55-1\.75/);
     assert.match(htmlPrompt, /If content feels crowded, shorten the copy/);
+    assert.match(htmlPrompt, /Output only JSON with one "document" field/);
+    assert.match(htmlPrompt, /Generate all pages in one response/);
+    assert.match(htmlPrompt, /data-celion-page="\{pageId\}"/);
+    assert.match(htmlPrompt, /Never put style="" attributes in HTML/);
+    assert.match(htmlPrompt, /Every page CSS selector starts with \[data-celion-page="\{pageId\}"\]/);
+    assert.match(htmlPrompt, /Manifest includes every editable element/);
     assert.doesNotMatch(htmlPrompt, /# Market/);
     assert.doesNotMatch(blueprintPrompt, /Core message:/);
     assert.doesNotMatch(htmlPrompt, /Why this matters now|The core idea|How to apply it/);
     assert.match(htmlPrompt, /Do not use color\(\), color-mix\(\), oklch\(\), lab\(\), or lch\(\)/);
   } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("ebook blueprint prompt expands the slide budget for long source material", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const calls: string[] = [];
+  const requestBodies: unknown[] = [];
+  process.env.GEMINI_API_KEY = "test-key";
+  const originalFetch = globalThis.fetch;
+  const longSource = Array.from({ length: 120 }, (_, index) =>
+    `## Section ${index + 1}\nThis source section includes a concrete method, warning, example, and detail that should not be collapsed into one tiny summary.`,
+  ).join("\n\n");
+  setQueuedFetch([
+    geminiJsonResponse(validBlueprint(20, 20)),
+    geminiJsonResponse({ document: validEbookDocument() }),
+  ], calls, requestBodies);
+
+  try {
+    await generateEbookHtml({ ...baseArgs, sourceText: longSource });
+    const blueprintRequest = requestBodies[0] as {
+      contents?: { parts?: { text?: string }[] }[];
+    };
+    const blueprintPrompt = blueprintRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+
+    assert.match(blueprintPrompt, /Recommended slide budget: 18-22 slides/);
+    assert.match(blueprintPrompt, /The blueprint must choose recommendedSlideCount after assessing the source/);
+    assert.match(blueprintPrompt, /Do not compress a long source into 10 slides/);
+    assert.doesNotMatch(blueprintPrompt, /Make 8-14 slides total/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtml rejects blueprints that ignore their own recommended slide count", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  setQueuedFetch([
+    geminiJsonResponse(validBlueprint(10, 20)),
+  ]);
+
+  try {
+    await assert.rejects(
+      () => generateEbookHtml(baseArgs),
+      /recommended 20 slides but only returned 10/,
+    );
+  } finally {
+    restoreWarn();
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = originalApiKey;

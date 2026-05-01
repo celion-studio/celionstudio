@@ -6,7 +6,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, Clock, FileText, Sparkles } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { ProjectList } from "@/components/dashboard/ProjectList";
-import { WorkspaceSidebar, type SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
+import {
+  WORKSPACE_EDGE_GAP,
+  WORKSPACE_TOP_RAIL_HEIGHT,
+  WorkspaceSidebar,
+  type SidebarItemKey,
+} from "@/components/dashboard/WorkspaceSidebar";
 import type { ProjectKind, ProjectRecord } from "@/types/project";
 
 type DashboardShellProps = {
@@ -14,51 +19,28 @@ type DashboardShellProps = {
   initialUserName: string | null;
   initialUserEmail: string | null;
   activeItem?: SidebarItemKey;
-  surface?: "workspace" | "documents";
 };
 
-const surfaceCopy = {
-  workspace: {
-    breadcrumbCurrent: "All Drafts",
-    heading: "Your drafts",
-    description: "All your manuscripts and works in progress.",
-    primaryActionLabel: "New ebook",
-    blankTitle: "Untitled Draft",
-    emptyTitle: "No drafts yet",
-    emptyDescription: "Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.",
-    emptyAction: "Create first ebook",
-    loadingLabel: "Loading drafts...",
-    statTotal: "Total drafts",
-    statActive: "In progress",
-    statExported: "Print opened",
-  },
-  documents: {
-    breadcrumbCurrent: "Documents",
-    heading: "Document editor",
-    description: "Standalone writing and formatting drafts live here.",
-    primaryActionLabel: "New document",
-    blankTitle: "Untitled Document",
-    emptyTitle: "No documents yet",
-    emptyDescription: "Create a blank document when you want a direct writing and formatting workspace.",
-    emptyAction: "Create document",
-    loadingLabel: "Loading documents...",
-    statTotal: "Total documents",
-    statActive: "Editing",
-    statExported: "Exported",
-  },
+const workspaceCopy = {
+  breadcrumbCurrent: "All Drafts",
+  heading: "Your drafts",
+  description: "All your manuscripts and works in progress.",
+  primaryActionLabel: "New ebook",
+  blankTitle: "Untitled Draft",
+  emptyTitle: "No drafts yet",
+  emptyDescription: "Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.",
+  emptyAction: "Create first ebook",
+  loadingLabel: "Loading drafts...",
+  statTotal: "Total drafts",
+  statActive: "In progress",
+  statExported: "Print opened",
 } as const;
-
-const surfaceProjectKind: Record<NonNullable<DashboardShellProps["surface"]>, ProjectKind> = {
-  workspace: "product",
-  documents: "document",
-};
 
 export function DashboardShell({
   isSignedIn,
   initialUserName,
   initialUserEmail,
   activeItem = "workspace",
-  surface = "workspace",
 }: DashboardShellProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,10 +60,9 @@ export function DashboardShell({
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
-  const [creatingBlank, setCreatingBlank] = useState(false);
   const showLoading = loading || (authPending && !hasVerifier);
-  const copy = surfaceCopy[surface];
-  const projectKind = surfaceProjectKind[surface];
+  const copy = workspaceCopy;
+  const projectKind: ProjectKind = "product";
 
   async function fetchProjects() {
     const response = await fetch(`/api/projects?kind=${projectKind}`, {
@@ -219,67 +200,12 @@ export function DashboardShell({
     }
   }
 
-  async function createBlankProject() {
-    if (creatingBlank) return;
-
-    setCreatingBlank(true);
-    setError("");
-
-    try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        body: JSON.stringify({
-          title: copy.blankTitle,
-          kind: projectKind,
-          sources: [],
-          profile: {
-            author: "",
-            targetAudience: "",
-            purpose: "",
-            designMode: "text",
-            pageFormat: "ebook",
-            customPageSize: { widthMm: 152, heightMm: 229 },
-            tone: "",
-            plan: null,
-            document: {
-              type: "tiptap-book",
-              version: 1,
-              pages: [{ id: "page-1", doc: { type: "doc", content: [{ type: "paragraph" }] } }],
-            },
-          },
-        }),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | { project?: ProjectRecord; message?: string }
-        | null;
-      if (!response.ok || !payload?.project) {
-        throw new Error(
-          payload?.message ??
-            `Could not create ${surface === "documents" ? "a blank document" : "a draft"}.`,
-        );
-      }
-
-      router.push(`/editor/${payload.project.id}`);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : `Could not create ${surface === "documents" ? "a blank document" : "a draft"}.`,
-      );
-    } finally {
-      setCreatingBlank(false);
-    }
-  }
-
   return (
     <div
       style={{
         display: "flex",
         height: "100vh",
-        background: "#F7F6F3",
+        background: "#f3f2ef",
         fontFamily: "'Inter', sans-serif",
         overflow: "hidden",
       }}
@@ -292,21 +218,20 @@ export function DashboardShell({
         primaryAction={{
           href: "/new",
           label: copy.primaryActionLabel,
-          onClick: surface === "documents" ? createBlankProject : undefined,
         }}
       />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header
           style={{
-            height: "57px",
-            background: "#fff",
-            borderBottom: "1px solid #ECEAE5",
+            height: `${WORKSPACE_TOP_RAIL_HEIGHT}px`,
+            background: "transparent",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 28px",
+            padding: `0 ${WORKSPACE_EDGE_GAP}px`,
             flexShrink: 0,
+            boxSizing: "border-box",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -323,12 +248,11 @@ export function DashboardShell({
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
-                background: "#F7F6F3",
+                background: "rgba(255,255,255,0.54)",
                 borderRadius: "6px",
                 padding: "5px 10px",
                 fontSize: "12px",
                 color: "#71717A",
-                border: "1px solid #ECEAE5",
               }}
             >
               <Sparkles size={11} strokeWidth={1.8} />
@@ -337,8 +261,19 @@ export function DashboardShell({
           </div>
         </header>
 
-        <main style={{ flex: 1, overflow: "auto", padding: "32px 32px 48px" }}>
-          <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
+        <main style={{ flex: 1, overflow: "auto", padding: `0 ${WORKSPACE_EDGE_GAP}px ${WORKSPACE_EDGE_GAP}px 0`, display: "flex" }}>
+          <div
+            style={{
+              flex: 1,
+              minHeight: `calc(100vh - ${WORKSPACE_TOP_RAIL_HEIGHT + WORKSPACE_EDGE_GAP}px)`,
+              background: "#fff",
+              border: "1px solid rgba(28,25,23,0.08)",
+              borderRadius: "12px",
+              boxShadow: "none",
+              boxSizing: "border-box",
+              padding: "30px",
+            }}
+          >
             <div style={{ marginBottom: "28px" }}>
               <h1
                 style={{
@@ -358,23 +293,29 @@ export function DashboardShell({
             </div>
 
             {resolvedSignedIn && projects.length > 0 ? (
-              <div style={{ display: "flex", gap: "12px", marginBottom: "28px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  marginBottom: "28px",
+                  background: "#f8f7f4",
+                  borderRadius: "10px",
+                  overflow: "hidden",
+                }}
+              >
                 {[
                   { label: copy.statTotal, value: projects.length, icon: FileText },
                   { label: copy.statActive, value: inProgress, icon: Clock },
                   { label: copy.statExported, value: printOpened, icon: BookOpen },
-                ].map(({ label, value, icon: Icon }) => (
+                ].map(({ label, value, icon: Icon }, index) => (
                   <div
                     key={label}
                     style={{
-                      flex: 1,
-                      background: "#fff",
-                      border: "1px solid #ECEAE5",
-                      borderRadius: "10px",
                       padding: "16px 18px",
                       display: "flex",
                       alignItems: "center",
                       gap: "14px",
+                      borderLeft: index === 0 ? "none" : "1px solid #ebe7df",
                     }}
                   >
                     <div
@@ -427,7 +368,7 @@ export function DashboardShell({
             ) : null}
 
             {showLoading ? (
-              <div style={{ padding: "60px 0", textAlign: "center" }}>
+              <div style={{ padding: "72px 0", textAlign: "center" }}>
                 <p
                   style={{
                     margin: 0,
@@ -444,7 +385,6 @@ export function DashboardShell({
             {!showLoading && resolvedSignedIn ? (
               <ProjectList
                 projects={projects}
-                surface={surface}
                 deletingProjectId={deletingProjectId}
                 onDeleteProject={deleteProject}
               />
@@ -454,11 +394,8 @@ export function DashboardShell({
               <div
                 style={{
                   marginTop: "24px",
-                  padding: "60px 32px",
+                  padding: "72px 32px",
                   textAlign: "center",
-                  background: "#fff",
-                  border: "1px dashed #DEDAD3",
-                  borderRadius: "12px",
                 }}
               >
                 <div
@@ -523,11 +460,8 @@ export function DashboardShell({
               <div
                 style={{
                   marginTop: "24px",
-                  padding: "60px 32px",
+                  padding: "72px 32px",
                   textAlign: "center",
-                  background: "#fff",
-                  border: "1px dashed #DEDAD3",
-                  borderRadius: "12px",
                 }}
               >
                 <div
@@ -569,7 +503,7 @@ export function DashboardShell({
                 </p>
                 <button
                   type="button"
-                  onClick={surface === "documents" ? createBlankProject : () => router.push("/new")}
+                  onClick={() => router.push("/new")}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",

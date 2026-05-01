@@ -4,14 +4,15 @@ import { applyAppSchema } from "./schema";
 
 function createRecordingSql() {
   const statements: string[] = [];
+  const normalizeSql = (statement: string) => statement.replace(/\s+/g, " ").trim();
   const sql = Object.assign(
     async (strings: TemplateStringsArray) => {
-      statements.push(strings.join("?"));
+      statements.push(normalizeSql(strings.join("?")));
       return [];
     },
     {
       query: async (statement: string) => {
-        statements.push(statement);
+        statements.push(normalizeSql(statement));
         return [];
       },
     },
@@ -59,7 +60,7 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ADD COLUMN IF NOT EXISTS page_format"),
+      statement.includes("DROP COLUMN IF EXISTS page_format"),
     ),
   );
   assert.ok(
@@ -75,27 +76,32 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ALTER COLUMN plan TYPE jsonb"),
+      statement.includes("DROP COLUMN IF EXISTS plan"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ALTER COLUMN document TYPE jsonb"),
+      statement.includes("DROP COLUMN IF EXISTS document"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ALTER TABLE project_profiles DROP COLUMN blocks"),
+      statement.includes("DROP COLUMN IF EXISTS blocks"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ADD COLUMN IF NOT EXISTS page_width_mm"),
+      statement.includes("DROP COLUMN IF EXISTS page_width_mm"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ADD COLUMN IF NOT EXISTS page_height_mm"),
+      statement.includes("DROP COLUMN IF EXISTS page_height_mm"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS ebook_document jsonb"),
     ),
   );
   assert.ok(
@@ -125,25 +131,8 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("backfill_existing_tiptap_projects_as_documents") &&
-      statement.includes("SET project_type = 'document'") &&
-      statement.includes("pp.ebook_html IS NULL") &&
-      statement.includes("pp.ebook_style IS NULL") &&
-      statement.includes("pp.plan IS NOT NULL") &&
-      statement.includes("pp.document::text"),
-    ),
-  );
-  assert.ok(
-    statements.some((statement) =>
-      statement.includes("reclassify_html_ebook_projects_as_products") &&
-      statement.includes("SET project_type = 'product'") &&
-      statement.includes("pp.ebook_html IS NOT NULL"),
-    ),
-  );
-  assert.ok(
-    statements.some((statement) =>
       statement.includes("projects_project_type_check") &&
-      statement.includes("project_type IN ('product', 'document')"),
+      statement.includes("CHECK (project_type = 'product')"),
     ),
   );
   assert.ok(
