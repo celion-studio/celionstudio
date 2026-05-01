@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { countCelionSlides, normalizeEbookHtmlSlideContract, sanitizeEbookHtmlForCanvas, validateCelionSlideHtml } from "./ebook-html";
 import { parseEbookGenerateRequest } from "../app/api/ebook/generate/route";
-import { parseEbookSaveRequest, prepareEbookHtmlForSave } from "../app/api/ebook/save/route";
+import { parseEbookSaveRequest, prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "../app/api/ebook/save/route";
 
 const validSlideHtml = `<!doctype html>
 <html>
@@ -163,4 +163,82 @@ test("prepareEbookHtmlForSave sanitizes and validates Celion A5 slide HTML", () 
   const invalid = prepareEbookHtmlForSave("<html><body><div class=\"page\">Bad</div></body></html>");
   assert.equal(invalid.ok, false);
   assert.ok(invalid.message.includes("Output must"));
+});
+
+test("prepareEbookDocumentForSave validates and compiles a page-level document", () => {
+  const result = prepareEbookDocumentForSave({
+    version: 1,
+    title: "Minimal ebook",
+    size: { width: 559, height: 794, unit: "px" },
+    themeCss: "",
+    pages: [
+      {
+        id: "page-1",
+        index: 0,
+        title: "Opening page",
+        role: "cover",
+        html: `
+          <section data-celion-page="page-1">
+            <h1>Opening page</h1>
+            <p>A concise page-level ebook document can be compiled for the canvas.</p>
+          </section>
+        `,
+        css: `[data-celion-page="page-1"] { color: oklch(0.2 0.03 240); }`,
+        manifest: { editableElements: [] },
+        version: 1,
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(result.html, /class="slide celion-page-shell"/);
+  assert.doesNotMatch(result.html, /oklch/i);
+  if (result.ok) {
+    assert.doesNotMatch(result.document.pages[0]?.css ?? "", /oklch/i);
+  }
+});
+
+test("prepareEbookDocumentForSave rejects malformed document inputs", () => {
+  const malformedInputs = [
+    {},
+    [],
+    null,
+    {
+      version: 1,
+      title: "Malformed manifest",
+      size: { width: 559, height: 794, unit: "px" },
+      themeCss: "",
+      pages: [
+        {
+          id: "page-1",
+          index: 0,
+          title: "Opening page",
+          role: "cover",
+          html: `
+            <section data-celion-page="page-1">
+              <h1 data-celion-id="headline">Opening page</h1>
+            </section>
+          `,
+          css: "",
+          manifest: {
+            editableElements: [
+              {
+                id: "headline",
+                role: "headline",
+                type: "unknown",
+                selector: "",
+                label: "Headline",
+                editableProps: ["text"],
+              },
+            ],
+          },
+          version: 1,
+        },
+      ],
+    },
+  ];
+
+  for (const input of malformedInputs) {
+    assert.equal(prepareEbookDocumentForSave(input).ok, false);
+  }
 });

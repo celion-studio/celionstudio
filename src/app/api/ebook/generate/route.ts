@@ -4,13 +4,14 @@ import { getRouteSession } from "@/lib/session";
 import { EBOOK_BLUEPRINT_GEMINI_MODEL, EBOOK_GEMINI_MODEL } from "@/lib/ai/gemini";
 import { EbookGenerationError, generateEbookHtmlWithDiagnostics } from "@/lib/ebook-generation";
 import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
+import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 import { createProjectForUser, getEbookPageCountForHtml } from "@/lib/projects";
-import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
+import { SOURCE_KIND_IDS } from "@/types/project";
 
 const sourceSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(["pasted_text", "pdf", "md", "txt", "docx"]),
+  kind: z.enum(SOURCE_KIND_IDS),
   name: z.string().min(1),
   content: z.string().min(1),
   excerpt: z.string().default(""),
@@ -24,7 +25,7 @@ const schema = z.object({
   tone: z.string().default(""),
   sourceText: z.string().default(""),
   sources: z.array(sourceSchema).default([]),
-  ebookStyle: z.enum(["minimal", "editorial", "neo-brutalism", "bold", "elegant"]),
+  ebookStyle: z.enum(EBOOK_STYLE_IDS),
   accentColor: z.string().default("#6366f1"),
 });
 
@@ -33,6 +34,21 @@ type GenerateRequestBody = z.infer<typeof schema>;
 type ParseGenerateRequestResult =
   | { ok: true; data: GenerateRequestBody }
   | { ok: false; message: string };
+
+type EbookGenerationDiagnostics = Awaited<ReturnType<typeof generateEbookHtmlWithDiagnostics>>["diagnostics"];
+
+function sanitizeBlueprintForLog(blueprint: EbookGenerationDiagnostics["blueprint"]) {
+  return {
+    ...blueprint,
+    slideCount: blueprint.slides.length,
+    slides: blueprint.slides.map((slide) => ({
+      role: slide.role,
+      eyebrow: slide.eyebrow,
+      headline: slide.headline,
+      visualDirection: slide.visualDirection,
+    })),
+  };
+}
 
 export async function parseEbookGenerateRequest(
   request: Request,
@@ -70,7 +86,7 @@ export async function POST(request: Request) {
   const sourceText = formatSourcesForPrompt(d.sources, d.sourceText);
 
   let html: string;
-  let diagnostics: Awaited<ReturnType<typeof generateEbookHtmlWithDiagnostics>>["diagnostics"];
+  let diagnostics: EbookGenerationDiagnostics;
   try {
     const result = await generateEbookHtmlWithDiagnostics({
       title: d.title,
@@ -90,7 +106,7 @@ export async function POST(request: Request) {
     await recordEbookGenerationLog({
       userId: session.user.id,
       status: "failure",
-      stage: error instanceof EbookGenerationError ? error.reason : "unknown",
+      stage: error instanceof EbookGenerationError ? error.stage ?? "unknown" : "unknown",
       blueprintModel: EBOOK_BLUEPRINT_GEMINI_MODEL,
       htmlModel: EBOOK_GEMINI_MODEL,
       title: d.title,
@@ -100,9 +116,11 @@ export async function POST(request: Request) {
       accentColor: d.accentColor,
       sourceCount: d.sources.length,
       sourceTextLength: sourceText.length,
+      validation: error instanceof EbookGenerationError ? error.validation : undefined,
       errorReason: error instanceof EbookGenerationError ? error.reason : undefined,
       errorMessage: message,
       errorStatus: status,
+      slideCount: error instanceof EbookGenerationError ? error.pageCount : undefined,
     });
     return NextResponse.json({ message }, { status });
   }
@@ -115,13 +133,10 @@ export async function POST(request: Request) {
       targetAudience: d.targetAudience,
       purpose: d.purpose,
       designMode: "balanced",
-      pageFormat: "a5",
-      customPageSize: { widthMm: 148, heightMm: 210 },
       tone: d.tone,
-      plan: null,
-      document: normalizeTiptapBookDocument([]),
       ebookStyle: d.ebookStyle,
       ebookHtml: html,
+      ebookDocument: diagnostics.ebookDocument,
       ebookPageCount: getEbookPageCountForHtml(html),
       accentColor: d.accentColor,
     },
@@ -150,7 +165,7 @@ export async function POST(request: Request) {
     accentColor: d.accentColor,
     sourceCount: d.sources.length,
     sourceTextLength: sourceText.length,
-    blueprint: diagnostics.blueprint,
+    blueprint: sanitizeBlueprintForLog(diagnostics.blueprint),
     validation: diagnostics.validation,
     htmlLength: diagnostics.htmlLength,
     slideCount: diagnostics.slideCount,

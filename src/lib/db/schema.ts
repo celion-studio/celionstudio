@@ -143,6 +143,36 @@ export async function applyAppSchema(
 
   await sql`
     ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS plan
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS document
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS blocks
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS page_format
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS page_width_mm
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    DROP COLUMN IF EXISTS page_height_mm
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
     ADD COLUMN IF NOT EXISTS author text NOT NULL DEFAULT ''
   `;
 
@@ -181,94 +211,17 @@ export async function applyAppSchema(
 
   await sql`
     ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS plan jsonb
-  `;
-
-  await sql`
-    ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS document jsonb NOT NULL DEFAULT '[]'::jsonb
-  `;
-
-  await executeStatement(
-    sql,
-    `
-      ALTER TABLE project_profiles
-      ALTER COLUMN plan DROP DEFAULT,
-      ALTER COLUMN plan DROP NOT NULL,
-      ALTER COLUMN plan TYPE jsonb USING
-        CASE
-          WHEN plan IS NULL OR plan::text = '' THEN NULL
-          ELSE plan::jsonb
-        END
-    `,
-  );
-
-  await executeStatement(
-    sql,
-    `
-      ALTER TABLE project_profiles
-      ALTER COLUMN document DROP DEFAULT,
-      ALTER COLUMN document TYPE jsonb USING
-        CASE
-          WHEN document IS NULL OR document::text = '' THEN '[]'::jsonb
-          ELSE document::jsonb
-        END,
-      ALTER COLUMN document SET DEFAULT '[]'::jsonb,
-      ALTER COLUMN document SET NOT NULL
-    `,
-  );
-
-  await executeStatement(
-    sql,
-    `
-      DO $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_schema = 'public'
-            AND table_name = 'project_profiles'
-            AND column_name = 'blocks'
-        ) THEN
-          UPDATE project_profiles
-          SET document = blocks::jsonb
-          WHERE (document IS NULL OR document = '[]'::jsonb)
-            AND blocks IS NOT NULL
-            AND blocks::text <> '';
-
-          ALTER TABLE project_profiles DROP COLUMN blocks;
-        END IF;
-      END $$;
-    `,
-  );
-
-  await sql`
-    ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS page_format text NOT NULL DEFAULT 'ebook'
-  `;
-
-  await sql`
-    ALTER TABLE project_profiles
-    ALTER COLUMN page_format SET DEFAULT 'ebook'
-  `;
-
-  await sql`
-    ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS page_width_mm numeric NOT NULL DEFAULT 152
-  `;
-
-  await sql`
-    ALTER TABLE project_profiles
-    ADD COLUMN IF NOT EXISTS page_height_mm numeric NOT NULL DEFAULT 229
-  `;
-
-  await sql`
-    ALTER TABLE project_profiles
     ADD COLUMN IF NOT EXISTS ebook_style text
   `;
 
   await sql`
     ALTER TABLE project_profiles
     ADD COLUMN IF NOT EXISTS ebook_html text
+  `;
+
+  await sql`
+    ALTER TABLE project_profiles
+    ADD COLUMN IF NOT EXISTS ebook_document jsonb
   `;
 
   await sql`
@@ -284,82 +237,27 @@ export async function applyAppSchema(
   await executeStatement(
     sql,
     `
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM app_migrations
-          WHERE name = '2026_04_28_backfill_existing_tiptap_projects_as_documents'
-        ) THEN
-          UPDATE projects AS p
-          SET project_type = 'document'
-          FROM project_profiles AS pp
-          WHERE pp.project_id = p.id
-            AND p.project_type = 'product'
-            AND pp.ebook_html IS NULL
-            AND pp.ebook_style IS NULL
-            AND (
-              pp.plan IS NOT NULL
-              OR pp.document::text ~ '"text"\\s*:\\s*"[^"]+'
-            );
-
-          INSERT INTO app_migrations (name)
-          VALUES ('2026_04_28_backfill_existing_tiptap_projects_as_documents');
-        END IF;
-      END $$;
-    `,
-  );
-
-  await executeStatement(
-    sql,
-    `
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM app_migrations
-          WHERE name = '2026_04_28_reclassify_html_ebook_projects_as_products'
-        ) THEN
-          UPDATE projects AS p
-          SET project_type = 'product'
-          FROM project_profiles AS pp
-          WHERE pp.project_id = p.id
-            AND p.project_type = 'document'
-            AND (
-              pp.ebook_html IS NOT NULL
-              OR pp.ebook_style IS NOT NULL
-            );
-
-          INSERT INTO app_migrations (name)
-          VALUES ('2026_04_28_reclassify_html_ebook_projects_as_products');
-        END IF;
-      END $$;
-    `,
-  );
-
-  await executeStatement(
-    sql,
-    `
       UPDATE projects
       SET project_type = 'product'
       WHERE project_type IS NULL
-        OR project_type NOT IN ('product', 'document')
+        OR project_type <> 'product'
     `,
   );
 
   await executeStatement(
     sql,
     `
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint
-          WHERE conname = 'projects_project_type_check'
-            AND conrelid = 'public.projects'::regclass
-        ) THEN
-          ALTER TABLE projects
-          ADD CONSTRAINT projects_project_type_check
-          CHECK (project_type IN ('product', 'document'));
-        END IF;
-      END $$;
+      ALTER TABLE projects
+      DROP CONSTRAINT IF EXISTS projects_project_type_check
+    `,
+  );
+
+  await executeStatement(
+    sql,
+    `
+      ALTER TABLE projects
+      ADD CONSTRAINT projects_project_type_check
+      CHECK (project_type = 'product')
     `,
   );
 

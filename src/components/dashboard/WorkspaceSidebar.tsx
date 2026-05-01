@@ -4,7 +4,6 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  FileText,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -13,7 +12,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
-export type SidebarItemKey = "workspace" | "documents" | "new" | "settings";
+export type SidebarItemKey = "workspace" | "new" | "settings";
 
 type WorkspaceSidebarProps = {
   activeItem: SidebarItemKey;
@@ -34,10 +33,13 @@ const NAV_ITEMS: Array<{
   href: Route;
 }> = [
   { key: "workspace", label: "Workspace", icon: LayoutDashboard, href: "/dashboard" },
-  { key: "documents", label: "Documents", icon: FileText, href: "/documents" as Route },
   { key: "new", label: "New ebook", icon: Plus, href: "/new" },
   { key: "settings", label: "Settings", icon: Settings, href: "/dashboard" },
 ];
+
+export const WORKSPACE_SIDEBAR_WIDTH = 280;
+export const WORKSPACE_TOP_RAIL_HEIGHT = 56;
+export const WORKSPACE_EDGE_GAP = 16;
 
 export function WorkspaceSidebar({
   activeItem,
@@ -59,17 +61,24 @@ export function WorkspaceSidebar({
   return (
     <aside
       style={{
-        width: "220px",
+        width: `${WORKSPACE_SIDEBAR_WIDTH}px`,
         flexShrink: 0,
-        background: "#FFFFFF",
-        borderRight: "1px solid #ECEAE5",
+        background: "transparent",
         display: "flex",
         flexDirection: "column",
         padding: "0",
         overflow: "hidden",
       }}
     >
-      <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #ECEAE5" }}>
+      <div
+        style={{
+          height: `${WORKSPACE_TOP_RAIL_HEIGHT}px`,
+          display: "flex",
+          alignItems: "center",
+          padding: `0 ${WORKSPACE_EDGE_GAP}px`,
+          boxSizing: "border-box",
+        }}
+      >
         <Link
           href="/"
           style={{ display: "flex", alignItems: "center", gap: "10px", textDecorationLine: "none" }}
@@ -112,7 +121,7 @@ export function WorkspaceSidebar({
         </Link>
       </div>
 
-      <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: "2px" }}>
+      <nav style={{ flex: 1, padding: `0 ${WORKSPACE_EDGE_GAP - 6}px 12px`, display: "flex", flexDirection: "column", gap: "2px" }}>
         {NAV_ITEMS.map((item) => {
           const active = item.key === activeItem;
 
@@ -143,7 +152,7 @@ export function WorkspaceSidebar({
       </nav>
 
       {primaryAction ? (
-        <div style={{ padding: "12px 10px", borderTop: "1px solid #ECEAE5" }}>
+        <div style={{ padding: `12px ${WORKSPACE_EDGE_GAP - 6}px` }}>
           <button
             onClick={() => {
               if (primaryAction.onClick) {
@@ -180,8 +189,7 @@ export function WorkspaceSidebar({
 
       <div
         style={{
-          padding: "12px 16px 16px",
-          borderTop: "1px solid #ECEAE5",
+          padding: `12px ${WORKSPACE_EDGE_GAP}px 16px`,
           display: "flex",
           alignItems: "center",
           gap: "10px",

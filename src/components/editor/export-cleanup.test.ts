@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearBuilderSelectionForExport } from "./export-cleanup";
+import { clearEditorSelectionForExport } from "./export-cleanup";
 
 class FakeSelectedElement {
   style = {
@@ -31,10 +31,10 @@ class FakeSelectedElement {
   }
 }
 
-test("clearBuilderSelectionForExport removes selected markers and restores them", () => {
+test("clearEditorSelectionForExport removes selected markers and restores them", () => {
   const selected = new FakeSelectedElement("true", "2px solid #6366f1", "2px");
 
-  const restore = clearBuilderSelectionForExport([selected]);
+  const restore = clearEditorSelectionForExport([selected]);
 
   assert.equal(selected.getAttribute("data-selected"), null);
   assert.equal(selected.style.outline, "none");

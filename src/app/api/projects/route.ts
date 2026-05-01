@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { normalizeTiptapBookDocument } from "@/lib/tiptap-document";
 import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
 import { isDatabaseUnavailableError } from "@/lib/db";
+import { DESIGN_MODE_IDS, PROJECT_KIND_IDS, SOURCE_KIND_IDS } from "@/types/project";
 
-const projectKindSchema = z.enum(["product", "document"]);
+const projectKindSchema = z.enum(PROJECT_KIND_IDS);
 
 const createProjectSchema = z.object({
   kind: projectKindSchema.default("product"),
@@ -14,25 +14,14 @@ const createProjectSchema = z.object({
     author: z.string().default(""),
     targetAudience: z.string().default(""),
     purpose: z.string().default(""),
-    designMode: z.enum(["text", "balanced", "visual"]).default("balanced"),
-    pageFormat: z
-      .enum(["ebook", "kindle", "tablet", "mobile", "a5", "a4", "a3", "a2", "custom"])
-      .default("ebook"),
-    customPageSize: z
-      .object({
-        widthMm: z.number().min(50).max(800),
-        heightMm: z.number().min(50).max(800),
-      })
-      .default({ widthMm: 152, heightMm: 229 }),
+    designMode: z.enum(DESIGN_MODE_IDS).default("balanced"),
     tone: z.string().default(""),
-    plan: z.any().optional().nullable(),
-    document: z.unknown().optional().default([]),
   }),
   sources: z
     .array(
       z.object({
         id: z.string().min(1),
-        kind: z.enum(["pasted_text", "pdf", "md", "txt", "docx"]),
+        kind: z.enum(SOURCE_KIND_IDS),
         name: z.string().min(1),
         content: z.string().min(1),
         excerpt: z.string(),
@@ -89,13 +78,10 @@ export async function POST(request: Request) {
         targetAudience: p.targetAudience,
         purpose: p.purpose,
         designMode: p.designMode,
-        pageFormat: p.pageFormat,
-        customPageSize: p.customPageSize,
         tone: p.tone,
-        plan: p.plan ?? null,
-        document: normalizeTiptapBookDocument(p.document),
         ebookStyle: null,
         ebookHtml: null,
+        ebookDocument: null,
         ebookPageCount: 16,
         accentColor: "#6366f1",
       },

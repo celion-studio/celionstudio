@@ -32,14 +32,13 @@ type WizardState = {
   // Step 2: Style
   accentColor: string;
   // Step 3: Source
-  sourceText: string;
   sourceFiles: ProjectSource[];
   // Step 4: Generate
   generating: boolean;
   error: string;
 
   setStep: (step: WizardStep) => void;
-  setField: (field: "title" | "author" | "targetAudience" | "purposeDetail" | "sourceText", value: string) => void;
+  setField: (field: "title" | "author" | "targetAudience" | "purposeDetail", value: string) => void;
   setPurpose: (purpose: WizardPurpose) => void;
   setTone: (tone: WizardTone) => void;
   setSourceFiles: (sources: ProjectSource[]) => void;
@@ -60,7 +59,6 @@ const initialState = {
   tone: "preserve" as WizardTone,
   ebookStyle: null as EbookStyle | null,
   accentColor: "#6366f1",
-  sourceText: "",
   sourceFiles: [],
   generating: false,
   error: "",
@@ -72,11 +70,7 @@ export const useProjectWizardStore = create<WizardState>((set) => ({
   setField: (field, value) => set({ [field]: value, error: "" }),
   setPurpose: (purpose) => set({ purpose, purposeDetail: purpose === "other" ? "" : "", error: "" }),
   setTone: (tone) => set({ tone, error: "" }),
-  setSourceFiles: (sourceFiles) => set({
-    sourceFiles,
-    sourceText: sourceFiles.map((source) => source.content).join("\n\n"),
-    error: "",
-  }),
+  setSourceFiles: (sourceFiles) => set({ sourceFiles, error: "" }),
   setEbookStyle: (ebookStyle) => set({ ebookStyle, error: "" }),
   setAccentColor: (accentColor) => set({ accentColor }),
   setGenerating: (generating) => set({ generating }),
