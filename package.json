@@ -8,11 +8,12 @@
         "build:deploy": "npm run db:init && npm run build",
         "start": "next start",
         "db:init": "tsx scripts/init-db.ts",
-        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/components/editor/export-cleanup.test.ts && node --import tsx src/components/editor/editor-preview.test.ts && node --import tsx src/components/editor/editor-document-edits.test.ts && node --import tsx src/components/editor/editor-preview-frame.test.ts && node --import tsx src/components/wizard/wizard-flow.test.tsx && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/ebook-html.test.ts && node --import tsx src/lib/ebook-document.test.ts && node --import tsx src/lib/ebook-generation.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx scripts/init-db.test.ts",
+        "test:unit": "node --import tsx src/lib/ai/json.test.ts && node --import tsx src/lib/ai/gemini.test.ts && node --import tsx src/components/editor/export-cleanup.test.ts && node --import tsx src/components/editor/editor-preview.test.ts && node --import tsx src/components/editor/editor-document-edits.test.ts && node --import tsx src/components/editor/editor-preview-frame.test.ts && node --import tsx src/components/wizard/wizard-flow.test.tsx && node --import tsx src/lib/source-ingestion.test.ts && node --import tsx src/lib/ebook-html.test.ts && node --import tsx src/lib/ebook-document.test.ts && node --import tsx src/lib/ebook-generation.test.ts && node --import tsx src/lib/projects.test.ts && node --import tsx src/lib/db/index.test.ts && node --import tsx src/lib/db/schema.test.ts && node --import tsx src/lib/storage/r2.test.ts && node --import tsx scripts/init-db.test.ts",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@neondatabase/auth": "^0.2.0-beta.1",
+        "@aws-sdk/client-s3": "^3.1040.0",
+        "@neondatabase/auth": "^0.3.0-beta",
         "@neondatabase/serverless": "^1.1.0",
         "html2canvas": "^1.4.1",
         "jspdf": "^4.2.1",
@@ -24,18 +25,19 @@
         "zod": "^4.1.5",
         "zustand": "^5.0.8"
     },
-    "overrides": {
-        "better-auth": "1.6.5"
-    },
     "devDependencies": {
         "@types/node": "^24.3.0",
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.2.3",
         "autoprefixer": "^10.4.21",
         "dotenv": "^17.4.2",
-        "postcss": "^8.5.6",
+        "postcss": "8.5.10",
         "tailwindcss": "^3.4.17",
         "tsx": "^4.20.6",
         "typescript": "^5.9.2"
+    },
+    "overrides": {
+        "postcss": "8.5.10",
+        "uuid": "14.0.0"
     }
 }

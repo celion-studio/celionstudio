@@ -40,7 +40,7 @@ Removed:
 - Old document routes: `/documents`, `/editor/[projectId]` Tiptap implementation.
 - Old Tiptap editor components and pagination helpers.
 - Old document validation, document generation, prompts, image storage, and legacy block utilities.
-- Tiptap and Vercel Blob dependencies.
+- Tiptap and legacy image-storage dependencies.
 - Obsolete Tiptap research and plan docs.
 
 Renamed:
@@ -73,7 +73,7 @@ Completed after cleanup:
   - `normalizeBuilderHtml`
   - `Tiptap`
   - `@tiptap`
-  - `@vercel/blob`
+  - legacy image-storage package references
   - `page-format`
   - `ProjectDocumentPayload`
   - `ProjectKind = "document"`

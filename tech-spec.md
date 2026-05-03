@@ -53,7 +53,7 @@ Out of scope for this document:
 - Tiptap renders and edits one continuous document inside a visual page frame
 - The editor supports image nodes with file insertion, selection menus, alignment, crop-frame display, and horizontal resizing
 - The editor supports a custom `mediaText` node for stable image-plus-text side-by-side layouts
-- Image insertion uploads to Vercel Blob and stores stable Blob URLs in the Tiptap document.
+- Image/file insertion should upload to Cloudflare R2 and store stable object URLs plus metadata in the project record.
 - Generated HTML is derived at export time from the saved document and is not persisted
 - PDF export uses improved print HTML/CSS, stable image URLs, and page sizing; accurate repeating page chrome remains a later export-pipeline upgrade.
 - Initial ebook generation should use one Gemini Flash call after project creation
@@ -206,11 +206,12 @@ Current document node policy:
 
 Current implementation:
 
-- `src/lib/image-storage.ts` defines the image storage boundary.
-- `vercel-blob` is the active image upload provider today.
-- `local-inline` remains a legacy fallback helper only and should not be used for saved editor documents.
-- Server uploads are limited to 4MB per image to stay below Vercel request body limits; saved documents are limited to 16MB JSON payloads.
-- `save-document` validates document payload size, supported Tiptap node/mark types, nesting depth, node count, image URLs, and rejects non-persistable image sources such as `blob:` or inline `data:` URLs.
+- `src/lib/storage/r2.ts` defines the Cloudflare R2 object-storage boundary.
+- There is no active editor image upload route in the current ebook editor.
+- Vercel Blob is not part of the runtime contract.
+- When image/file storage returns to the UI, it should use the R2 boundary rather than adding another provider.
+- Saved documents should store stable object URLs, keys, ownership metadata, and references, not inline binaries.
+- Save validation should reject non-persistable image sources such as `blob:` or inline `data:` URLs.
 
 Production direction:
 
@@ -219,16 +220,30 @@ Production direction:
 - Keep Neon as the application database for project rows, document JSON, image metadata, ownership, and references.
 - Do not use Neon/Postgres as the primary store for large image binaries unless there is a very specific reason.
 
-Preferred provider order:
+Selected provider:
 
-1. Vercel Blob if staying tightly centered on Vercel deployment and simplest Next.js integration matters most.
-2. Cloudflare R2 if long-term portability, S3-compatible APIs, and object-storage cost profile matter more.
-3. S3-compatible storage as a generic fallback if R2 is not chosen.
+1. Cloudflare R2 for long-term portability, S3-compatible APIs, and object-storage cost profile.
+2. Other S3-compatible storage only if R2 is reopened later.
+
+Image optimization direction:
+
+- Store one original object in R2 and keep generated derivative files out of the MVP storage model.
+- Serve production assets through an R2 custom domain on Cloudflare, not the public `r2.dev` development URL.
+- Generate optimized display URLs at render time with Cloudflare image transformations, such as `/cdn-cgi/image/format=auto,width=960/...`.
+- Use `srcset`/`sizes` for responsive images when images return to the editor or public previews.
+
+Avoid:
+
+- Vercel Blob as the default provider. Choosing it now creates a likely migration cost later.
+- Neon/Postgres as the primary store for large image binaries.
 
 References:
 
-- Vercel Blob: https://vercel.com/docs/vercel-blob
 - Cloudflare R2 S3-compatible API: https://developers.cloudflare.com/r2/get-started/s3/
+- Cloudflare R2 public buckets and custom domains: https://developers.cloudflare.com/r2/buckets/public-buckets/
+- Cloudflare image transformations: https://developers.cloudflare.com/images/optimization/features/
+- Cloudflare responsive images: https://developers.cloudflare.com/images/optimization/make-responsive-images/
+- AWS SDK for JavaScript S3 client: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/
 
 ### Current API surface
 
@@ -287,7 +302,11 @@ Important rule:
 - `NEON_AUTH_BASE_URL`
 - `NEON_AUTH_COOKIE_SECRET`
 - `GEMINI_API_KEY`
-- `BLOB_READ_WRITE_TOKEN`
+- `CLOUDFLARE_R2_ACCOUNT_ID`
+- `CLOUDFLARE_R2_ACCESS_KEY_ID`
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY`
+- `CLOUDFLARE_R2_BUCKET`
+- `CLOUDFLARE_R2_PUBLIC_BASE_URL`
 
 ### AI generation contract
 
@@ -317,6 +336,11 @@ DATABASE_URL=
 NEON_AUTH_BASE_URL=
 NEON_AUTH_COOKIE_SECRET=
 GEMINI_API_KEY=
+CLOUDFLARE_R2_ACCOUNT_ID=
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
+CLOUDFLARE_R2_BUCKET=
+CLOUDFLARE_R2_PUBLIC_BASE_URL=
 ```
 
 ## 9. What Was Removed From The Current Plan
@@ -356,11 +380,12 @@ If the team wants to reintroduce any of those later, that should be treated as a
   - Verify visual page count with headings, lists, images, and `mediaText`.
   - Verify header/footer editing and persistence.
   - Decide whether Pages Lite is enough for MVP or whether line-accurate pagination must be implemented before launch.
-- [x] Replace inline image persistence with object storage.
-  - Vercel Blob is the active provider.
-  - Upload route/client upload flow persists returned blob URLs.
+- [x] Add Cloudflare R2-backed object storage boundary.
+  - `src/lib/storage/r2.ts` resolves env, creates an S3-compatible R2 client, uploads objects, builds public URLs, and creates project-scoped object keys.
+- [ ] Wire Cloudflare R2 into image/file upload routes when uploads return.
+  - Upload route/client upload flow should persist returned R2 object URLs or public CDN URLs.
   - Keep Neon for metadata and references only.
-  - Add cleanup behavior for deleted/replaced images later.
+  - Add cleanup behavior for deleted/replaced objects.
 - [ ] Improve manual save QA.
   - Test save while typing under slow network.
   - Test image insertion while save is pending.
