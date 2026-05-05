@@ -150,6 +150,71 @@ test("ebook routes report malformed JSON as invalid requests", async () => {
   });
 });
 
+test("ebook generate request rejects excessive source volume before generation", async () => {
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: Array.from({ length: 9 }, (_, index) => ({
+        id: `source-${index}`,
+        kind: "pasted_text",
+        name: `Source ${index}`,
+        content: "Useful source content",
+        excerpt: "",
+      })),
+      ebookStyle: "minimal",
+    }),
+  });
+
+  assert.deepEqual(await parseEbookGenerateRequest(request), {
+    ok: false,
+    message: "Too many sources. Maximum is 8.",
+  });
+});
+
+test("ebook generate request rejects oversized fields before generation", async () => {
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "T".repeat(201),
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+    }),
+  });
+
+  assert.deepEqual(await parseEbookGenerateRequest(request), {
+    ok: false,
+    message: "Title is too long. Maximum is 200 characters.",
+  });
+});
+
+test("ebook generate request rejects oversized source content before generation", async () => {
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "",
+      sources: [
+        {
+          id: "source-1",
+          kind: "pasted_text",
+          name: "Large source",
+          content: "S".repeat(50001),
+          excerpt: "",
+        },
+      ],
+      ebookStyle: "minimal",
+    }),
+  });
+
+  assert.deepEqual(await parseEbookGenerateRequest(request), {
+    ok: false,
+    message: "Source content is too long. Maximum is 50000 characters per source.",
+  });
+});
+
 test("prepareEbookHtmlForSave sanitizes and validates Celion A5 slide HTML", () => {
   const html = validSlideHtml.replace(
     "overflow: hidden;",

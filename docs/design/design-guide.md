@@ -98,9 +98,9 @@ Rules:
 
 Default shape:
 
-- Small controls: `4px` to `6px`
-- Cards and modals: `6px` to `8px`
-- Avoid radius above `10px` unless there is a specific product reason.
+- Default controls, buttons, fields, dropdowns, badges, and pricing cards: `4px`
+- Large app shells and preview frames may use `8px` when they need a softer container boundary.
+- Avoid radius above `8px` unless there is a specific product reason.
 
 Rules:
 
@@ -131,7 +131,7 @@ Do not use:
 Recommended status pattern:
 
 ```tsx
-<span className="inline-flex items-center gap-1.5 rounded-[5px] border border-line bg-surface-subtle px-2 py-0.5 text-[11.5px] font-medium text-muted">
+<span className="inline-flex items-center gap-1.5 rounded-[4px] border border-line bg-surface-subtle px-2 py-0.5 text-[11.5px] font-medium text-muted">
   <span className="h-[5px] w-[5px] rounded-full bg-accent" />
   Ready
 </span>
@@ -265,4 +265,3 @@ Before finishing a UI change, ask:
 - Is the typography calm, with limited weight?
 - Does this screen match the editor and dashboard language?
 - Would this still feel right after the user creates 50 drafts?
-

@@ -145,7 +145,7 @@ export function AuthModal({ onClose }: Props) {
         onClick={(event) => event.stopPropagation()}
       >
         <div
-          className="rounded-[28px] p-8"
+          className="rounded-[4px] p-8"
           style={{
             background: "rgba(255,255,255,0.82)",
             backdropFilter: "blur(28px) saturate(180%)",
@@ -159,12 +159,12 @@ export function AuthModal({ onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full border border-black/[0.07] bg-white/80 text-[#71717a] transition hover:bg-white hover:text-[#1F1F1F]"
+            className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-[4px] border border-black/[0.07] bg-white/80 text-[#71717a] transition hover:bg-white hover:text-[#1F1F1F]"
           >
             <X className="size-[15px]" />
           </button>
 
-          <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-xl bg-[#1F1F1F]">
+          <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-[4px] bg-[#1F1F1F]">
             <span className="font-mono text-[12px] font-bold text-white">C</span>
           </div>
 
@@ -177,13 +177,13 @@ export function AuthModal({ onClose }: Props) {
               : "Start turning your knowledge into ebooks."}
           </p>
 
-          <div className="mt-6 flex rounded-full border border-black/[0.06] bg-[#f1f2f4] p-[3px]">
+          <div className="mt-6 flex rounded-[4px] border border-black/[0.06] bg-[#f1f2f4] p-[3px]">
             {(["sign-up", "sign-in"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => switchMode(value)}
-                className={`flex-1 rounded-full py-[7px] text-[12px] font-medium transition-all duration-150 ${
+                className={`flex-1 rounded-[4px] py-[7px] text-[12px] font-medium transition-all duration-150 ${
                   mode === value
                     ? "bg-[#1F1F1F] text-white shadow-sm"
                     : "text-[#71717a] hover:text-[#1F1F1F]"
@@ -198,7 +198,7 @@ export function AuthModal({ onClose }: Props) {
             type="button"
             onClick={handleGoogle}
             disabled={loading !== null}
-            className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-2xl border border-black/[0.08] bg-white py-[11px] text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#f1f2f4] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-5 flex w-full items-center justify-center gap-2.5 rounded-[4px] border border-black/[0.08] bg-white py-[11px] text-[14px] font-medium text-[#1F1F1F] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:bg-[#f1f2f4] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <GoogleIcon />
             {loading === "google" ? "Redirecting..." : "Continue with Google"}
@@ -219,7 +219,7 @@ export function AuthModal({ onClose }: Props) {
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Full name"
                 autoComplete="name"
-                className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+                className="w-full rounded-[4px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
               />
             ) : null}
 
@@ -229,7 +229,7 @@ export function AuthModal({ onClose }: Props) {
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Email address"
               autoComplete="email"
-              className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+              className="w-full rounded-[4px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
             />
 
             <input
@@ -238,7 +238,7 @@ export function AuthModal({ onClose }: Props) {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
               autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-              className="w-full rounded-2xl border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+              className="w-full rounded-[4px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
             />
           </div>
 
@@ -246,7 +246,7 @@ export function AuthModal({ onClose }: Props) {
             type="button"
             onClick={handleEmailAuth}
             disabled={!canSubmit}
-            className="mt-4 w-full rounded-2xl bg-[#1F1F1F] py-[11px] text-[14px] font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-4 w-full rounded-[4px] bg-[#1F1F1F] py-[11px] text-[14px] font-medium text-white transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading === "email"
               ? "Working..."
@@ -257,7 +257,7 @@ export function AuthModal({ onClose }: Props) {
 
           {message ? (
             <p
-              className={`mt-3 rounded-2xl px-4 py-3 text-[13px] leading-[1.6] ${
+              className={`mt-3 rounded-[4px] px-4 py-3 text-[13px] leading-[1.6] ${
                 isSuccess
                   ? "bg-[#F0FDF4] text-[#166534]"
                   : "bg-[#FFF1E6] text-[#9B4C19]"

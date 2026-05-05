@@ -3,6 +3,11 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Trash2 } from "lucide-react";
+import {
+  CELION_COLOR,
+  CELION_FONT,
+  CELION_RADIUS,
+} from "@/components/ui/celion-style";
 import type { ProjectRecord } from "@/types/project";
 
 const statusLabel: Record<string, string> = {
@@ -27,8 +32,8 @@ function StatusBadge({ status }: { status: string }) {
   const tone = statusTone[status] ?? statusTone.draft;
 
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 9px", borderRadius: "5px", fontSize: "11.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", background: "#f7f6f3", color: "#5f6670", border: "1px solid #e5e2dc" }}>
-      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: tone.dot, flexShrink: 0 }} />
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 9px", borderRadius: CELION_RADIUS.control, fontSize: "11.5px", fontWeight: 500, fontFamily: CELION_FONT.display, background: "#f7f6f3", color: "#5f6670", border: "1px solid #e5e2dc" }}>
+      <span style={{ width: "5px", height: "5px", borderRadius: CELION_RADIUS.round, background: tone.dot, flexShrink: 0 }} />
       {statusLabel[status] ?? status}
     </span>
   );
@@ -51,9 +56,9 @@ export function ProjectList({
 
   return (
     <div style={{ overflow: "hidden" }}>
-      <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 16px", borderBottom: "1px solid #ECEAE5", background: "#f8f7f4", borderRadius: "8px 8px 0 0" }}>
+      <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 16px", borderBottom: `1px solid ${CELION_COLOR.lineSoft}`, background: CELION_COLOR.panelSoft, borderRadius: `${CELION_RADIUS.control} ${CELION_RADIUS.control} 0 0` }}>
         {columns.map((col) => (
-          <span key={col || "actions"} style={{ fontSize: "11px", fontWeight: 500, color: "#A1A1AA", textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "'Geist', sans-serif" }}>
+          <span key={col || "actions"} style={{ fontSize: "11px", fontWeight: 500, color: CELION_COLOR.mutedSoft, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: CELION_FONT.display }}>
             {col}
           </span>
         ))}
@@ -82,10 +87,10 @@ export function ProjectList({
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              border: "1px solid #ECEAE5",
-              borderRadius: "6px",
-              background: isDeleting ? "#F7F6F3" : "#fff",
-              color: isDeleting ? "#C9C3B8" : "#A1A1AA",
+              border: `1px solid ${CELION_COLOR.lineSoft}`,
+              borderRadius: CELION_RADIUS.control,
+              background: isDeleting ? "#F7F6F3" : CELION_COLOR.panel,
+              color: isDeleting ? "#C9C3B8" : CELION_COLOR.mutedSoft,
               cursor: isDeleting ? "not-allowed" : "pointer",
             }}
           >
@@ -98,7 +103,7 @@ export function ProjectList({
             key={project.id}
             style={{
               display: "block",
-              borderBottom: isLast ? "none" : "1px solid #F0EEE9",
+              borderBottom: isLast ? "none" : `1px solid ${CELION_COLOR.controlSoft}`,
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#fbfaf8")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -108,10 +113,10 @@ export function ProjectList({
                 href={`/editor/${project.id}` as Route}
                 style={{ flex: 1, minWidth: 0, textDecorationLine: "none" }}
               >
-                <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, fontFamily: "'Geist', sans-serif", color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, fontFamily: CELION_FONT.display, color: CELION_COLOR.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {title}
                 </p>
-                <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#A1A1AA" }}>
+                <p style={{ margin: "4px 0 0", fontSize: "12px", color: CELION_COLOR.mutedSoft }}>
                   {project.profile.targetAudience.slice(0, 24)} / {updatedDate}
                 </p>
               </Link>
@@ -126,17 +131,17 @@ export function ProjectList({
                 href={`/editor/${project.id}` as Route}
                 style={{ minWidth: 0, textDecorationLine: "none" }}
               >
-                <p style={{ margin: 0, fontSize: "13.5px", fontWeight: 500, fontFamily: "'Geist', sans-serif", color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "340px" }}>
+                <p style={{ margin: 0, fontSize: "13.5px", fontWeight: 500, fontFamily: CELION_FONT.display, color: CELION_COLOR.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "340px" }}>
                   {title}
                 </p>
-                <p style={{ margin: "3px 0 0", fontSize: "11.5px", color: "#A1A1AA" }}>
+                <p style={{ margin: "3px 0 0", fontSize: "11.5px", color: CELION_COLOR.mutedSoft }}>
                   Updated {updatedDateWithYear}
                 </p>
               </Link>
-              <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "12.5px", color: CELION_COLOR.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {project.profile.targetAudience.slice(0, 18)}
               </span>
-              <span style={{ fontSize: "12.5px", color: "#71717A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ fontSize: "12.5px", color: CELION_COLOR.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {project.profile.tone.slice(0, 18)}
               </span>
               <div>

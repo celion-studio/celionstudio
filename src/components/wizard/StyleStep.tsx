@@ -41,7 +41,7 @@ export function StyleStep({ ebookStyle, onStyleChange, accentColor, onAccentColo
                 gap: "16px",
                 width: "100%",
                 padding: "16px 18px",
-                borderRadius: "8px",
+                borderRadius: "4px",
                 border: isSelected ? "2px solid #1a1714" : "1.5px solid #e1e4e8",
                 background: isSelected ? "#f7f6f4" : "#ffffff",
                 cursor: "pointer",

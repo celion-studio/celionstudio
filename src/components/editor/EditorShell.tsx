@@ -487,7 +487,7 @@ export function EditorShell({
             minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
             background: "#fff",
             border: "1px solid rgba(28,25,23,0.08)",
-            borderRadius: "12px",
+            borderRadius: "8px",
             boxShadow: "none",
             overflow: "hidden",
           }}

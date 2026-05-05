@@ -142,108 +142,128 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
   const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
 
   return (
-    <div className="space-y-7">
-      <section>
-        <div className="flex items-center justify-between">
-          <span style={{ fontSize: "11px", fontFamily: "'Geist', sans-serif", fontWeight: 500, letterSpacing: "0.1em", color: "#b8b4aa" }}>
-            {String(step).padStart(2, "0")} / {String(TOTAL_STEPS).padStart(2, "0")}
-          </span>
-          <div className="flex items-center gap-4">
+    <div
+      style={{
+        width: "100%",
+        maxWidth: "760px",
+        margin: "0 auto",
+      }}
+    >
+      <section style={{ marginBottom: "30px", textAlign: "center" }}>
+        <h1
+          style={{
+            margin: 0,
+            fontFamily: "'Geist', sans-serif",
+            fontSize: "clamp(25px, 3vw, 36px)",
+            lineHeight: 1.08,
+            letterSpacing: "-0.04em",
+            fontWeight: 500,
+            color: "#17191d",
+          }}
+        >
+          {STEP_TITLES[currentStepIndex]}
+        </h1>
+
+        <div style={{ display: "flex", justifyContent: "center", marginTop: "18px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", minWidth: 0 }}>
             {STEP_LABELS.map((label, index) => {
-              const isActive = step === index + 1;
-              const isDone = step > index + 1;
+              const stepNumber = index + 1;
+              const isActive = step === stepNumber;
+              const isDone = step > stepNumber;
+
               return (
-                <span
+                <button
                   key={label}
+                  type="button"
+                  onClick={() => {
+                    if (!busy && (isDone || stepNumber === step)) {
+                      setStep(stepNumber as WizardStep);
+                    }
+                  }}
                   style={{
-                    fontSize: "11px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    border: "none",
+                    background: "transparent",
+                    padding: 0,
+                    cursor: !busy && (isDone || stepNumber === step) ? "pointer" : "default",
+                    color: isActive ? "#17191d" : isDone ? "#4b515a" : "#b6bbc2",
                     fontFamily: "'Geist', sans-serif",
-                    fontWeight: 500,
-                    letterSpacing: "0.06em",
-                    color: isActive ? "#1f1f1f" : isDone ? "#c8c4bb" : "#d8d4cc",
-                    textDecorationLine: isActive ? "underline" : "none",
-                    textUnderlineOffset: "4px",
-                    textDecorationColor: "#1a1714",
-                    textDecorationThickness: "1.5px",
-                    transition: "color 0.2s ease",
+                    fontSize: "11.5px",
+                    fontWeight: isActive ? 600 : 500,
                   }}
                 >
+                  <span
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      borderRadius: "4px",
+                      border: isActive || isDone ? "1px solid #24272c" : "1px solid #d7dbe0",
+                      background: isDone ? "#24272c" : isActive ? "#ffffff" : "#f6f7f8",
+                      color: isDone ? "#ffffff" : isActive ? "#24272c" : "#858b93",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "10px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {stepNumber}
+                  </span>
                   {label}
-                </span>
+                </button>
               );
             })}
           </div>
         </div>
-
-        <h1 style={{ margin: "18px 0 0", fontFamily: "'Geist', sans-serif", fontSize: "clamp(24px, 3vw, 34px)", lineHeight: 1.08, letterSpacing: "-0.04em", fontWeight: 500, color: "#1a1714" }}>
-          {STEP_TITLES[currentStepIndex]}
-        </h1>
-        <p style={{ margin: "9px 0 0", fontSize: "13.5px", lineHeight: 1.55, color: "#8a867e", fontFamily: "'Geist', sans-serif" }}>
-          {STEP_DESCRIPTIONS[currentStepIndex]}
-        </p>
-
-        <div className="mt-6 flex gap-1">
-          {STEP_LABELS.map((_, index) => (
-            <div
-              key={index}
-              style={{
-                height: "2px",
-                flex: 1,
-                borderRadius: "2px",
-                background: step > index ? "#17191d" : "#e1e4e8",
-                transition: "background 0.3s ease",
-              }}
-            />
-          ))}
-        </div>
       </section>
 
-      <section style={{ borderRadius: "10px", border: "1px solid #e1e4e8", background: "linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%)", boxShadow: "0 4px 32px rgba(24,27,31,0.05), 0 1px 2px rgba(0,0,0,0.03)", overflow: "hidden" }}>
-        <div key={step} className="step-in px-6 pt-7 pb-2 md:px-8 md:pt-8">
-          {step === 1 && (
-            <BasicsStep
-              title={title}
-              author={author}
-              targetAudience={targetAudience}
-              purpose={purpose}
-              purposeDetail={purposeDetail}
-              tone={tone}
-              onFieldChange={setField}
-              onPurposeChange={setPurpose}
-              onToneChange={setTone}
-            />
-          )}
-          {step === 2 && (
-            <StyleStep
-              ebookStyle={ebookStyle}
-              onStyleChange={setEbookStyle}
-              accentColor={accentColor}
-              onAccentColorChange={setAccentColor}
-            />
-          )}
-          {step === 3 && (
-            <SourceStepEbook
-              sources={sourceFiles}
-              sourceTextLength={promptSourceText.length}
-              onSourceFilesChange={setSourceFiles}
-              onError={setError}
-            />
-          )}
-          {step === 4 && (
-            <GenerateStepEbook
-              title={title}
-              author={author}
-              ebookStyle={ebookStyle}
-              accentColor={accentColor}
-              generating={generating}
-            />
-          )}
-        </div>
+      <section key={step} className="step-in">
+        {step === 1 && (
+          <BasicsStep
+            title={title}
+            author={author}
+            targetAudience={targetAudience}
+            purpose={purpose}
+            purposeDetail={purposeDetail}
+            tone={tone}
+            onFieldChange={setField}
+            onPurposeChange={setPurpose}
+            onToneChange={setTone}
+          />
+        )}
+        {step === 2 && (
+          <StyleStep
+            ebookStyle={ebookStyle}
+            onStyleChange={setEbookStyle}
+            accentColor={accentColor}
+            onAccentColorChange={setAccentColor}
+          />
+        )}
+        {step === 3 && (
+          <SourceStepEbook
+            sources={sourceFiles}
+            sourceTextLength={promptSourceText.length}
+            onSourceFilesChange={setSourceFiles}
+            onError={setError}
+          />
+        )}
+        {step === 4 && (
+          <GenerateStepEbook
+            title={title}
+            author={author}
+            ebookStyle={ebookStyle}
+            accentColor={accentColor}
+            generating={generating}
+          />
+        )}
+      </section>
 
-        <div style={{ margin: "28px 0 0", padding: "20px 32px 24px", borderTop: "1px solid #eef0f2", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+      <div style={{ marginTop: "32px", paddingTop: "20px", borderTop: "1px solid #eef0f2", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
           <div>
             {error ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#5f6670", fontFamily: "'Geist', sans-serif", background: "#f7f6f3", border: "1px solid #e5e2dc", borderRadius: "6px", padding: "5px 10px" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#5f6670", fontFamily: "'Geist', sans-serif", background: "#f7f6f3", border: "1px solid #e5e2dc", borderRadius: "4px", padding: "5px 10px" }}>
                 {error}
               </span>
             ) : null}
@@ -255,7 +275,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
                 type="button"
                 disabled={busy}
                 onClick={handlePrevious}
-                className="inline-flex items-center gap-1.5 rounded-[6px] border border-[#e1e4e8] bg-white px-4 py-2.5 text-[13px] font-medium text-[#4b515a] transition-all duration-150 hover:border-[#c5cad1] hover:text-[#17191d] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-[4px] border border-[#e1e4e8] bg-white px-4 py-2.5 text-[13px] font-medium text-[#4b515a] transition-all duration-150 hover:border-[#c5cad1] hover:text-[#17191d] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ fontFamily: "'Geist', sans-serif" }}
               >
                 <ArrowLeft size={12} />
@@ -267,7 +287,7 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
               type="button"
               disabled={!canAdvance}
               onClick={handleNext}
-              className={`inline-flex items-center gap-1.5 rounded-[6px] px-5 py-2.5 text-[13px] font-medium text-white transition-all duration-150 ${canAdvance ? "cursor-pointer bg-[#1a1714] hover:-translate-y-px hover:bg-[#2d2925] hover:shadow-[0_4px_16px_rgba(0,0,0,0.16)]" : "cursor-not-allowed bg-[#1a1714] opacity-30"}`}
+              className={`inline-flex items-center gap-1.5 rounded-[4px] px-5 py-2.5 text-[13px] font-medium text-white transition-all duration-150 ${canAdvance ? "cursor-pointer bg-[#1a1714] hover:-translate-y-px hover:bg-[#2d2925] hover:shadow-[0_4px_16px_rgba(0,0,0,0.16)]" : "cursor-not-allowed bg-[#1a1714] opacity-30"}`}
               style={{ fontFamily: "'Geist', sans-serif" }}
             >
               {ctaLabel}
@@ -275,7 +295,6 @@ export function WizardContent({ isSignedIn = true }: { isSignedIn?: boolean }) {
             </button>
           </div>
         </div>
-      </section>
     </div>
   );
 }

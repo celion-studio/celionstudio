@@ -18,7 +18,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Celion — Knowledge, packaged",
+  title: "Celion | Knowledge, packaged",
   description:
     "Paste notes, upload transcripts, drop a draft. Celion reshapes what you already know into a polished ebook.",
 };

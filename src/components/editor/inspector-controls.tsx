@@ -19,7 +19,7 @@ const labelStyle = {
 const inputStyle = {
   width: "100%",
   padding: "8px 10px",
-  borderRadius: "6px",
+  borderRadius: "4px",
   border: "1.5px solid #e4e4e7",
   fontSize: "13px",
   fontFamily: "'Geist', sans-serif",
@@ -95,7 +95,7 @@ export function InspectorControls({
             disabled={!textValue.trim()}
             style={{
               padding: "8px 14px",
-              borderRadius: "6px",
+              borderRadius: "4px",
               background: "#18181b",
               color: "#ffffff",
               border: "none",

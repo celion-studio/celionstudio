@@ -11,6 +11,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import {
+  CELION_COLOR,
+  CELION_FONT,
+  CELION_RADIUS,
+} from "@/components/ui/celion-style";
 
 export type SidebarItemKey = "workspace" | "new" | "settings";
 
@@ -49,10 +54,9 @@ export function WorkspaceSidebar({
   primaryAction = null,
 }: WorkspaceSidebarProps) {
   const router = useRouter();
-  const { data: session } = authClient.useSession();
 
-  const userName = session?.user?.name ?? initialUserName;
-  const userEmail = session?.user?.email ?? initialUserEmail;
+  const userName = initialUserName;
+  const userEmail = initialUserEmail;
   const userInitial =
     userName?.charAt(0).toUpperCase() ??
     userEmail?.charAt(0).toUpperCase() ??
@@ -87,8 +91,8 @@ export function WorkspaceSidebar({
             style={{
               width: "30px",
               height: "30px",
-              background: "#111",
-              borderRadius: "8px",
+              background: CELION_COLOR.ink,
+              borderRadius: CELION_RADIUS.control,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -109,10 +113,10 @@ export function WorkspaceSidebar({
           </div>
           <span
             style={{
-              fontFamily: "'Geist', sans-serif",
+              fontFamily: CELION_FONT.display,
               fontSize: "15px",
               fontWeight: 600,
-              color: "#111",
+              color: CELION_COLOR.text,
               letterSpacing: "-0.02em",
             }}
           >
@@ -134,12 +138,12 @@ export function WorkspaceSidebar({
                 alignItems: "center",
                 gap: "10px",
                 padding: "8px 10px",
-                borderRadius: "8px",
+                borderRadius: CELION_RADIUS.control,
                 textDecorationLine: "none",
                 fontSize: "13.5px",
                 fontWeight: active ? 500 : 400,
-                color: active ? "#111" : "#71717A",
-                background: active ? "#F0EEE9" : "transparent",
+                color: active ? CELION_COLOR.text : CELION_COLOR.muted,
+                background: active ? CELION_COLOR.controlSoft : "transparent",
                 transition: "all 0.15s ease",
               }}
             >
@@ -169,13 +173,13 @@ export function WorkspaceSidebar({
               justifyContent: "center",
               gap: "8px",
               padding: "9px 0",
-              background: "#111",
-              color: "#fff",
+              background: CELION_COLOR.ink,
+              color: CELION_COLOR.white,
               border: "none",
-              borderRadius: "8px",
+              borderRadius: CELION_RADIUS.control,
               fontSize: "13px",
               fontWeight: 500,
-              fontFamily: "'Geist', sans-serif",
+              fontFamily: CELION_FONT.display,
               cursor: isSignedIn ? "pointer" : "not-allowed",
               opacity: isSignedIn ? 1 : 0.4,
               transition: "opacity 0.15s ease",
@@ -199,14 +203,14 @@ export function WorkspaceSidebar({
           style={{
             width: "28px",
             height: "28px",
-            background: "#111",
-            borderRadius: "50%",
+            background: CELION_COLOR.ink,
+            borderRadius: CELION_RADIUS.round,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: "11px",
             fontWeight: 600,
-            color: "#fff",
+            color: CELION_COLOR.white,
             flexShrink: 0,
           }}
         >
@@ -218,7 +222,7 @@ export function WorkspaceSidebar({
               margin: 0,
               fontSize: "13px",
               fontWeight: 500,
-              color: "#111",
+              color: CELION_COLOR.text,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -230,7 +234,7 @@ export function WorkspaceSidebar({
             style={{
               margin: 0,
               fontSize: "11px",
-              color: "#A1A1AA",
+              color: CELION_COLOR.mutedSoft,
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -241,14 +245,18 @@ export function WorkspaceSidebar({
         </div>
         {isSignedIn ? (
           <button
-            onClick={() => authClient.signOut().then(() => window.location.replace("/"))}
+            onClick={() => {
+              void authClient.signOut().finally(() => {
+                window.location.replace("/");
+              });
+            }}
             title="Sign out"
             style={{
               background: "none",
               border: "none",
               cursor: "pointer",
               padding: "4px",
-              color: "#A1A1AA",
+              color: CELION_COLOR.mutedSoft,
               display: "flex",
               alignItems: "center",
             }}

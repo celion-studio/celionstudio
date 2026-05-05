@@ -4,10 +4,17 @@ import { getRouteSession } from "@/lib/session";
 import { EBOOK_BLUEPRINT_GEMINI_MODEL, EBOOK_GEMINI_MODEL } from "@/lib/ai/gemini";
 import { EbookGenerationError, generateEbookHtmlWithDiagnostics } from "@/lib/ebook-generation";
 import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
+import { checkEbookGenerationQuota } from "@/lib/ebook-generation-quota";
 import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 import { createProjectForUser, getEbookPageCountForHtml } from "@/lib/projects";
 import { SOURCE_KIND_IDS } from "@/types/project";
+
+const MAX_TITLE_LENGTH = 200;
+const MAX_SOURCE_TEXT_LENGTH = 100_000;
+const MAX_SOURCES = 8;
+const MAX_SOURCE_CONTENT_LENGTH = 50_000;
+const MAX_TOTAL_SOURCE_CONTENT_LENGTH = 120_000;
 
 const sourceSchema = z.object({
   id: z.string().min(1),
@@ -36,6 +43,34 @@ type ParseGenerateRequestResult =
   | { ok: false; message: string };
 
 type EbookGenerationDiagnostics = Awaited<ReturnType<typeof generateEbookHtmlWithDiagnostics>>["diagnostics"];
+
+function validateGenerateRequestLimits(data: GenerateRequestBody): string | null {
+  if (data.title.length > MAX_TITLE_LENGTH) {
+    return `Title is too long. Maximum is ${MAX_TITLE_LENGTH} characters.`;
+  }
+
+  if (data.sourceText.length > MAX_SOURCE_TEXT_LENGTH) {
+    return `Source text is too long. Maximum is ${MAX_SOURCE_TEXT_LENGTH} characters.`;
+  }
+
+  if (data.sources.length > MAX_SOURCES) {
+    return `Too many sources. Maximum is ${MAX_SOURCES}.`;
+  }
+
+  let totalSourceContentLength = 0;
+  for (const source of data.sources) {
+    if (source.content.length > MAX_SOURCE_CONTENT_LENGTH) {
+      return `Source content is too long. Maximum is ${MAX_SOURCE_CONTENT_LENGTH} characters per source.`;
+    }
+    totalSourceContentLength += source.content.length;
+  }
+
+  if (totalSourceContentLength > MAX_TOTAL_SOURCE_CONTENT_LENGTH) {
+    return `Total source content is too long. Maximum is ${MAX_TOTAL_SOURCE_CONTENT_LENGTH} characters.`;
+  }
+
+  return null;
+}
 
 function sanitizeBlueprintForLog(blueprint: EbookGenerationDiagnostics["blueprint"]) {
   return {
@@ -68,6 +103,11 @@ export async function parseEbookGenerateRequest(
     };
   }
 
+  const limitError = validateGenerateRequestLimits(parsed.data);
+  if (limitError) {
+    return { ok: false, message: limitError };
+  }
+
   return { ok: true, data: parsed.data };
 }
 
@@ -80,6 +120,11 @@ export async function POST(request: Request) {
   const parsed = await parseEbookGenerateRequest(request);
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
+  }
+
+  const quota = await checkEbookGenerationQuota(session.user.id);
+  if (!quota.ok) {
+    return NextResponse.json({ message: quota.message }, { status: quota.status });
   }
 
   const d = parsed.data;

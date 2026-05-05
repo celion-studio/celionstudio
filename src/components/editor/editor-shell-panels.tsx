@@ -50,14 +50,14 @@ export function EditorTopBar({
         <button
           onClick={onToggleExport}
           disabled={exporting}
-          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "6px", background: "#18181b", color: "#ffffff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "4px", background: "#18181b", color: "#ffffff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}
         >
           <Download size={13} />
           {exporting ? "Exporting..." : "Export"}
           <ChevronDown size={12} />
         </button>
         {exportOpen && (
-          <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "8px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
+          <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "4px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
             {(["pdf", "png", "jpg"] as const).map((fmt) => (
               <button
                 key={fmt}
@@ -104,7 +104,7 @@ export function EditorPageList({
             gap: "8px",
             width: "100%",
             padding: "8px 9px",
-            borderRadius: "6px",
+            borderRadius: "4px",
             border: currentSlide === index ? "1px solid rgba(28,25,23,0.08)" : "1px solid transparent",
             background: currentSlide === index ? "rgba(255,255,255,0.72)" : "transparent",
             cursor: "pointer",
@@ -193,7 +193,7 @@ export function EditorInspectorPanel({
   onStyleChange,
 }: InspectorPanelProps) {
   return (
-    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "12px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
+    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "8px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
         <h3 style={{ fontSize: "12px", fontWeight: 650, letterSpacing: "0.06em", textTransform: "uppercase", color: "#71717a", margin: 0 }}>
           Inspector

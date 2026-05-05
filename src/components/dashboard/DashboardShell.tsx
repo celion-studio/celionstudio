@@ -1,17 +1,21 @@
 ﻿"use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, ChevronRight, Clock, FileText, Sparkles } from "lucide-react";
+import { BookOpen, Clock, FileText } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { ProjectList } from "@/components/dashboard/ProjectList";
+import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
+import { WorkspaceStats } from "@/components/dashboard/WorkspaceStats";
 import {
-  WORKSPACE_EDGE_GAP,
-  WORKSPACE_TOP_RAIL_HEIGHT,
-  WorkspaceSidebar,
-  type SidebarItemKey,
-} from "@/components/dashboard/WorkspaceSidebar";
+  CELION_COLOR,
+  CELION_FONT,
+  CELION_RADIUS,
+} from "@/components/ui/celion-style";
+import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
 import type { ProjectKind, ProjectRecord } from "@/types/project";
 
 type DashboardShellProps = {
@@ -36,6 +40,20 @@ const workspaceCopy = {
   statExported: "Print opened",
 } as const;
 
+const dashboardActionStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "6px",
+  padding: "8px 18px",
+  background: CELION_COLOR.ink,
+  color: CELION_COLOR.white,
+  borderRadius: CELION_RADIUS.control,
+  textDecorationLine: "none",
+  fontSize: "13px",
+  fontWeight: 500,
+  fontFamily: CELION_FONT.display,
+};
+
 export function DashboardShell({
   isSignedIn,
   initialUserName,
@@ -45,22 +63,15 @@ export function DashboardShell({
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
-  const { data: clientSession, isPending: authPending } = authClient.useSession();
-  const resolvedSignedIn = authPending
-    ? isSignedIn
-    : Boolean(clientSession?.user);
-  const resolvedUserName = authPending
-    ? initialUserName
-    : clientSession?.user?.name ?? null;
-  const resolvedUserEmail = authPending
-    ? initialUserEmail
-    : clientSession?.user?.email ?? null;
+  const resolvedSignedIn = isSignedIn;
+  const resolvedUserName = initialUserName;
+  const resolvedUserEmail = initialUserEmail;
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
-  const showLoading = loading || (authPending && !hasVerifier);
+  const showLoading = loading;
   const copy = workspaceCopy;
   const projectKind: ProjectKind = "product";
 
@@ -113,7 +124,7 @@ export function DashboardShell({
   }, []);
 
   useEffect(() => {
-    if (hasVerifier || authPending) {
+    if (hasVerifier) {
       return;
     }
 
@@ -164,7 +175,7 @@ export function DashboardShell({
     return () => {
       active = false;
     };
-  }, [authPending, hasVerifier, projectKind, resolvedSignedIn]);
+  }, [hasVerifier, projectKind, resolvedSignedIn]);
 
   const printOpened = projects.filter((project) => project.status === "exported").length;
   const inProgress = projects.filter(
@@ -201,156 +212,43 @@ export function DashboardShell({
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        background: "#f3f2ef",
-        fontFamily: "'Inter', sans-serif",
-        overflow: "hidden",
+    <WorkspaceLayout
+      activeItem={activeItem}
+      isSignedIn={resolvedSignedIn}
+      initialUserName={resolvedUserName}
+      initialUserEmail={resolvedUserEmail}
+      breadcrumbCurrent={copy.breadcrumbCurrent}
+      primaryAction={{
+        href: "/new",
+        label: copy.primaryActionLabel,
       }}
     >
-      <WorkspaceSidebar
-        activeItem={activeItem}
-        isSignedIn={resolvedSignedIn}
-        initialUserName={resolvedUserName}
-        initialUserEmail={resolvedUserEmail}
-        primaryAction={{
-          href: "/new",
-          label: copy.primaryActionLabel,
-        }}
-      />
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header
-          style={{
-            height: `${WORKSPACE_TOP_RAIL_HEIGHT}px`,
-            background: "transparent",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: `0 ${WORKSPACE_EDGE_GAP}px`,
-            flexShrink: 0,
-            boxSizing: "border-box",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "13px", color: "#A1A1AA" }}>Workspace</span>
-            <ChevronRight size={12} color="#D4D2CC" />
-            <span style={{ fontSize: "13px", fontWeight: 500, color: "#111" }}>
-              {copy.breadcrumbCurrent}
-            </span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                background: "rgba(255,255,255,0.54)",
-                borderRadius: "6px",
-                padding: "5px 10px",
-                fontSize: "12px",
-                color: "#71717A",
-              }}
-            >
-              <Sparkles size={11} strokeWidth={1.8} />
-              <span style={{ fontFamily: "'Geist', sans-serif" }}>AI ready</span>
-            </div>
-          </div>
-        </header>
-
-        <main style={{ flex: 1, overflow: "auto", padding: `0 ${WORKSPACE_EDGE_GAP}px ${WORKSPACE_EDGE_GAP}px 0`, display: "flex" }}>
-          <div
-            style={{
-              flex: 1,
-              minHeight: `calc(100vh - ${WORKSPACE_TOP_RAIL_HEIGHT + WORKSPACE_EDGE_GAP}px)`,
-              background: "#fff",
-              border: "1px solid rgba(28,25,23,0.08)",
-              borderRadius: "12px",
-              boxShadow: "none",
-              boxSizing: "border-box",
-              padding: "30px",
-            }}
-          >
             <div style={{ marginBottom: "28px" }}>
               <h1
                 style={{
                   margin: 0,
-                  fontFamily: "'Geist', sans-serif",
+                  fontFamily: CELION_FONT.display,
                   fontSize: "22px",
                   fontWeight: 600,
                   letterSpacing: "-0.03em",
-                  color: "#111",
+                  color: CELION_COLOR.text,
                 }}
               >
                 {copy.heading}
               </h1>
-              <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: "#71717A" }}>
+              <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: CELION_COLOR.muted }}>
                 {copy.description}
               </p>
             </div>
 
             {resolvedSignedIn && projects.length > 0 ? (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                  marginBottom: "28px",
-                  background: "#f8f7f4",
-                  borderRadius: "10px",
-                  overflow: "hidden",
-                }}
-              >
-                {[
+              <WorkspaceStats
+                stats={[
                   { label: copy.statTotal, value: projects.length, icon: FileText },
                   { label: copy.statActive, value: inProgress, icon: Clock },
                   { label: copy.statExported, value: printOpened, icon: BookOpen },
-                ].map(({ label, value, icon: Icon }, index) => (
-                  <div
-                    key={label}
-                    style={{
-                      padding: "16px 18px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                      borderLeft: index === 0 ? "none" : "1px solid #ebe7df",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "34px",
-                        height: "34px",
-                        background: "#F0EEE9",
-                        borderRadius: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Icon size={15} color="#555" strokeWidth={1.8} />
-                    </div>
-                    <div>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "22px",
-                          fontFamily: "'Geist', sans-serif",
-                          fontWeight: 600,
-                          letterSpacing: "-0.03em",
-                          color: "#111",
-                        }}
-                      >
-                        {value}
-                      </p>
-                      <p style={{ margin: 0, fontSize: "12px", color: "#A1A1AA" }}>
-                        {label}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                ]}
+              />
             ) : null}
 
             {error ? (
@@ -359,7 +257,7 @@ export function DashboardShell({
                   marginBottom: "20px",
                   padding: "12px 16px",
                   background: "#FFF5F2",
-                  borderRadius: "8px",
+                  borderRadius: CELION_RADIUS.control,
                   border: "1px solid #FEDDCF",
                 }}
               >
@@ -373,8 +271,8 @@ export function DashboardShell({
                   style={{
                     margin: 0,
                     fontSize: "13px",
-                    color: "#A1A1AA",
-                    fontFamily: "'Geist', sans-serif",
+                    color: CELION_COLOR.mutedSoft,
+                    fontFamily: CELION_FONT.display,
                   }}
                 >
                   {copy.loadingLabel}
@@ -391,143 +289,43 @@ export function DashboardShell({
             ) : null}
 
             {!showLoading && !resolvedSignedIn ? (
-              <div
-                style={{
-                  marginTop: "24px",
-                  padding: "72px 32px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: "44px",
-                    height: "44px",
-                    background: "#F0EEE9",
-                    borderRadius: "10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px",
-                  }}
-                >
-                  <BookOpen size={18} color="#555" strokeWidth={1.8} />
-                </div>
-                <h3
-                  style={{
-                    margin: "0 0 8px",
-                    fontFamily: "'Geist', sans-serif",
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#111",
-                  }}
-                >
-                  Sign in to continue
-                </h3>
-                <p
-                  style={{
-                    margin: "0 0 20px",
-                    fontSize: "13.5px",
-                    color: "#71717A",
-                    maxWidth: "320px",
-                    marginLeft: "auto",
-                    marginRight: "auto",
-                  }}
-                >
-                  Your workspace is account-backed. Sign in to access your manuscripts.
-                </p>
-                <Link
-                  href="/"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 18px",
-                    background: "#111",
-                    color: "#fff",
-                    borderRadius: "8px",
-                    textDecorationLine: "none",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    fontFamily: "'Geist', sans-serif",
-                  }}
-                >
-                  Return to sign in
-                </Link>
-              </div>
+              <DashboardEmptyState
+                icon={BookOpen}
+                title="Sign in to continue"
+                description="Your workspace is account-backed. Sign in to access your manuscripts."
+                action={
+                  <Link
+                    href="/"
+                    style={dashboardActionStyle}
+                  >
+                    Return to sign in
+                  </Link>
+                }
+              />
             ) : null}
 
             {!showLoading && resolvedSignedIn && projects.length === 0 ? (
-              <div
-                style={{
-                  marginTop: "24px",
-                  padding: "72px 32px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: "44px",
-                    height: "44px",
-                    background: "#F0EEE9",
-                    borderRadius: "10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px",
-                  }}
-                >
-                  <FileText size={18} color="#555" strokeWidth={1.8} />
-                </div>
-                <h3
-                  style={{
-                    margin: "0 0 8px",
-                    fontFamily: "'Geist', sans-serif",
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#111",
-                  }}
-                >
-                  {copy.emptyTitle}
-                </h3>
-                <p
-                  style={{
-                    margin: "0 0 20px",
-                    fontSize: "13.5px",
-                    color: "#71717A",
-                    maxWidth: "300px",
-                    marginLeft: "auto",
-                    marginRight: "auto",
-                  }}
-                >
-                  {copy.emptyDescription}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => router.push("/new")}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 18px",
-                    background: "#111",
-                    color: "#fff",
-                    borderRadius: "8px",
-                    textDecorationLine: "none",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    fontFamily: "'Geist', sans-serif",
-                    border: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <FileText size={13} strokeWidth={2.2} />
-                  {copy.emptyAction}
-                </button>
-              </div>
+              <DashboardEmptyState
+                icon={FileText}
+                title={copy.emptyTitle}
+                description={copy.emptyDescription}
+                maxWidth="300px"
+                action={
+                  <button
+                    type="button"
+                    onClick={() => router.push("/new")}
+                    style={{
+                      ...dashboardActionStyle,
+                      border: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <FileText size={13} strokeWidth={2.2} />
+                    {copy.emptyAction}
+                  </button>
+                }
+              />
             ) : null}
-          </div>
-        </main>
-      </div>
-    </div>
+    </WorkspaceLayout>
   );
 }

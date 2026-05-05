@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { EbookGenerationError, generateEbookHtml, generateEbookHtmlWithDiagnostics } from "./ebook-generation";
 import type { CelionEbookDocument } from "./ebook-document";
+import { setGeminiClientFactoryForTests } from "./ai/gemini";
 
+const originalGoogleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
+process.env.GOOGLE_CLOUD_PROJECT = "celion-test";
+process.on("exit", () => {
+  if (originalGoogleCloudProject === undefined) delete process.env.GOOGLE_CLOUD_PROJECT;
+  else process.env.GOOGLE_CLOUD_PROJECT = originalGoogleCloudProject;
+});
 function muteConsoleWarn() {
   const originalWarn = console.warn;
   console.warn = () => {};
@@ -134,14 +141,37 @@ function validEbookDocument(titlePrefix = "Founder decision"): CelionEbookDocume
   };
 }
 
-function setQueuedFetch(responses: Response[], calls: string[] = [], requestBodies: unknown[] = []) {
-  globalThis.fetch = (async (input, init) => {
-    calls.push(String(input));
-    requestBodies.push(JSON.parse(String(init?.body)));
-    const response = responses.shift();
-    if (!response) throw new Error("No mocked response queued.");
-    return response;
-  }) as typeof fetch;
+function setQueuedGemini(responses: Response[], calls: string[] = [], requestBodies: unknown[] = []) {
+  setGeminiClientFactoryForTests(() => ({
+    models: {
+      async generateContent(params) {
+        calls.push(`/models/${params.model}:generateContent`);
+        requestBodies.push({
+          generationConfig: { temperature: params.config.temperature },
+          systemInstruction: { parts: [{ text: params.config.systemInstruction }] },
+          contents: [{ parts: [{ text: params.contents }] }],
+        });
+
+        const response = responses.shift();
+        if (!response) throw new Error("No mocked response queued.");
+        const body = await response.json() as {
+          candidates?: { content?: { parts?: { text?: string }[] } }[];
+          error?: { message?: string; status?: string };
+        };
+        if (!response.ok) {
+          const error = new Error(body.error?.message ?? response.statusText) as Error & {
+            status: number;
+          };
+          error.status = response.status;
+          throw error;
+        }
+
+        return {
+          text: body.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("\n"),
+        };
+      },
+    },
+  }));
 }
 
 const baseArgs = {
@@ -159,11 +189,12 @@ test("generateEbookHtml throws instead of saving fallback when blueprint Gemini 
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  globalThis.fetch = (async () =>
+  setQueuedGemini([
     new Response(
       JSON.stringify({ error: { status: "UNAVAILABLE", message: "This model is currently experiencing high demand." } }),
       { status: 503, statusText: "Service Unavailable", headers: { "Content-Type": "application/json" } },
-    )) as typeof fetch;
+    ),
+  ]);
 
   try {
     await assert.rejects(
@@ -177,7 +208,6 @@ test("generateEbookHtml throws instead of saving fallback when blueprint Gemini 
     else process.env.GEMINI_API_KEY = originalApiKey;
   }
 });
-
 test("generateEbookHtml logs failure reasons without source text", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
@@ -192,18 +222,22 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
   const args = { ...baseArgs, sourceText: `# Market\n\n${sensitiveSource} with enough length to become a paragraph.` };
 
   try {
-    globalThis.fetch = (async () => {
-      throw new Error(sensitiveSource);
-    }) as typeof fetch;
+    setGeminiClientFactoryForTests(() => ({
+      models: {
+        async generateContent() {
+          throw new Error(sensitiveSource);
+        },
+      },
+    }));
     await assert.rejects(() => generateEbookHtml(args), /AI ebook planning failed/);
 
-    setQueuedFetch([
+    setQueuedGemini([
       geminiJsonResponse(validBlueprint()),
       geminiJsonResponse({}),
     ]);
     await assert.rejects(() => generateEbookHtml(args), /Gemini did not return an ebook document/);
 
-    setQueuedFetch([
+    setQueuedGemini([
       geminiJsonResponse(validBlueprint()),
       geminiJsonResponse({ document: { ...validEbookDocument(), pages: [] } }),
     ]);
@@ -227,12 +261,13 @@ test("generateEbookHtml surfaces blueprint Gemini rate limits as retryable gener
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  globalThis.fetch = (async () =>
+  setQueuedGemini([
     new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded for this model." } }), {
       status: 429,
       statusText: "Too Many Requests",
       headers: { "Content-Type": "application/json" },
-    })) as typeof fetch;
+    }),
+  ]);
 
   try {
     await assert.rejects(
@@ -256,7 +291,7 @@ test("generateEbookHtml surfaces document Gemini rate limits as retryable genera
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded for this model." } }), {
       status: 429,
@@ -288,7 +323,7 @@ test("generateEbookHtml rejects invalid blueprints before HTML generation", asyn
   const restoreWarn = muteConsoleWarn();
   const calls: string[] = [];
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([geminiJsonResponse({ slides: [] })], calls);
+  setQueuedGemini([geminiJsonResponse({ slides: [] })], calls);
 
   try {
     await assert.rejects(
@@ -309,7 +344,7 @@ test("generateEbookHtml rejects structurally unusable Gemini document with valid
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({
       document: {
@@ -352,7 +387,7 @@ test("generateEbookHtml compiles structurally valid Gemini documents into HTML",
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document: validEbookDocument("The core idea") }),
   ]);
@@ -387,7 +422,7 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
     },
   };
 
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document }),
   ]);
@@ -430,7 +465,7 @@ test("generateEbookHtml removes inline style attributes from Gemini page HTML", 
     css: sixthPage.css.replaceAll(`[data-celion-page="page-6"]`, `[data-celion-page="p6"]`),
   };
 
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document }),
   ]);
@@ -453,7 +488,7 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document: validEbookDocument("Source-led insight") }),
   ]);
@@ -487,7 +522,7 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
   background: oklch(0.72 0.12 240);
 }`,
   };
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document }),
   ]);
@@ -512,7 +547,7 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for document design
   const requestBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "test-key";
   const originalFetch = globalThis.fetch;
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint()),
     geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
@@ -524,13 +559,13 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for document design
     assert.ok(calls[1]?.includes("/models/gemini-3.1-pro-preview:generateContent"));
     const blueprintRequest = requestBodies[0] as {
       generationConfig?: { temperature?: number };
-      system_instruction?: { parts?: { text?: string }[] };
+      systemInstruction?: { parts?: { text?: string }[] };
       contents?: { parts?: { text?: string }[] }[];
     };
     const htmlRequest = requestBodies[1] as typeof blueprintRequest;
-    const blueprintSystem = blueprintRequest.system_instruction?.parts?.[0]?.text ?? "";
+    const blueprintSystem = blueprintRequest.systemInstruction?.parts?.[0]?.text ?? "";
     const blueprintPrompt = blueprintRequest.contents?.[0]?.parts?.[0]?.text ?? "";
-    const htmlSystem = htmlRequest.system_instruction?.parts?.[0]?.text ?? "";
+    const htmlSystem = htmlRequest.systemInstruction?.parts?.[0]?.text ?? "";
     const htmlPrompt = htmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
 
     assert.equal(blueprintRequest.generationConfig?.temperature, 0.75);
@@ -576,7 +611,7 @@ test("ebook blueprint prompt expands the slide budget for long source material",
   const longSource = Array.from({ length: 120 }, (_, index) =>
     `## Section ${index + 1}\nThis source section includes a concrete method, warning, example, and detail that should not be collapsed into one tiny summary.`,
   ).join("\n\n");
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint(20, 20)),
     geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
@@ -604,7 +639,7 @@ test("generateEbookHtml rejects blueprints that ignore their own recommended sli
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
-  setQueuedFetch([
+  setQueuedGemini([
     geminiJsonResponse(validBlueprint(10, 20)),
   ]);
 
