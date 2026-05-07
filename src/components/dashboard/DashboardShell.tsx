@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/celion-style";
 import { CelionButton, CelionButtonLink } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
-import type { ProjectRecord } from "@/types/project";
+import type { ProjectSummary } from "@/types/project";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
@@ -33,6 +33,9 @@ const workspaceCopy = {
   emptyTitle: "No projects yet",
   emptyDescription: "Upload a source file or start fresh. Celion shapes it into a structured project.",
   emptyAction: "Create first project",
+  unavailableTitle: "Workspace unavailable",
+  unavailableDescription: "We could not load your projects. Try again in a moment.",
+  unavailableAction: "Retry",
   loadingLabel: "Loading projects...",
 } as const;
 
@@ -54,8 +57,10 @@ export function DashboardShell({
   const resolvedUserName = initialUserName;
   const resolvedUserEmail = initialUserEmail;
 
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
+  const [loadSucceeded, setLoadSucceeded] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
   const visibleError = error || createProjectError;
@@ -117,6 +122,7 @@ export function DashboardShell({
 
     if (!resolvedSignedIn) {
       setProjects([]);
+      setLoadSucceeded(false);
       setLoading(false);
       return;
     }
@@ -137,13 +143,15 @@ export function DashboardShell({
           throw new Error(payload?.message ?? "Could not load your workspace.");
         }
 
-        const payload = (await response.json()) as { projects: ProjectRecord[] };
+        const payload = (await response.json()) as { projects: ProjectSummary[] };
 
         if (active) {
           setProjects(payload.projects);
+          setLoadSucceeded(true);
         }
       } catch (caught) {
         if (active) {
+          setLoadSucceeded(false);
           setError(
             caught instanceof Error
               ? caught.message
@@ -162,9 +170,9 @@ export function DashboardShell({
     return () => {
       active = false;
     };
-  }, [hasVerifier, resolvedSignedIn]);
+  }, [hasVerifier, reloadToken, resolvedSignedIn]);
 
-  async function deleteProject(project: ProjectRecord) {
+  async function deleteProject(project: ProjectSummary) {
     const label = project.title || copy.blankTitle;
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
 
@@ -260,6 +268,24 @@ export function DashboardShell({
         </div>
       ) : null}
 
+      {!showLoading && resolvedSignedIn && error ? (
+        <DashboardEmptyState
+          icon={FileText}
+          title={copy.unavailableTitle}
+          description={copy.unavailableDescription}
+          maxWidth="330px"
+          action={
+            <CelionButton
+              onClick={() => setReloadToken((value) => value + 1)}
+              variant="primary"
+              style={{ padding: "0 18px" }}
+            >
+              {copy.unavailableAction}
+            </CelionButton>
+          }
+        />
+      ) : null}
+
       {showLoading ? (
         <div style={{ padding: "72px 0", textAlign: "center" }}>
           <p
@@ -275,7 +301,7 @@ export function DashboardShell({
         </div>
       ) : null}
 
-      {!showLoading && resolvedSignedIn ? (
+      {!showLoading && resolvedSignedIn && !error ? (
         <ProjectList
           projects={projects}
           deletingProjectId={deletingProjectId}
@@ -300,7 +326,7 @@ export function DashboardShell({
         />
       ) : null}
 
-      {!showLoading && resolvedSignedIn && projects.length === 0 ? (
+      {!showLoading && resolvedSignedIn && loadSucceeded && projects.length === 0 && !visibleError ? (
         <DashboardEmptyState
           icon={FileText}
           title={copy.emptyTitle}

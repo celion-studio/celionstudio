@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 type Props = {
+  initialMode?: "sign-in" | "sign-up";
   onClose: () => void;
+  redirectTo?: string;
 };
 
 function GoogleIcon() {
@@ -31,8 +33,14 @@ function GoogleIcon() {
   );
 }
 
-export function AuthModal({ onClose }: Props) {
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+export function AuthModal({
+  initialMode = "sign-in",
+  onClose,
+  redirectTo = "/dashboard",
+}: Props) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [mode, setMode] = useState<"sign-in" | "sign-up">(initialMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,9 +49,48 @@ export function AuthModal({ onClose }: Props) {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousBodyOverflow = document.body.style.overflow;
+    const focusableSelector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+
+    const focusCloseButton = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") {
+        return;
+      }
+
+      const focusable = Array.from(
+        modalRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
@@ -51,8 +98,12 @@ export function AuthModal({ onClose }: Props) {
     document.body.style.overflow = "hidden";
 
     return () => {
+      window.clearTimeout(focusCloseButton);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = previousBodyOverflow;
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus();
+      }
     };
   }, [onClose]);
 
@@ -89,7 +140,7 @@ export function AuthModal({ onClose }: Props) {
       }
 
       setIsSuccess(true);
-      window.location.assign("/dashboard");
+      window.location.assign(redirectTo);
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Authentication failed.",
@@ -106,7 +157,7 @@ export function AuthModal({ onClose }: Props) {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: redirectTo,
       });
     } catch (error) {
       setMessage(
@@ -140,6 +191,7 @@ export function AuthModal({ onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={mode === "sign-in" ? "Sign in" : "Create account"}
+        ref={modalRef}
         className="relative w-full max-w-[400px] animate-in fade-in zoom-in-95 duration-200"
         style={{ perspective: 800 }}
         onClick={(event) => event.stopPropagation()}
@@ -157,6 +209,7 @@ export function AuthModal({ onClose }: Props) {
         >
           <button
             type="button"
+            ref={closeButtonRef}
             onClick={onClose}
             aria-label="Close"
             className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-[6px] border border-black/[0.07] bg-white/80 text-[#71717a] transition hover:bg-white hover:text-[#1F1F1F]"
@@ -182,6 +235,7 @@ export function AuthModal({ onClose }: Props) {
               <button
                 key={value}
                 type="button"
+                aria-pressed={mode === value}
                 onClick={() => switchMode(value)}
                 className={`flex-1 rounded-[6px] py-[7px] text-[12px] font-medium transition duration-150 ${
                   mode === value
@@ -214,32 +268,44 @@ export function AuthModal({ onClose }: Props) {
 
           <div className="space-y-2.5">
             {mode === "sign-up" ? (
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Full name"
-                autoComplete="name"
-                className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
-              />
+              <label htmlFor="auth-name" className="block">
+                <span className="sr-only">Full name</span>
+                <input
+                  id="auth-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Full name"
+                  autoComplete="name"
+                  className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+                />
+              </label>
             ) : null}
 
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Email address"
-              autoComplete="email"
-              className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
-            />
+            <label htmlFor="auth-email" className="block">
+              <span className="sr-only">Email address</span>
+              <input
+                id="auth-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Email address"
+                autoComplete="email"
+                className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+              />
+            </label>
 
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password"
-              autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
-              className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
-            />
+            <label htmlFor="auth-password" className="block">
+              <span className="sr-only">Password</span>
+              <input
+                id="auth-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+                className="w-full rounded-[6px] border border-black/[0.08] bg-[#f1f2f4] px-4 py-[11px] text-[14px] text-[#1F1F1F] outline-none transition placeholder:text-[#a1a1aa] focus:border-[#34373d]/40 focus:bg-white focus:ring-2 focus:ring-[#34373d]/10"
+              />
+            </label>
           </div>
 
           <button
@@ -257,6 +323,7 @@ export function AuthModal({ onClose }: Props) {
 
           {message ? (
             <p
+              role={isSuccess ? "status" : "alert"}
               className={`mt-3 rounded-[6px] px-4 py-3 text-[13px] leading-[1.6] ${
                 isSuccess
                   ? "bg-[#F0FDF4] text-[#166534]"

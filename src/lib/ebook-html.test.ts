@@ -356,6 +356,20 @@ test("prepareEbookHtmlForSave sanitizes and validates Celion A5 slide HTML", () 
   assert.ok(invalid.message.includes("Output must"));
 });
 
+test("prepareEbookHtmlForSave rejects active legacy HTML markup", () => {
+  const scriptResult = prepareEbookHtmlForSave(
+    validSlideHtml.replace("</body>", "<script>alert('x')</script></body>"),
+  );
+  assert.equal(scriptResult.ok, false);
+  assert.match(scriptResult.message, /unsupported <script>/i);
+
+  const eventHandlerResult = prepareEbookHtmlForSave(
+    validSlideHtml.replace("</body>", "<img src=\"x\" onerror=\"alert(1)\" /></body>"),
+  );
+  assert.equal(eventHandlerResult.ok, false);
+  assert.match(eventHandlerResult.message, /event handler/i);
+});
+
 test("prepareEbookDocumentForSave validates and compiles a page-level document", () => {
   const result = prepareEbookDocumentForSave({
     version: 1,
@@ -387,6 +401,28 @@ test("prepareEbookDocumentForSave validates and compiles a page-level document",
   if (result.ok) {
     assert.doesNotMatch(result.document.pages[0]?.css ?? "", /oklch/i);
   }
+});
+
+test("prepareEbookDocumentForSave rejects oversized save payloads", () => {
+  const result = prepareEbookDocumentForSave({
+    version: 1,
+    title: "Too many pages",
+    size: { width: 559, height: 794, unit: "px" },
+    themeCss: "",
+    pages: Array.from({ length: 31 }, (_, index) => ({
+      id: `page-${index + 1}`,
+      index,
+      title: `Page ${index + 1}`,
+      role: "page",
+      html: `<section data-celion-page="page-${index + 1}"><p>Readable page.</p></section>`,
+      css: "",
+      manifest: { editableElements: [] },
+      version: 1,
+    })),
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Too many ebook pages/);
 });
 
 test("prepareEbookDocumentForSave rejects malformed document inputs", () => {

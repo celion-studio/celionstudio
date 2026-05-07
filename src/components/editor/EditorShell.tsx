@@ -185,7 +185,7 @@ export function EditorShell({
       if (editorModeRef.current !== "edit") return;
 
       const target = e.target as HTMLElement;
-      const pointedElements = typeof doc.elementsFromPoint === "function"
+      const pointedElements = typeof doc.elementsFromPoint === "function" && (e.clientX !== 0 || e.clientY !== 0)
         ? doc.elementsFromPoint(e.clientX, e.clientY)
         : [target];
 
@@ -297,9 +297,20 @@ export function EditorShell({
       }
     };
 
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (editorModeRef.current !== "edit") return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (!(event.target instanceof HTMLElement)) return;
+
+      event.preventDefault();
+      event.target.click();
+    };
+
     doc.addEventListener("click", handleClick);
+    doc.addEventListener("keydown", handleKeyDown);
     iframeClickCleanupRef.current = () => {
       doc.removeEventListener("click", handleClick);
+      doc.removeEventListener("keydown", handleKeyDown);
     };
 
     measureFrameRef.current = window.requestAnimationFrame(() => {
@@ -540,7 +551,7 @@ export function EditorShell({
   }, [latestDocumentRef, selection]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f3f2ef", fontFamily: "'Geist', sans-serif", overflow: "hidden" }}>
+    <div className="editor-shell" style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f3f2ef", fontFamily: "'Geist', sans-serif", overflow: "hidden" }}>
       <EditorTopBar
         projectTitle={displayTitle}
         saving={saving}
@@ -558,9 +569,10 @@ export function EditorShell({
         onExport={exportAs}
       />
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: "10px", padding: `0 ${EDITOR_EDGE_GAP}px ${EDITOR_EDGE_GAP}px`, boxSizing: "border-box" }}>
+      <div className="editor-shell-main" style={{ display: "flex", flex: 1, overflow: "hidden", gap: "10px", padding: `0 ${EDITOR_EDGE_GAP}px ${EDITOR_EDGE_GAP}px`, boxSizing: "border-box" }}>
         {setupOpen ? (
           <div
+            className="editor-setup-panel"
             style={{
               flex: 1,
               minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
@@ -588,6 +600,7 @@ export function EditorShell({
             />
 
             <div
+              className="editor-preview-shell"
               style={{
                 display: "flex",
                 flex: 1,

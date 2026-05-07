@@ -119,7 +119,7 @@ const faqs = [
 
 export default async function PricingPage() {
   const session = await getPageSession();
-  const actionHref = (session?.user ? "/new" : "/") as Route;
+  const actionHref = (session?.user ? "/new" : "/?auth=signup&next=/new") as Route;
 
   return (
     <div className="editorial-landing-page pricing-page">

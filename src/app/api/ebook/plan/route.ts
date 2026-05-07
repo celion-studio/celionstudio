@@ -3,7 +3,14 @@ import { EBOOK_PLAN_GEMINI_MODEL } from "@/lib/ai/gemini";
 import { EbookGenerationError, generateEbookPlan } from "@/lib/ebook-generation";
 import { getEbookGenerationArgs, parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
 import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
+import { claimRequestSlot } from "@/lib/request-throttle";
 import { getRouteSession } from "@/lib/session";
+
+function retryAfterResponse(message: string, status: 409 | 429, retryAfterSeconds: number) {
+  const response = NextResponse.json({ message }, { status });
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
+}
 
 export async function POST(request: Request) {
   const session = await getRouteSession();
@@ -18,6 +25,15 @@ export async function POST(request: Request) {
 
   const d = parsed.data;
   const generationArgs = getEbookGenerationArgs(d);
+  const throttle = claimRequestSlot(`ebook-plan:${session.user.id}`, {
+    concurrencyKey: `ebook-plan:${session.user.id}`,
+    limit: 8,
+    windowMs: 10 * 60 * 1000,
+  });
+
+  if (!throttle.ok) {
+    return retryAfterResponse(throttle.message, throttle.status, throttle.retryAfterSeconds);
+  }
 
   try {
     const plan = await generateEbookPlan(generationArgs);
@@ -48,5 +64,7 @@ export async function POST(request: Request) {
       slideCount: error instanceof EbookGenerationError ? error.pageCount : undefined,
     });
     return NextResponse.json({ message }, { status });
+  } finally {
+    throttle.release();
   }
 }

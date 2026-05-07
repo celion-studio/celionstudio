@@ -5,6 +5,21 @@ import {
 } from "./ebook-format";
 
 const UNSUPPORTED_COLOR_FUNCTIONS = ["color-mix", "oklch", "lab", "lch", "color"] as const;
+const UNSAFE_LEGACY_TAGS = [
+  "script",
+  "iframe",
+  "object",
+  "embed",
+  "form",
+  "input",
+  "textarea",
+  "button",
+  "video",
+  "audio",
+  "canvas",
+  "link",
+  "meta",
+] as const;
 
 export const CELION_A5_SLIDE_HTML_SPEC = [
   "Single complete HTML document with one <style> block in <head>",
@@ -87,6 +102,26 @@ function hasGenericOutlineHeadings(html: string) {
 function hasPageClassToken(html: string) {
   return [...html.matchAll(/\bclass=(["'])([^"']*)\1/gi)]
     .some((match) => match[2]?.split(/\s+/).includes("page"));
+}
+
+export function validateLegacyEbookHtmlSafety(html: string) {
+  const forbiddenTag = UNSAFE_LEGACY_TAGS.find((tag) => (
+    new RegExp(`<\\s*${tag}(?:\\s|>|/)`, "i").test(html)
+  ));
+  if (forbiddenTag) {
+    return `HTML contains unsupported <${forbiddenTag}> markup.`;
+  }
+  if (/<[a-z][^>]*\son[a-z]+\s*=/i.test(html)) {
+    return "HTML contains event handler attributes.";
+  }
+  if (/\s(?:href|src|xlink:href)\s*=\s*(?:"[^"]*(?:javascript:|data:text\/html)|'[^']*(?:javascript:|data:text\/html)|[^\s>]*(?:javascript:|data:text\/html))/i.test(html)) {
+    return "HTML contains unsafe link or source attributes.";
+  }
+  if (/@import\b|url\s*\(/i.test(html)) {
+    return "HTML contains external CSS or url() tokens.";
+  }
+
+  return null;
 }
 
 export function validateCelionSlideHtml(

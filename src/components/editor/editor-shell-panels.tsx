@@ -45,7 +45,7 @@ export function EditorTopBar({
   onExport,
 }: TopBarProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", gap: "12px", padding: `0 ${edgeGap}px`, height: `${topRailHeight}px`, background: "transparent", flexShrink: 0, boxSizing: "border-box" }}>
+    <div className="editor-top-bar" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", gap: "12px", padding: `0 ${edgeGap}px`, height: `${topRailHeight}px`, background: "transparent", flexShrink: 0, boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
         <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", color: "#71717a", textDecoration: "none", fontSize: "13px", flexShrink: 0 }}>
           <ArrowLeft size={14} />
@@ -135,7 +135,7 @@ function EditorPageListComponent({
   onSelectPage,
 }: PageListProps) {
   return (
-    <div style={{ width: "220px", background: "transparent", overflowY: "auto", padding: "14px 4px 14px 0", flexShrink: 0 }}>
+    <div className="editor-page-list" style={{ width: "220px", background: "transparent", overflowY: "auto", padding: "14px 4px 14px 0", flexShrink: 0 }}>
       <p style={{ fontSize: "10px", fontWeight: 650, letterSpacing: "0.11em", color: "#a1a1aa", textTransform: "uppercase", marginBottom: "10px", paddingLeft: "6px" }}>
         {slideCount} pages
       </p>
@@ -196,10 +196,11 @@ function EditorPreviewPaneComponent({
   onPreviewScroll,
 }: PreviewPaneProps) {
   return (
-    <div ref={previewScrollRef} onScroll={onPreviewScroll} style={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center", padding: "40px 24px", background: "#f8f7f4" }}>
-      <div style={{ width: `${width}px` }}>
+    <div className="editor-preview-pane" ref={previewScrollRef} onScroll={onPreviewScroll} style={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center", padding: "40px 24px", background: "#f8f7f4" }}>
+      <div className="editor-preview-frame" style={{ width: `${width}px` }}>
         {html ? (
           <iframe
+            className="editor-preview-iframe"
             ref={iframeRef}
             srcDoc={html}
             onLoad={onIframeLoad}
@@ -244,7 +245,7 @@ export function EditorInspectorPanel({
   onStyleChange,
 }: InspectorPanelProps) {
   return (
-    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "6px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
+    <div className="editor-inspector-panel" style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "6px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
         <h3 style={{ fontSize: "12px", fontWeight: 650, letterSpacing: "0.06em", textTransform: "uppercase", color: "#71717a", margin: 0 }}>
           Inspector

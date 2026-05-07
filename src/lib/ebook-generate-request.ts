@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
+import {
+  MAX_SOURCE_TEXT_LENGTH,
+  MAX_TITLE_LENGTH,
+  validateSourceLimits,
+} from "@/lib/request-limits";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 import type { EbookGenerationArgs } from "@/lib/ebook-generation";
 import { SOURCE_KIND_IDS } from "@/types/project";
 
-const MAX_TITLE_LENGTH = 200;
-const MAX_SOURCE_TEXT_LENGTH = 100_000;
-const MAX_SOURCES = 8;
-const MAX_SOURCE_CONTENT_LENGTH = 50_000;
-const MAX_TOTAL_SOURCE_CONTENT_LENGTH = 120_000;
 const MAX_PLAN_SLIDES = 24;
 const MAX_PLAN_LIST_ITEMS = 24;
 const MAX_PLAN_ANCHORS = 8;
@@ -105,21 +105,8 @@ function validateGenerateRequestLimits(data: EbookGenerateRequestBody): string |
     return `Source text is too long. Maximum is ${MAX_SOURCE_TEXT_LENGTH} characters.`;
   }
 
-  if (data.sources.length > MAX_SOURCES) {
-    return `Too many sources. Maximum is ${MAX_SOURCES}.`;
-  }
-
-  let totalSourceContentLength = 0;
-  for (const source of data.sources) {
-    if (source.content.length > MAX_SOURCE_CONTENT_LENGTH) {
-      return `Source content is too long. Maximum is ${MAX_SOURCE_CONTENT_LENGTH} characters per source.`;
-    }
-    totalSourceContentLength += source.content.length;
-  }
-
-  if (totalSourceContentLength > MAX_TOTAL_SOURCE_CONTENT_LENGTH) {
-    return `Total source content is too long. Maximum is ${MAX_TOTAL_SOURCE_CONTENT_LENGTH} characters.`;
-  }
+  const sourceLimitError = validateSourceLimits(data.sources);
+  if (sourceLimitError) return sourceLimitError;
 
   return null;
 }

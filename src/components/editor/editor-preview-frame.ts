@@ -50,9 +50,20 @@ export function preparePreviewFrame(
     page.setAttribute("data-slide-index", String(index));
     getRuntimeTextElements(page).forEach((element, textIndex) => {
       element.setAttribute("data-celion-runtime-text-index", String(textIndex));
+      element.setAttribute("tabindex", "0");
+      element.setAttribute("role", "button");
+      element.setAttribute("aria-label", `Edit text on page ${index + 1}`);
     });
     page.querySelectorAll<HTMLElement>("[data-text-editable]").forEach((editable, editableIndex) => {
       editable.setAttribute("data-celion-edit-id", `slide-${index}-text-${editableIndex}`);
+      editable.setAttribute("tabindex", "0");
+      editable.setAttribute("role", "button");
+      editable.setAttribute("aria-label", `Edit text on page ${index + 1}`);
+    });
+    page.querySelectorAll<HTMLElement>("[data-celion-id]").forEach((editable) => {
+      editable.setAttribute("tabindex", "0");
+      editable.setAttribute("role", "button");
+      editable.setAttribute("aria-label", `Edit element on page ${index + 1}`);
     });
   });
 

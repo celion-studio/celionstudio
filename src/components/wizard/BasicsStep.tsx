@@ -1,7 +1,6 @@
 "use client";
 
 import type { WizardPurpose } from "@/store/useProjectWizardStore";
-import { Check, ChevronDown } from "lucide-react";
 
 const purposeOptions: {
   value: Exclude<WizardPurpose, "">;
@@ -63,8 +62,6 @@ export function BasicsStep({
   onFieldChange,
   onPurposeChange,
 }: BasicsStepProps) {
-  const selectedPurpose = purposeOptions.find((option) => option.value === purpose);
-
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-[1.15fr_0.85fr]">
@@ -101,41 +98,19 @@ export function BasicsStep({
 
       <div className="wizard-field">
         <Label>Purpose</Label>
-        <details className="wizard-purpose-details">
-          <summary
-            className="wizard-purpose-trigger"
-            data-selected={Boolean(selectedPurpose)}
-          >
-            <span>{selectedPurpose?.label ?? "Select a purpose"}</span>
-            <ChevronDown size={15} className="wizard-purpose-chevron" />
-          </summary>
-
-          <div className="wizard-purpose-menu" role="listbox">
-            {purposeOptions.map((option) => {
-              const active = purpose === option.value;
-
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="wizard-purpose-option"
-                  data-active={active}
-                  role="option"
-                  aria-selected={active}
-                  onClick={(event) => {
-                    onPurposeChange(option.value);
-                    event.currentTarget.closest("details")?.removeAttribute("open");
-                  }}
-                >
-                  <span className="wizard-purpose-option-title">
-                    {option.label}
-                  </span>
-                  {active ? <Check size={13} className="wizard-purpose-check" /> : null}
-                </button>
-              );
-            })}
-          </div>
-        </details>
+        <select
+          aria-label="Purpose"
+          className="wizard-input wizard-select"
+          value={purpose}
+          onChange={(event) => onPurposeChange(event.target.value as WizardPurpose)}
+        >
+          <option value="">Select a purpose</option>
+          {purposeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {purpose === "other" ? (

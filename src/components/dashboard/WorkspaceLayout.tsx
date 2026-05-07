@@ -35,6 +35,7 @@ export function WorkspaceLayout({
 }: WorkspaceLayoutProps) {
   return (
     <div
+      className="workspace-layout-shell"
       style={{
         display: "flex",
         height: "100vh",
@@ -51,8 +52,9 @@ export function WorkspaceLayout({
         primaryAction={primaryAction}
       />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="workspace-layout-body" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header
+          className="workspace-layout-header"
           style={{
             height: `${WORKSPACE_TOP_RAIL_HEIGHT}px`,
             background: "transparent",
@@ -92,6 +94,7 @@ export function WorkspaceLayout({
         </header>
 
         <main
+          className="workspace-layout-main"
           style={{
             flex: 1,
             overflow: "auto",
@@ -101,6 +104,7 @@ export function WorkspaceLayout({
           }}
         >
           <div
+            className="workspace-layout-panel"
             style={{
               flex: 1,
               width: "100%",

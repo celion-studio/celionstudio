@@ -49,3 +49,15 @@ export type ProjectRecord = {
   sources: ProjectSource[];
   profile: ProjectProfile;
 };
+
+export type ProjectSummary = {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+  createdAt: string;
+  updatedAt: string;
+  sourceCount: number;
+  ebookPageCount: number;
+  ebookStyle: EbookStyle | null;
+  accentColor: string;
+};

@@ -62,6 +62,7 @@ export function WorkspaceSidebar({
 
   return (
     <aside
+      className="workspace-sidebar"
       style={{
         width: `${WORKSPACE_SIDEBAR_WIDTH}px`,
         flexShrink: 0,

@@ -12,11 +12,14 @@ import { getEbookGenerationArgs, parseEbookGenerateRequest } from "@/lib/ebook-g
 import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
 import { isDatabaseUnavailableError } from "@/lib/db";
 import {
+  beginProjectGenerationForUser,
   createProjectForUser,
   getEbookPageCountForHtml,
+  restoreProjectStatusForUser,
   updateProjectWithGeneratedEbook,
 } from "@/lib/projects";
-import type { ProjectSource } from "@/types/project";
+import { claimRequestSlot } from "@/lib/request-throttle";
+import type { ProjectSource, ProjectStatus } from "@/types/project";
 
 export { parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
 
@@ -43,6 +46,25 @@ function sanitizePlanForLog(plan: EbookGenerationDiagnostics["plan"]) {
   };
 }
 
+function retryAfterResponse(message: string, status: 409 | 429, retryAfterSeconds: number) {
+  const response = NextResponse.json({ message }, { status });
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
+}
+
+async function restoreGeneratingProjectStatus(
+  userId: string,
+  projectId: string,
+  previousStatus: ProjectStatus,
+) {
+  try {
+    await restoreProjectStatusForUser(userId, projectId, previousStatus);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown error";
+    console.warn(`[ebook-generation] status_restore_failed ${JSON.stringify({ projectId, message })}`);
+  }
+}
+
 export async function POST(request: Request) {
   const session = await getRouteSession();
   if (!session?.user?.id) {
@@ -57,6 +79,44 @@ export async function POST(request: Request) {
   const d = parsed.data;
   const generationArgs = getEbookGenerationArgs(d);
   const sourceText = generationArgs.sourceText;
+  const throttle = claimRequestSlot(`ebook-generate:${session.user.id}`, {
+    concurrencyKey: d.projectId
+      ? `ebook-generate:project:${d.projectId}`
+      : `ebook-generate:user:${session.user.id}`,
+    limit: 3,
+    windowMs: 15 * 60 * 1000,
+  });
+
+  if (!throttle.ok) {
+    return retryAfterResponse(throttle.message, throttle.status, throttle.retryAfterSeconds);
+  }
+
+  try {
+  let previousProjectStatus: ProjectStatus | null = null;
+
+  if (d.projectId) {
+    try {
+      const claim = await beginProjectGenerationForUser(session.user.id, d.projectId);
+      if (!claim.ok) {
+        const status = claim.reason === "busy" ? 409 : 404;
+        const message = claim.reason === "busy"
+          ? "A generation request is already running for this project."
+          : "Project not found";
+        return status === 409
+          ? retryAfterResponse(message, 409, 20)
+          : NextResponse.json({ message }, { status });
+      }
+      previousProjectStatus = claim.previousStatus;
+    } catch (error) {
+      if (!isDatabaseUnavailableError(error)) {
+        throw error;
+      }
+      return NextResponse.json(
+        { message: "Database is temporarily unavailable. Please retry in a moment." },
+        { status: 503 },
+      );
+    }
+  }
 
   let html: string;
   let diagnostics: EbookGenerationDiagnostics;
@@ -80,6 +140,10 @@ export async function POST(request: Request) {
       diagnostics = result.diagnostics;
     }
   } catch (error) {
+    if (d.projectId && previousProjectStatus) {
+      await restoreGeneratingProjectStatus(session.user.id, d.projectId, previousProjectStatus);
+    }
+
     const message = error instanceof Error ? error.message : "Failed to generate ebook";
     const submittedPlanInvalid = Boolean(d.plan) &&
       error instanceof EbookGenerationError &&
@@ -143,6 +207,10 @@ export async function POST(request: Request) {
       throw error;
     }
 
+    if (d.projectId && previousProjectStatus) {
+      await restoreGeneratingProjectStatus(session.user.id, d.projectId, previousProjectStatus);
+    }
+
     const message = "Database is temporarily unavailable. Please retry in a moment.";
     await recordEbookGenerationLog({
       userId: session.user.id,
@@ -171,6 +239,10 @@ export async function POST(request: Request) {
   }
 
   if (!project) {
+    if (d.projectId && previousProjectStatus) {
+      await restoreGeneratingProjectStatus(session.user.id, d.projectId, previousProjectStatus);
+    }
+
     return NextResponse.json(
       { message: d.projectId ? "Project not found" : "Failed to create project" },
       { status: d.projectId ? 404 : 500 },
@@ -198,4 +270,7 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ projectId: project.id, project });
+  } finally {
+    throttle.release();
+  }
 }

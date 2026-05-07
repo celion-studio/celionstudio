@@ -9,12 +9,12 @@ import {
   CELION_FONT,
 } from "@/components/ui/celion-style";
 import { CelionIconButton } from "@/components/ui/celion-controls";
-import type { ProjectRecord } from "@/types/project";
+import type { ProjectSummary } from "@/types/project";
 
 type ProjectListProps = {
-  projects: ProjectRecord[];
+  projects: ProjectSummary[];
   deletingProjectId?: string;
-  onDeleteProject?: (project: ProjectRecord) => void;
+  onDeleteProject?: (project: ProjectSummary) => void;
 };
 
 const PROJECT_CARD_HEIGHT = 138;

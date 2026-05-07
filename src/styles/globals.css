@@ -125,6 +125,10 @@ textarea {
   box-shadow: 0 0 0 3px rgba(36, 39, 44, 0.06);
 }
 
+.wizard-select {
+  appearance: auto;
+}
+
 .wizard-purpose-details {
   margin-top: 8px;
   position: relative;
@@ -315,6 +319,150 @@ textarea {
 
 .pulse-glow {
   animation: glow 3.2s ease-in-out infinite;
+}
+
+@media (max-width: 900px) {
+  .workspace-layout-shell {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+  }
+
+  .workspace-sidebar {
+    width: 100% !important;
+    min-height: auto !important;
+    border-bottom: 1px solid var(--color-line);
+    overflow-x: auto !important;
+  }
+
+  .workspace-sidebar nav {
+    flex-direction: row !important;
+    flex: 0 0 auto !important;
+    overflow-x: auto !important;
+    padding: 0 10px 10px !important;
+    white-space: nowrap;
+  }
+
+  .workspace-sidebar nav a {
+    flex: 0 0 auto;
+  }
+
+  .workspace-sidebar > div:last-child {
+    display: none !important;
+  }
+
+  .workspace-layout-body,
+  .workspace-layout-main {
+    overflow: visible !important;
+  }
+
+  .workspace-layout-header {
+    padding: 0 14px !important;
+  }
+
+  .workspace-layout-main {
+    display: block !important;
+    padding: 0 14px 14px !important;
+  }
+
+  .workspace-layout-panel {
+    min-height: auto !important;
+    padding: 22px !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .editor-shell {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: visible !important;
+  }
+
+  .editor-top-bar {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    height: auto !important;
+    min-height: 56px !important;
+    row-gap: 8px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .editor-top-bar > div:last-child {
+    grid-column: 1 / -1;
+    justify-content: flex-start !important;
+  }
+
+  .editor-shell-main {
+    flex-direction: column !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding: 0 12px 12px !important;
+  }
+
+  .editor-setup-panel,
+  .editor-preview-shell,
+  .editor-inspector-panel {
+    min-height: auto !important;
+    width: 100% !important;
+  }
+
+  .editor-preview-shell {
+    min-height: 70vh !important;
+  }
+
+  .editor-page-list {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center;
+    overflow-x: auto !important;
+    padding: 8px 0 !important;
+  }
+
+  .editor-page-list > p {
+    flex: 0 0 auto;
+    margin: 0 8px 0 0 !important;
+    padding-left: 0 !important;
+  }
+
+  .editor-page-list > button {
+    flex: 0 0 172px;
+    width: 172px !important;
+    margin-bottom: 0 !important;
+  }
+
+  .editor-preview-pane {
+    justify-content: flex-start !important;
+    padding: 20px 12px !important;
+  }
+
+  .editor-inspector-panel {
+    max-height: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace-layout-header {
+    height: auto !important;
+    min-height: 52px !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    padding: 10px 14px !important;
+  }
+
+  .workspace-layout-panel {
+    padding: 18px !important;
+  }
+
+  .editor-top-bar {
+    grid-template-columns: 1fr !important;
+  }
+
+  .editor-top-bar > div {
+    justify-content: flex-start !important;
+  }
 }
 
 /* Soft radial neutral overlay */

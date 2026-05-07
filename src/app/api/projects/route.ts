@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
+import { createProjectForUser, listProjectSummariesForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
-import { isDatabaseUnavailableError } from "@/lib/db";
+import { databaseUnavailableResponse, parseJsonRequest } from "@/lib/route-errors";
+import {
+  MAX_SOURCE_CONTENT_LENGTH,
+  MAX_SOURCES,
+  MAX_TITLE_LENGTH,
+  validateSourceLimits,
+} from "@/lib/request-limits";
 import { DESIGN_MODE_IDS, SOURCE_KIND_IDS } from "@/types/project";
 
 const createProjectSchema = z.object({
-  title: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(MAX_TITLE_LENGTH),
   profile: z.object({
     author: z.string().default(""),
     targetAudience: z.string().default(""),
@@ -26,10 +32,11 @@ const createProjectSchema = z.object({
         id: z.string().min(1),
         kind: z.enum(SOURCE_KIND_IDS),
         name: z.string().min(1),
-        content: z.string().min(1),
+        content: z.string().min(1).max(MAX_SOURCE_CONTENT_LENGTH),
         excerpt: z.string(),
       }),
     )
+    .max(MAX_SOURCES)
     .default([]),
 });
 
@@ -40,15 +47,11 @@ export async function GET(_request: Request) {
   }
 
   try {
-    const projects = await listProjectRecordsForUser(session.user.id);
+    const projects = await listProjectSummariesForUser(session.user.id);
     return NextResponse.json({ projects });
   } catch (error) {
-    if (isDatabaseUnavailableError(error)) {
-      return NextResponse.json(
-        { message: "Database is temporarily unavailable. Please retry in a moment." },
-        { status: 503 },
-      );
-    }
+    const unavailable = databaseUnavailableResponse(error);
+    if (unavailable) return unavailable;
     throw error;
   }
 }
@@ -59,13 +62,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const json = await request.json();
-  const parsed = createProjectSchema.safeParse(json);
+  const json = await parseJsonRequest(request);
+  if (!json.ok) return json.response;
+
+  const parsed = createProjectSchema.safeParse(json.data);
   if (!parsed.success) {
     return NextResponse.json(
       { message: parsed.error.issues[0]?.message ?? "Invalid request body" },
       { status: 400 },
     );
+  }
+
+  const sourceLimitError = validateSourceLimits(parsed.data.sources);
+  if (sourceLimitError) {
+    return NextResponse.json({ message: sourceLimitError }, { status: 400 });
   }
 
   try {
@@ -89,12 +99,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
-    if (isDatabaseUnavailableError(error)) {
-      return NextResponse.json(
-        { message: "Database is temporarily unavailable. Please retry in a moment." },
-        { status: 503 },
-      );
-    }
+    const unavailable = databaseUnavailableResponse(error);
+    if (unavailable) return unavailable;
     throw error;
   }
 }

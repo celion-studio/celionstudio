@@ -1,5 +1,19 @@
 import type { NextConfig } from "next";
 
+const contentSecurityPolicyReportOnly = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https:",
+  "frame-src 'self' https://accounts.google.com",
+  "frame-ancestors 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: process.cwd(),
@@ -14,6 +28,10 @@ const nextConfig: NextConfig = {
           {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: contentSecurityPolicyReportOnly,
           },
         ],
       },

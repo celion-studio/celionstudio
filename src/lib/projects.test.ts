@@ -4,6 +4,7 @@ import {
   getEbookPageCountForHtml,
   profileFromRow,
 } from "./projects";
+import { claimRequestSlot, resetRequestThrottleForTests } from "./request-throttle";
 
 test("getEbookPageCountForHtml reflects current Celion slide count", () => {
   assert.equal(getEbookPageCountForHtml("<div>No slides yet</div>"), 1);
@@ -60,4 +61,60 @@ test("profileFromRow ignores empty or malformed ebook document JSON", () => {
 
     assert.equal(profile.ebookDocument, null);
   }
+});
+
+test("claimRequestSlot rejects concurrent requests for the same work", () => {
+  resetRequestThrottleForTests();
+
+  const first = claimRequestSlot("generate:user-1", {
+    concurrencyKey: "generate:project-1",
+    limit: 5,
+    windowMs: 60_000,
+  });
+  assert.equal(first.ok, true);
+
+  const second = claimRequestSlot("generate:user-1", {
+    concurrencyKey: "generate:project-1",
+    limit: 5,
+    windowMs: 60_000,
+  });
+  assert.deepEqual(second, {
+    ok: false,
+    status: 409,
+    message: "A generation request is already running. Please wait for it to finish.",
+    retryAfterSeconds: 20,
+  });
+
+  if (first.ok) first.release();
+  const third = claimRequestSlot("generate:user-1", {
+    concurrencyKey: "generate:project-1",
+    limit: 5,
+    windowMs: 60_000,
+  });
+  assert.equal(third.ok, true);
+  if (third.ok) third.release();
+});
+
+test("claimRequestSlot rate limits repeated requests by key", () => {
+  resetRequestThrottleForTests();
+
+  const config = {
+    concurrencyKey: "plan:user-1",
+    limit: 2,
+    windowMs: 60_000,
+  };
+
+  const first = claimRequestSlot("plan:user-1", config);
+  assert.equal(first.ok, true);
+  if (first.ok) first.release();
+
+  const second = claimRequestSlot("plan:user-1", config);
+  assert.equal(second.ok, true);
+  if (second.ok) second.release();
+
+  const third = claimRequestSlot("plan:user-1", config);
+  if (third.ok) {
+    assert.fail("Expected the third request to be rate limited.");
+  }
+  assert.equal(third.status, 429);
 });
