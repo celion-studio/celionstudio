@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LogOut,
   Plus,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -17,7 +16,7 @@ import {
   CELION_RADIUS,
 } from "@/components/ui/celion-style";
 
-export type SidebarItemKey = "workspace" | "new" | "settings";
+export type SidebarItemKey = "workspace" | "new";
 
 type WorkspaceSidebarProps = {
   activeItem: SidebarItemKey;
@@ -37,9 +36,8 @@ const NAV_ITEMS: Array<{
   icon: LucideIcon;
   href: Route;
 }> = [
-  { key: "workspace", label: "Workspace", icon: LayoutDashboard, href: "/dashboard" },
-  { key: "new", label: "New ebook", icon: Plus, href: "/new" },
-  { key: "settings", label: "Settings", icon: Settings, href: "/dashboard" },
+  { key: "workspace", label: "Projects", icon: LayoutDashboard, href: "/dashboard" },
+  { key: "new", label: "New project", icon: Plus, href: "/new" },
 ];
 
 export const WORKSPACE_SIDEBAR_WIDTH = 280;
@@ -144,7 +142,7 @@ export function WorkspaceSidebar({
                 fontWeight: active ? 500 : 400,
                 color: active ? CELION_COLOR.text : CELION_COLOR.muted,
                 background: active ? CELION_COLOR.controlSoft : "transparent",
-                transition: "all 0.15s ease",
+                transition: "background 0.15s ease, color 0.15s ease",
               }}
             >
               <item.icon size={15} strokeWidth={1.8} />

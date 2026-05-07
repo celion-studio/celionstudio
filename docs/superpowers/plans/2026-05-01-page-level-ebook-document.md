@@ -6,7 +6,7 @@
 
 Implemented on 2026-05-01.
 
-The plan was completed and followed by a cleanup pass that removed the old Tiptap document editor, dropped the document project kind from the app contract, renamed the product surface from builder to editor, and kept `/builder/[projectId]` as a compatibility redirect.
+The plan was completed and followed by a cleanup pass that removed the old Tiptap document editor, dropped the document project kind from the app contract, renamed the product surface to editor, and later removed the legacy redirect route.
 
 **Goal:** Replace fragile single-HTML ebook editing with a page-level document model while keeping the default Gemini generation path at two LLM calls.
 
@@ -537,9 +537,9 @@ Add `ebookDocument` to diagnostics:
 
 ```ts
 type EbookGenerationDiagnostics = {
-  blueprintModel: string;
+  planModel: string;
   htmlModel: string;
-  blueprint: EbookBlueprint;
+  plan: EbookPlan;
   ebookDocument: CelionEbookDocument;
   validation: ReturnType<typeof validateUsableEbookHtml>;
   htmlLength: number;
@@ -554,7 +554,7 @@ Replace the HTML system wording from single HTML to document JSON:
 ```ts
 const HTML_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designer.
 
-You receive an approved editorial blueprint.
+You receive an approved editorial plan.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
 Your job is to design a complete page-level Celion ebook document.
 Return JSON only: { "document": { "version": 1, "size": { "width": 559, "height": 794, "unit": "px" }, "title": "...", "themeCss": "...", "pages": [] } }`;
@@ -577,7 +577,7 @@ Technical contract:
 
 - [ ] **Step 3: Parse document result**
 
-In `generateEbookHtmlFromBlueprint`, after parsing model JSON:
+In `generateEbookHtmlFromPlan`, after parsing model JSON:
 
 ```ts
 const record = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
@@ -608,7 +608,7 @@ return { html: sanitizedHtml, validation, ebookDocument };
 In `generateEbookHtmlWithDiagnostics`, capture the document:
 
 ```ts
-const { html, validation, ebookDocument } = await generateEbookHtmlFromBlueprint(args, blueprint);
+const { html, validation, ebookDocument } = await generateEbookHtmlFromPlan(args, plan);
 ```
 
 Add it to diagnostics:

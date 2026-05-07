@@ -39,8 +39,22 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   assert.ok(
     statements.some((statement) =>
       statement.includes("CREATE TABLE IF NOT EXISTS ebook_generation_logs") &&
-      statement.includes("blueprint jsonb") &&
+      statement.includes("plan_model text") &&
+      statement.includes("plan jsonb") &&
       statement.includes("validation jsonb"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS plan_model"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("SET plan_model = blueprint_model") &&
+      statement.includes("DROP COLUMN blueprint_model") &&
+      statement.includes("SET plan = blueprint") &&
+      statement.includes("DROP COLUMN blueprint"),
     ),
   );
   assert.ok(
@@ -101,6 +115,21 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS ebook_html_url"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS ebook_html_pathname"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS ebook_html_size"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("ADD COLUMN IF NOT EXISTS ebook_document jsonb"),
     ),
   );
@@ -111,7 +140,17 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("DROP COLUMN IF EXISTS source_metadata"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("CREATE INDEX IF NOT EXISTS ebook_generation_logs_user_id_created_at_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX CONCURRENTLY IF NOT EXISTS ebook_generation_logs_project_id_created_at_idx"),
     ),
   );
   assert.ok(
@@ -121,23 +160,17 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("ADD COLUMN IF NOT EXISTS project_type"),
+      statement.includes("DROP CONSTRAINT IF EXISTS projects_project_type_check"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("CREATE TABLE IF NOT EXISTS app_migrations"),
+      statement.includes("DROP COLUMN IF EXISTS project_type"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
-      statement.includes("projects_project_type_check") &&
-      statement.includes("CHECK (project_type = 'product')"),
-    ),
-  );
-  assert.ok(
-    statements.some((statement) =>
-      statement.includes("CREATE INDEX IF NOT EXISTS projects_user_id_type_updated_at_idx"),
+      statement.includes("DROP TABLE IF EXISTS app_migrations"),
     ),
   );
   assert.ok(
@@ -167,7 +200,7 @@ test("applyAppSchema grants app table privileges when an app role is provided", 
   );
   assert.ok(
     statements.includes(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, app_migrations, ebook_generation_logs TO "app""user"',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, ebook_generation_logs TO "app""user"',
     ),
   );
   assert.ok(

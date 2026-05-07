@@ -1,11 +1,15 @@
 import type { CelionEditableElement } from "@/lib/ebook-document";
 
+export type EditorMode = "view" | "edit";
+
 export type RuntimeTextSelection = {
   mode: "document" | "legacy";
   pageId: string;
   pageIndex: number;
   textIndex: number;
 };
+
+export type InspectorStyleValues = Record<string, string>;
 
 export type ReadyPreviewDocument = {
   doc: Document;
@@ -20,4 +24,5 @@ export type SelectedElementState = {
   element: CelionEditableElement | null;
   selector: string;
   runtimeText: RuntimeTextSelection | null;
+  styleValues?: InspectorStyleValues;
 };

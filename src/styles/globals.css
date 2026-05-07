@@ -87,22 +87,21 @@ textarea {
 }
 
 .wizard-label-text {
-  color: var(--color-muted);
-  font-family: var(--font-display), -apple-system, sans-serif;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  line-height: 1;
-  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  font-family: var(--font-body), -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .wizard-input {
   width: 100%;
   border: 1px solid #d9dde2;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #ffffff;
   color: var(--color-accent-deep);
-  font-family: var(--font-display), -apple-system, sans-serif;
+  font-family: var(--font-body), -apple-system, sans-serif;
   font-size: 13.5px;
   line-height: 1.4;
   outline: none;
@@ -123,9 +122,7 @@ textarea {
 
 .wizard-input:focus {
   border-color: var(--color-ink);
-  box-shadow:
-    inset 3px 0 0 var(--color-ink),
-    0 0 0 3px rgba(36, 39, 44, 0.06);
+  box-shadow: 0 0 0 3px rgba(36, 39, 44, 0.06);
 }
 
 .wizard-purpose-details {
@@ -145,20 +142,21 @@ textarea {
   align-items: center;
   background: #ffffff;
   border: 1px solid #d9dde2;
-  border-radius: 4px;
+  border-radius: 6px;
   color: var(--color-accent-deep);
   cursor: pointer;
   display: flex;
-  font-family: var(--font-display), -apple-system, sans-serif;
+  font-family: var(--font-body), -apple-system, sans-serif;
   font-size: 13.5px;
   justify-content: space-between;
+  line-height: 1.4;
   min-height: 44px;
   padding: 0 12px 0 13px;
-  text-align: left;
   transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
   width: 100%;
 }
 
@@ -166,15 +164,23 @@ textarea {
   border-color: #c5cad1;
 }
 
+.wizard-purpose-trigger[data-selected="true"] {
+  background: #17191d;
+  border-color: #17191d;
+  color: #ffffff;
+}
+
 .wizard-purpose-details[open] .wizard-purpose-trigger {
   border-color: var(--color-ink);
-  box-shadow:
-    inset 3px 0 0 var(--color-ink),
-    0 0 0 3px rgba(36, 39, 44, 0.06);
+  box-shadow: 0 0 0 3px rgba(36, 39, 44, 0.06);
+}
+
+.wizard-purpose-details[open] .wizard-purpose-trigger[data-selected="true"] {
+  box-shadow: none;
 }
 
 .wizard-purpose-chevron {
-  color: var(--color-muted);
+  color: currentColor;
   flex-shrink: 0;
   transition: transform 0.15s ease;
 }
@@ -186,49 +192,57 @@ textarea {
 .wizard-purpose-menu {
   background: #ffffff;
   border: 1px solid #d9dde2;
-  border-radius: 4px;
-  box-shadow: 0 18px 40px rgba(23, 25, 29, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 8px 18px rgba(23, 25, 29, 0.06);
   left: 0;
   overflow: hidden;
-  padding: 4px;
+  padding: 3px;
   position: absolute;
   right: 0;
-  top: calc(100% + 6px);
+  top: calc(100% + 5px);
   z-index: 20;
 }
 
 .wizard-purpose-option {
-  align-items: flex-start;
+  align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 3px;
+  border-radius: 6px;
   color: var(--color-ink-soft);
   cursor: pointer;
   display: grid;
   grid-template-columns: 1fr auto;
-  padding: 10px 10px;
+  min-height: 38px;
+  padding: 0 10px;
   text-align: left;
   width: 100%;
 }
 
-.wizard-purpose-option:hover,
-.wizard-purpose-option[data-active="true"] {
+.wizard-purpose-option:hover {
   background: var(--color-surface-subtle);
   color: var(--color-accent-deep);
 }
 
+.wizard-purpose-option[data-active="true"] {
+  background: #17191d;
+  color: #ffffff;
+}
+
 .wizard-purpose-option-title {
   display: block;
-  font-family: var(--font-display), -apple-system, sans-serif;
+  font-family: var(--font-body), -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.2;
+}
+
+.wizard-purpose-check {
+  color: currentColor;
 }
 
 .wizard-tone-card {
   background: #ffffff;
   border: 1px solid #d9dde2;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   min-height: 44px;
   padding: 12px 13px;
@@ -242,13 +256,24 @@ textarea {
 
 .wizard-tone-card:hover {
   border-color: #c5cad1;
-  transform: translateY(-1px);
 }
 
 .wizard-tone-card[data-active="true"] {
-  background: var(--color-surface-subtle);
-  border-color: var(--color-ink);
-  box-shadow: inset 3px 0 0 var(--color-ink);
+  background: #17191d;
+  border-color: #17191d;
+  box-shadow: none;
+}
+
+.wizard-tone-label {
+  color: #17191d;
+  display: block;
+  font-family: var(--font-body), -apple-system, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.wizard-tone-card[data-active="true"] .wizard-tone-label {
+  color: #ffffff;
 }
 
 /* Staggered reveals */

@@ -21,6 +21,7 @@ export default async function EditorPage({
     <EditorShell
       projectId={project.id}
       projectTitle={project.title}
+      projectStatus={project.status}
       initialHtml={project.profile.ebookHtml ?? ""}
       initialDocument={project.profile.ebookDocument}
     />

@@ -17,6 +17,55 @@ const validSlideHtml = `<!doctype html>
 </body>
 </html>`;
 
+function validRequestPlan(slideCount = 10) {
+  return {
+    title: "Launch guide",
+    subtitle: "A practical source-led guide",
+    author: "Celion",
+    targetAudience: "founders",
+    readerPromise: "Make the source useful.",
+    language: "English",
+    sourceAssessment: {
+      sourceScale: "medium",
+      detectedSections: ["Offer", "Audience"],
+      essentialSections: ["Offer", "Audience"],
+      compressionRisk: "low",
+      recommendedSlideCount: slideCount,
+      coveragePlan: ["Cover the main source argument"],
+      rationale: "The source fits the selected slide count.",
+    },
+    cover: {
+      eyebrow: "Guide",
+      title: "Launch guide",
+      subtitle: "A practical source-led guide",
+      promise: "Make the source useful.",
+      visualDirection: "Clean typographic cover.",
+    },
+    editorialStrategy: {
+      angle: "Turn notes into a useful guide.",
+      readerProblem: "The source is hard to scan.",
+      promisedOutcome: "A clearer reading path.",
+      narrativeArc: "Problem, method, example, checklist.",
+    },
+    designBrief: {
+      mood: "focused",
+      visualSystem: "clean typography and restrained accent",
+      coverConcept: "source-first title treatment",
+      layoutRhythm: "alternate text-led and checklist pages",
+      avoid: ["generic section labels"],
+    },
+    slides: Array.from({ length: slideCount }, (_, index) => ({
+      role: index === 0 ? "cover" : "insight",
+      eyebrow: "Section",
+      headline: `Source-led slide ${index + 1}`,
+      body: "A concise source-backed body that is long enough to render as a useful page.",
+      evidence: "Source-backed detail.",
+      sourceAnchors: ["source-backed detail"],
+      visualDirection: "Use a distinct editorial layout.",
+    })),
+  };
+}
+
 test("sanitizeEbookHtmlForCanvas removes modern color functions including nested values", () => {
   const html = `
     <style>
@@ -212,6 +261,83 @@ test("ebook generate request rejects oversized source content before generation"
   assert.deepEqual(await parseEbookGenerateRequest(request), {
     ok: false,
     message: "Source content is too long. Maximum is 50000 characters per source.",
+  });
+});
+
+test("ebook generate request ignores fallback sourceText limit when structured sources are present", async () => {
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "S".repeat(100001),
+      sources: [
+        {
+          id: "source-1",
+          kind: "pasted_text",
+          name: "Structured source",
+          content: "Useful source content",
+          excerpt: "",
+        },
+      ],
+      ebookStyle: "minimal",
+    }),
+  });
+
+  const result = await parseEbookGenerateRequest(request);
+
+  assert.equal(result.ok, true);
+});
+
+test("ebook generate request accepts a bounded approved plan", async () => {
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+      plan: validRequestPlan(),
+    }),
+  });
+
+  const result = await parseEbookGenerateRequest(request);
+
+  assert.equal(result.ok, true);
+});
+
+test("ebook generate request rejects oversized approved plans before generation", async () => {
+  const tooManySlides = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+      plan: validRequestPlan(25),
+    }),
+  });
+
+  assert.deepEqual(await parseEbookGenerateRequest(tooManySlides), {
+    ok: false,
+    message: "Plan is too large or invalid.",
+  });
+
+  const longBodyPlan = validRequestPlan();
+  longBodyPlan.slides[0]!.body = "B".repeat(4001);
+  const overlongSlideBody = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+      plan: longBodyPlan,
+    }),
+  });
+
+  assert.deepEqual(await parseEbookGenerateRequest(overlongSlideBody), {
+    ok: false,
+    message: "Plan is too large or invalid.",
   });
 });
 

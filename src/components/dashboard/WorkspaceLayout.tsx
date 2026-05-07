@@ -65,7 +65,7 @@ export function WorkspaceLayout({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "13px", color: CELION_COLOR.mutedSoft }}>Workspace</span>
+            <span style={{ fontSize: "13px", color: CELION_COLOR.mutedSoft }}>Projects</span>
             <ChevronRight size={12} color="#D4D2CC" />
             <span style={{ fontSize: "13px", fontWeight: 500, color: CELION_COLOR.text }}>
               {breadcrumbCurrent}

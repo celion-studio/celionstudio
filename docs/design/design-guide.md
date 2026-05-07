@@ -168,7 +168,7 @@ The dashboard should feel like a manuscript desk, not an analytics product.
 Rules:
 
 - Project list is the hero.
-- Keep stats minimal or remove them when they compete with drafts.
+- Keep stats minimal or remove them when they compete with ebooks.
 - Avoid colorful status badges.
 - Keep rows quiet, scannable, and table-like.
 - Use dates, titles, audience, and status as precise metadata.
@@ -264,4 +264,4 @@ Before finishing a UI change, ask:
 - Are controls compact and precise?
 - Is the typography calm, with limited weight?
 - Does this screen match the editor and dashboard language?
-- Would this still feel right after the user creates 50 drafts?
+- Would this still feel right after the user creates 50 ebooks?

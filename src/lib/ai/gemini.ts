@@ -5,7 +5,7 @@ import type { BaseExternalAccountClient } from "google-auth-library/build/src/au
 import { AiJsonExtractionError, extractJsonObjectFromText } from "./json";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
-export const EBOOK_BLUEPRINT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+export const EBOOK_PLAN_GEMINI_MODEL = "gemini-2.5-flash-lite";
 export const EBOOK_GEMINI_MODEL = "gemini-3.1-pro-preview";
 const DEFAULT_VERTEX_AI_LOCATION = "global";
 const DEFAULT_GEMINI_TIMEOUT_MS = 120_000;

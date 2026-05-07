@@ -1,30 +1,7 @@
 "use client";
 
+import type { WizardPurpose } from "@/store/useProjectWizardStore";
 import { Check, ChevronDown } from "lucide-react";
-import type { WizardPurpose, WizardTone } from "@/store/useProjectWizardStore";
-
-const toneOptions: { value: WizardTone; label: string }[] = [
-  {
-    value: "preserve",
-    label: "Keep source voice",
-  },
-  {
-    value: "clear",
-    label: "Clear and concise",
-  },
-  {
-    value: "practical",
-    label: "Practical",
-  },
-  {
-    value: "editorial",
-    label: "Editorial",
-  },
-  {
-    value: "friendly",
-    label: "Friendly",
-  },
-];
 
 const purposeOptions: {
   value: Exclude<WizardPurpose, "">;
@@ -70,13 +47,11 @@ type BasicsStepProps = {
   targetAudience: string;
   purpose: WizardPurpose;
   purposeDetail: string;
-  tone: WizardTone;
   onFieldChange: (
     field: "title" | "author" | "targetAudience" | "purposeDetail",
     value: string,
   ) => void;
   onPurposeChange: (purpose: WizardPurpose) => void;
-  onToneChange: (tone: WizardTone) => void;
 };
 
 export function BasicsStep({
@@ -85,10 +60,8 @@ export function BasicsStep({
   targetAudience,
   purpose,
   purposeDetail,
-  tone,
   onFieldChange,
   onPurposeChange,
-  onToneChange,
 }: BasicsStepProps) {
   const selectedPurpose = purposeOptions.find((option) => option.value === purpose);
 
@@ -129,14 +102,15 @@ export function BasicsStep({
       <div className="wizard-field">
         <Label>Purpose</Label>
         <details className="wizard-purpose-details">
-          <summary className="wizard-purpose-trigger">
-            <span style={{ color: selectedPurpose ? "#17191d" : "#858b93" }}>
-              {selectedPurpose?.label ?? "Select a purpose"}
-            </span>
+          <summary
+            className="wizard-purpose-trigger"
+            data-selected={Boolean(selectedPurpose)}
+          >
+            <span>{selectedPurpose?.label ?? "Select a purpose"}</span>
             <ChevronDown size={15} className="wizard-purpose-chevron" />
           </summary>
 
-          <div role="listbox" className="wizard-purpose-menu">
+          <div className="wizard-purpose-menu" role="listbox">
             {purposeOptions.map((option) => {
               const active = purpose === option.value;
 
@@ -144,17 +118,19 @@ export function BasicsStep({
                 <button
                   key={option.value}
                   type="button"
+                  className="wizard-purpose-option"
+                  data-active={active}
                   role="option"
                   aria-selected={active}
-                  data-active={active}
-                  className="wizard-purpose-option"
                   onClick={(event) => {
                     onPurposeChange(option.value);
                     event.currentTarget.closest("details")?.removeAttribute("open");
                   }}
                 >
-                  <span className="wizard-purpose-option-title">{option.label}</span>
-                  {active ? <Check size={13} style={{ color: "#24272c", marginTop: "1px" }} /> : null}
+                  <span className="wizard-purpose-option-title">
+                    {option.label}
+                  </span>
+                  {active ? <Check size={13} className="wizard-purpose-check" /> : null}
                 </button>
               );
             })}
@@ -175,35 +151,6 @@ export function BasicsStep({
         </label>
       ) : null}
 
-      <div>
-        <Label>Tone and manner</Label>
-        <div className="mt-2 grid gap-2 md:grid-cols-2">
-          {toneOptions.map((option) => {
-            const active = tone === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => onToneChange(option.value)}
-                className="wizard-tone-card"
-                data-active={active}
-              >
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    color: "#17191d",
-                    fontFamily: "'Geist', sans-serif",
-                  }}
-                >
-                  {option.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

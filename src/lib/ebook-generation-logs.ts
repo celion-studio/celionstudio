@@ -1,4 +1,4 @@
-import { ensureAppSchema, getSql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 
 type EbookGenerationLogStatus = "success" | "failure";
 
@@ -7,7 +7,7 @@ type EbookGenerationLogInput = {
   projectId?: string;
   status: EbookGenerationLogStatus;
   stage?: string;
-  blueprintModel: string;
+  planModel: string;
   htmlModel: string;
   title: string;
   purpose: string;
@@ -16,7 +16,7 @@ type EbookGenerationLogInput = {
   accentColor?: string;
   sourceCount: number;
   sourceTextLength: number;
-  blueprint?: unknown;
+  plan?: unknown;
   validation?: unknown;
   errorReason?: string;
   errorMessage?: string;
@@ -32,15 +32,14 @@ function truncate(value: string | undefined, maxLength: number) {
 
 export async function recordEbookGenerationLog(input: EbookGenerationLogInput) {
   try {
-    await ensureAppSchema();
     const sql = getSql();
     await sql`
       INSERT INTO ebook_generation_logs (
         id, user_id, project_id, status, stage,
-        blueprint_model, html_model,
+        plan_model, html_model,
         title, purpose, target_audience, ebook_style, accent_color,
         source_count, source_text_length,
-        blueprint, validation,
+        plan, validation,
         error_reason, error_message, error_status,
         html_length, slide_count, created_at
       ) VALUES (
@@ -49,7 +48,7 @@ export async function recordEbookGenerationLog(input: EbookGenerationLogInput) {
         ${input.projectId ?? null},
         ${input.status},
         ${input.stage ?? null},
-        ${input.blueprintModel},
+        ${input.planModel},
         ${input.htmlModel},
         ${truncate(input.title, 300) ?? ""},
         ${truncate(input.purpose, 1000) ?? ""},
@@ -58,7 +57,7 @@ export async function recordEbookGenerationLog(input: EbookGenerationLogInput) {
         ${input.accentColor ?? null},
         ${input.sourceCount},
         ${input.sourceTextLength},
-        ${input.blueprint ? JSON.stringify(input.blueprint) : null}::jsonb,
+        ${input.plan ? JSON.stringify(input.plan) : null}::jsonb,
         ${input.validation ? JSON.stringify(input.validation) : null}::jsonb,
         ${input.errorReason ?? null},
         ${truncate(input.errorMessage, 1000) ?? null},

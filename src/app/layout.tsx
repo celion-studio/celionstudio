@@ -27,7 +27,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable} ${inter.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${geist.variable} ${inter.variable}`}>
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
   );

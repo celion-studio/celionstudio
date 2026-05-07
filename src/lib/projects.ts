@@ -4,13 +4,12 @@ import {
   type CelionEbookDocument,
 } from "@/lib/ebook-document";
 import { countCelionSlides } from "@/lib/ebook-html";
-import { ensureAppSchema, getSql } from "@/lib/db";
+import { getSql } from "@/lib/db";
 import type {
   DesignMode,
   EbookStyle,
   ProjectProfile,
   ProjectRecord,
-  ProjectKind,
   ProjectSource,
   ProjectStatus,
 } from "@/types/project";
@@ -21,14 +20,14 @@ type ProjectCreateProfileInput = Omit<ProjectProfile, "ebookDocument"> & {
 
 type ProjectCreateInput = {
   title: string;
-  kind?: ProjectKind;
   profile: ProjectCreateProfileInput;
   sources: ProjectSource[];
 };
 
+type ProjectGeneratedInput = ProjectCreateInput;
+
 type ProjectRow = {
   id: string;
-  kind: ProjectKind;
   title: string;
   status: ProjectStatus;
   createdAt: Date | string;
@@ -61,26 +60,6 @@ type SourceRow = {
 
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
-}
-
-function normalizeProjectRecord(input: ProjectRecord): ProjectRecord {
-  return {
-    ...input,
-    kind: input.kind ?? "product",
-    revisionPrompt: input.revisionPrompt || undefined,
-  };
-}
-
-function parseJson<T>(raw: unknown, fallback: T): T {
-  if (raw == null || raw === "") return fallback;
-  if (typeof raw !== "string") return (raw as T) ?? fallback;
-
-  try {
-    const parsed = JSON.parse(raw);
-    return (parsed as T) ?? fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -125,32 +104,15 @@ export function profileFromRow(row: ProfileRow): ProjectProfile {
   };
 }
 
-function isMissingProjectProfileColumnError(caught: unknown) {
-  return (
-    typeof caught === "object" &&
-    caught !== null &&
-    "code" in caught &&
-    caught.code === "42703" &&
-    "message" in caught &&
-    typeof caught.message === "string" &&
-    caught.message.includes("project_profiles")
-  );
-}
-
 export async function listProjectRecordsForUser(
   userId: string,
-  kind: ProjectKind = "product",
 ) {
-  await ensureAppSchema();
-
   const sql = getSql();
   const projectRows = (await sql`
     SELECT id::text AS id, title, status,
-      COALESCE(project_type, 'product') AS kind,
       created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects
     WHERE user_id = ${userId}
-      AND COALESCE(project_type, 'product') = ${kind}
     ORDER BY updated_at DESC
   `) as ProjectRow[];
 
@@ -195,23 +157,18 @@ export async function listProjectRecordsForUser(
     sourceMap.set(row.projectId, [...(sourceMap.get(row.projectId) ?? []), next]);
   }
 
-  return projectRows.map((row) =>
-    normalizeProjectRecord({
-      id: row.id, kind: row.kind, title: row.title, status: row.status,
-      createdAt: toIsoString(row.createdAt), updatedAt: toIsoString(row.updatedAt),
-      sources: sourceMap.get(row.id) ?? [],
-      profile: profileMap.get(row.id) ?? emptyProfile(),
-    }),
-  );
+  return projectRows.map((row) => ({
+    id: row.id, title: row.title, status: row.status,
+    createdAt: toIsoString(row.createdAt), updatedAt: toIsoString(row.updatedAt),
+    sources: sourceMap.get(row.id) ?? [],
+    profile: profileMap.get(row.id) ?? emptyProfile(),
+  }));
 }
 
 export async function getProjectRecordForUser(userId: string, projectId: string) {
-  await ensureAppSchema();
-
   const sql = getSql();
   const [projectRow] = (await sql`
     SELECT id::text AS id, title, status,
-      COALESCE(project_type, 'product') AS kind,
       created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
   `) as ProjectRow[];
@@ -242,9 +199,8 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
   const profileRows = profileRowsResult as ProfileRow[];
   const sourceRows = sourceRowsResult as SourceRow[];
 
-  return normalizeProjectRecord({
+  return {
     id: projectRow.id, title: projectRow.title, status: projectRow.status,
-    kind: projectRow.kind,
     createdAt: toIsoString(projectRow.createdAt), updatedAt: toIsoString(projectRow.updatedAt),
     profile: profileRows[0] ? profileFromRow(profileRows[0]) : emptyProfile(),
     sources: sourceRows.map((row) => ({
@@ -252,12 +208,10 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
       name: row.originalFilename ?? "Untitled source",
       content: row.rawText, excerpt: row.normalizedText.slice(0, 180),
     })),
-  });
+  };
 }
 
 export async function createProjectForUser(userId: string, input: ProjectCreateInput) {
-  await ensureAppSchema();
-
   const sql = getSql();
   const p: ProjectProfile = {
     ...input.profile,
@@ -281,8 +235,8 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
 
     await sql.transaction([
       sql`
-        INSERT INTO projects (id, user_id, project_type, title, status, created_at, updated_at)
-        VALUES (${projectId}, ${userId}, ${draft.kind}, ${draft.title}, ${draft.status}, ${createdAt}, ${updatedAt})
+        INSERT INTO projects (id, user_id, title, status, created_at, updated_at)
+        VALUES (${projectId}, ${userId}, ${draft.title}, ${draft.status}, ${createdAt}, ${updatedAt})
       `,
       sql`
         INSERT INTO project_profiles (
@@ -304,16 +258,7 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
     ]);
   };
 
-  try {
-    await insertDraft();
-  } catch (caught) {
-    if (!isMissingProjectProfileColumnError(caught)) {
-      throw caught;
-    }
-
-    await ensureAppSchema(undefined, { force: true });
-    await insertDraft();
-  }
+  await insertDraft();
 
   return getProjectRecordForUser(userId, projectId);
 }
@@ -327,8 +272,6 @@ export async function updateProjectEbookHtml(
   projectId: string,
   ebookHtml: string,
 ) {
-  await ensureAppSchema();
-
   const sql = getSql();
   const updatedAt = new Date();
   const ebookPageCount = getEbookPageCountForHtml(ebookHtml);
@@ -344,7 +287,6 @@ export async function updateProjectEbookHtml(
           SELECT 1 FROM projects
           WHERE id::text = ${projectId}
             AND user_id = ${userId}
-            AND COALESCE(project_type, 'product') = 'product'
         )
       RETURNING project_id::text AS id
     `,
@@ -353,7 +295,6 @@ export async function updateProjectEbookHtml(
       SET status = 'ready', updated_at = ${updatedAt}
       WHERE id::text = ${projectId}
         AND user_id = ${userId}
-        AND COALESCE(project_type, 'product') = 'product'
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -369,8 +310,6 @@ export async function updateProjectEbookDocument(
   ebookDocument: CelionEbookDocument,
   ebookHtml: string,
 ) {
-  await ensureAppSchema();
-
   const sql = getSql();
   const updatedAt = new Date();
   const normalizedDocument = normalizeEbookDocument(ebookDocument);
@@ -387,7 +326,6 @@ export async function updateProjectEbookDocument(
           SELECT 1 FROM projects
           WHERE id::text = ${projectId}
             AND user_id = ${userId}
-            AND COALESCE(project_type, 'product') = 'product'
         )
       RETURNING project_id::text AS id
     `,
@@ -396,7 +334,6 @@ export async function updateProjectEbookDocument(
       SET status = 'ready', updated_at = ${updatedAt}
       WHERE id::text = ${projectId}
         AND user_id = ${userId}
-        AND COALESCE(project_type, 'product') = 'product'
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -406,9 +343,74 @@ export async function updateProjectEbookDocument(
   return getProjectRecordForUser(userId, projectId);
 }
 
-export async function deleteProjectForUser(userId: string, projectId: string) {
-  await ensureAppSchema();
+export async function updateProjectWithGeneratedEbook(
+  userId: string,
+  projectId: string,
+  input: ProjectGeneratedInput,
+) {
+  const existing = await getProjectRecordForUser(userId, projectId);
+  if (!existing) return null;
 
+  const sql = getSql();
+  const p: ProjectProfile = {
+    ...input.profile,
+    ebookDocument: input.profile.ebookDocument
+      ? normalizeEbookDocument(input.profile.ebookDocument)
+      : null,
+  };
+  const updatedAt = new Date();
+  const sourceQueries = input.sources.map((source) => {
+    const sourceId = crypto.randomUUID();
+    return sql`
+      INSERT INTO source_items (id, project_id, source_type, original_filename, raw_text, normalized_text, created_at)
+      VALUES (${sourceId}, ${projectId}, ${source.kind}, ${source.name}, ${source.content}, ${source.excerpt || source.content.slice(0, 180)}, ${updatedAt})
+    `;
+  });
+
+  const [projectRows, profileRows] = await sql.transaction([
+    sql`
+      UPDATE projects
+      SET title = ${input.title},
+          status = 'ready',
+          updated_at = ${updatedAt}
+      WHERE id::text = ${projectId}
+        AND user_id = ${userId}
+      RETURNING id::text AS id
+    `,
+    sql`
+      UPDATE project_profiles
+      SET target_audience = ${p.targetAudience},
+          tone = ${p.tone},
+          author = ${p.author},
+          purpose = ${p.purpose},
+          design_mode = ${p.designMode},
+          ebook_style = ${p.ebookStyle ?? null},
+          ebook_html = ${p.ebookHtml ?? null},
+          ebook_document = ${p.ebookDocument ? JSON.stringify(p.ebookDocument) : null}::jsonb,
+          ebook_page_count = ${p.ebookPageCount ?? 16},
+          accent_color = ${p.accentColor ?? "#6366f1"},
+          updated_at = ${updatedAt}
+      WHERE project_id::text = ${projectId}
+        AND EXISTS (
+          SELECT 1 FROM projects
+          WHERE id::text = ${projectId}
+            AND user_id = ${userId}
+        )
+      RETURNING project_id::text AS id
+    `,
+    sql`
+      DELETE FROM source_items
+      WHERE project_id::text = ${projectId}
+    `,
+    ...sourceQueries,
+  ]) as [{ id: string }[], { id: string }[], unknown[], ...unknown[]];
+
+  if (projectRows.length === 0 || profileRows.length === 0) return null;
+
+  return getProjectRecordForUser(userId, projectId);
+}
+
+export async function deleteProjectForUser(userId: string, projectId: string) {
   const sql = getSql();
   const deletedRows = (await sql`
     DELETE FROM projects

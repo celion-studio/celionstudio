@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import type { ProjectRecord, ProjectStatus } from "@/types/project";
+import { WizardContent } from "@/components/wizard/WizardContent";
 import { EBOOK_PAGE_SIZE_PX, EBOOK_PDF_A5_SIZE_PT } from "@/lib/ebook-format";
 import { countCelionSlides } from "@/lib/ebook-html";
 import {
@@ -10,6 +12,7 @@ import {
 } from "@/lib/ebook-document";
 import {
   buildPageSummariesFromDocument,
+  buildPageSummariesFromElements,
   estimatePreviewIframeHeight,
   normalizeEditorHtml,
   pickSelectableElement,
@@ -32,6 +35,7 @@ import {
   EditorPreviewPane,
   EditorTopBar,
 } from "./editor-shell-panels";
+import type { EditorMode, InspectorStyleValues } from "./editor-types";
 import { clearEditorSelectionFromDocument } from "./export-cleanup";
 import { useEditorSave } from "./use-editor-save";
 import { useEditorSelection } from "./use-editor-selection";
@@ -47,6 +51,7 @@ const EDITOR_EDGE_GAP = 16;
 type Props = {
   projectId: string;
   projectTitle: string;
+  projectStatus: ProjectStatus;
   initialHtml: string;
   initialDocument: CelionEbookDocument | null;
 };
@@ -54,15 +59,21 @@ type Props = {
 export function EditorShell({
   projectId,
   projectTitle,
+  projectStatus,
   initialHtml,
   initialDocument,
 }: Props) {
   const initialEbookDocument = initialDocument ? normalizeEbookDocument(initialDocument) : null;
+  const initialHasContent = Boolean(initialEbookDocument || initialHtml.trim());
+  const initialSetupOpen = !initialHasContent && !["ready", "exported"].includes(projectStatus);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const iframeClickCleanupRef = useRef<(() => void) | null>(null);
   const measureTimeoutRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const prepareFallbackRef = useRef<number | null>(null);
+  const editorModeRef = useRef<EditorMode>("view");
   const {
     latestDocumentRef,
     saving,
@@ -73,6 +84,9 @@ export function EditorShell({
   } = useEditorSave(projectId, initialEbookDocument);
   const [ebookDocument, setEbookDocument] = useState<CelionEbookDocument | null>(initialEbookDocument);
   const [html, setHtml] = useState(() => initialEbookDocument ? compileEbookDocumentToHtml(initialEbookDocument) : normalizeEditorHtml(initialHtml));
+  const [displayTitle, setDisplayTitle] = useState(projectTitle);
+  const [setupOpen, setSetupOpen] = useState(initialSetupOpen);
+  const [editorMode, setEditorMode] = useState<EditorMode>("view");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideCount, setSlideCount] = useState(0);
   const [iframeHeight, setIframeHeight] = useState(PAGE_HEIGHT);
@@ -88,7 +102,9 @@ export function EditorShell({
       pageHeight: PAGE_HEIGHT,
       pageGap: PAGE_GAP,
     });
-    if (height !== null) setIframeHeight(height);
+    if (height !== null) {
+      setIframeHeight((current) => current === height ? current : height);
+    }
   }, []);
 
   const cleanupIframeEffects = useCallback(() => {
@@ -104,6 +120,16 @@ export function EditorShell({
       window.cancelAnimationFrame(measureFrameRef.current);
       measureFrameRef.current = null;
     }
+
+    if (scrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(scrollFrameRef.current);
+      scrollFrameRef.current = null;
+    }
+
+    if (prepareFallbackRef.current !== null) {
+      window.clearTimeout(prepareFallbackRef.current);
+      prepareFallbackRef.current = null;
+    }
   }, []);
 
   useEffect(() => cleanupIframeEffects, [cleanupIframeEffects]);
@@ -118,23 +144,10 @@ export function EditorShell({
     if (!previewFrame) return;
 
     const { doc, pages } = previewFrame;
-    setSlideCount(pages.length);
-    setPageSummaries(ebookDocument
-      ? buildPageSummariesFromDocument(ebookDocument)
-      : pages.map((page, i) => {
-          const title =
-            page.querySelector("h1, h2, h3")?.textContent?.trim() ||
-            page.querySelector("[data-text-editable]")?.textContent?.trim() ||
-            `Page ${i + 1}`;
-          const eyebrow =
-            page.querySelector(".eyebrow, .kicker")?.textContent?.trim() ||
-            (i === 0 ? "Cover" : `Page ${i + 1}`);
-
-          return {
-            title: title.slice(0, 42),
-            eyebrow: eyebrow.slice(0, 24),
-          };
-        }));
+    setSlideCount((current) => current === pages.length ? current : pages.length);
+    if (!ebookDocument) {
+      setPageSummaries(buildPageSummariesFromElements(pages));
+    }
 
     const selectPreviewElement = (textEl: Element) => {
       doc.querySelectorAll("[data-selected]").forEach((el) => {
@@ -143,11 +156,34 @@ export function EditorShell({
         (el as HTMLElement).style.outlineOffset = "";
       });
       textEl.setAttribute("data-selected", "true");
-      (textEl as HTMLElement).style.outline = "2px solid #6366f1";
+      (textEl as HTMLElement).style.outline = "2px solid #18181b";
       (textEl as HTMLElement).style.outlineOffset = "2px";
     };
 
+    const readInspectorStyleValues = (element: HTMLElement): InspectorStyleValues => {
+      const styles = doc.defaultView?.getComputedStyle(element);
+      if (!styles) return {};
+
+      return {
+        fontSize: styles.fontSize,
+        fontWeight: styles.fontWeight,
+        lineHeight: styles.lineHeight,
+        letterSpacing: styles.letterSpacing,
+        textAlign: styles.textAlign,
+        color: styles.color,
+        backgroundColor: styles.backgroundColor,
+        opacity: styles.opacity,
+        borderColor: styles.borderColor,
+        borderWidth: styles.borderWidth,
+        borderRadius: styles.borderRadius,
+        margin: styles.margin,
+        padding: styles.padding,
+      };
+    };
+
     const handleClick = (e: MouseEvent) => {
+      if (editorModeRef.current !== "edit") return;
+
       const target = e.target as HTMLElement;
       const pointedElements = typeof doc.elementsFromPoint === "function"
         ? doc.elementsFromPoint(e.clientX, e.clientY)
@@ -184,6 +220,7 @@ export function EditorShell({
             pageId,
             selector: "",
             runtimeText: { mode: "document", pageId, pageIndex, textIndex: runtimeTextIndex },
+            styleValues: readInspectorStyleValues(runtimeTextEl),
             element: {
               id: `runtime-text-${pageId}-${runtimeTextIndex}`,
               role: "text",
@@ -193,7 +230,7 @@ export function EditorShell({
               editableProps: ["text"],
             },
           });
-          setCurrentSlide(pageIndex);
+          setCurrentSlide((current) => current === pageIndex ? current : pageIndex);
           return;
         }
 
@@ -211,8 +248,9 @@ export function EditorShell({
           element: manifestElement,
           selector: "",
           runtimeText: null,
+          styleValues: readInspectorStyleValues(celionEl),
         });
-        setCurrentSlide(pageIndex);
+        setCurrentSlide((current) => current === pageIndex ? current : pageIndex);
         return;
       }
 
@@ -232,7 +270,7 @@ export function EditorShell({
         ? Array.from(pageEl.querySelectorAll("[data-text-editable]")).indexOf(textEl)
         : -1;
       const runtimeTextIndex = runtimeTextIndexFromElement(textEl);
-      setCurrentSlide(Number(pageIdx));
+      setCurrentSlide((current) => current === Number(pageIdx) ? current : Number(pageIdx));
       if (runtimeTextIndex !== null) {
         selectElement({
           text,
@@ -245,6 +283,7 @@ export function EditorShell({
             pageIndex: Number(pageIdx),
             textIndex: runtimeTextIndex,
           },
+          styleValues: readInspectorStyleValues(textEl as HTMLElement),
         });
       } else {
         selectElement({
@@ -253,6 +292,7 @@ export function EditorShell({
           element: null,
           selector: editableIndex >= 0 ? `${pageIdx}:${editableIndex}` : `[data-slide-index="${pageIdx}"] ${tag}`,
           runtimeText: null,
+          styleValues: readInspectorStyleValues(textEl as HTMLElement),
         });
       }
     };
@@ -273,34 +313,35 @@ export function EditorShell({
   }, [cleanupIframeEffects, ebookDocument, measurePreview, selectElement]);
 
   useEffect(() => {
-    if (!html) return;
+    if (!html || setupOpen) return;
 
-    let cancelled = false;
-    const applyWhenReady = () => {
-      if (!cancelled) handleIframeLoad();
-    };
+    if (prepareFallbackRef.current !== null) {
+      window.clearTimeout(prepareFallbackRef.current);
+    }
 
-    const frameId = window.requestAnimationFrame(applyWhenReady);
-    const earlyTimeoutId = window.setTimeout(applyWhenReady, 80);
-    const lateTimeoutId = window.setTimeout(applyWhenReady, 450);
+    prepareFallbackRef.current = window.setTimeout(() => {
+      prepareFallbackRef.current = null;
+      handleIframeLoad();
+    }, 120);
 
     return () => {
-      cancelled = true;
-      window.cancelAnimationFrame(frameId);
-      window.clearTimeout(earlyTimeoutId);
-      window.clearTimeout(lateTimeoutId);
+      if (prepareFallbackRef.current !== null) {
+        window.clearTimeout(prepareFallbackRef.current);
+        prepareFallbackRef.current = null;
+      }
     };
-  }, [handleIframeLoad, html]);
+  }, [handleIframeLoad, html, setupOpen]);
 
   useEffect(() => {
     const count = ebookDocument ? ebookDocument.pages.length : countCelionSlides(html);
-    setSlideCount(count);
-    setIframeHeight(estimatePreviewIframeHeight(count, PAGE_HEIGHT, PAGE_GAP));
+    setSlideCount((current) => current === count ? current : count);
+    const estimatedHeight = estimatePreviewIframeHeight(count, PAGE_HEIGHT, PAGE_GAP);
+    setIframeHeight((current) => current === estimatedHeight ? current : estimatedHeight);
     setPageSummaries(ebookDocument ? buildPageSummariesFromDocument(ebookDocument) : []);
   }, [ebookDocument, html]);
 
   const scrollToPage = useCallback((index: number) => {
-    setCurrentSlide(index);
+    setCurrentSlide((current) => current === index ? current : index);
     const iframe = iframeRef.current;
     const doc = iframe?.contentDocument;
     const scroller = previewScrollRef.current;
@@ -316,21 +357,26 @@ export function EditorShell({
   }, []);
 
   const handlePreviewScroll = useCallback(() => {
-    const iframe = iframeRef.current;
-    const doc = iframe?.contentDocument;
-    const scroller = previewScrollRef.current;
-    if (!doc || !scroller) return;
+    if (scrollFrameRef.current !== null) return;
 
-    const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
-    if (pages.length === 0) return;
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const iframe = iframeRef.current;
+      const doc = iframe?.contentDocument;
+      const scroller = previewScrollRef.current;
+      if (!doc || !scroller) return;
 
-    const viewportAnchor = scroller.scrollTop + 140;
-    const nearest = pages.reduce((best, page, index) => {
-      const distance = Math.abs(page.offsetTop - viewportAnchor);
-      return distance < best.distance ? { index, distance } : best;
-    }, { index: 0, distance: Number.POSITIVE_INFINITY });
+      const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
+      if (pages.length === 0) return;
 
-    setCurrentSlide(nearest.index);
+      const viewportAnchor = scroller.scrollTop + 140;
+      const nearest = pages.reduce((best, page, index) => {
+        const distance = Math.abs(page.offsetTop - viewportAnchor);
+        return distance < best.distance ? { index, distance } : best;
+      }, { index: 0, distance: Number.POSITIVE_INFINITY });
+
+      setCurrentSlide((current) => current === nearest.index ? current : nearest.index);
+    });
   }, []);
 
   const applyEdit = () => {
@@ -396,6 +442,7 @@ export function EditorShell({
     latestDocumentRef.current = styleEdit.value;
     setEbookDocument(styleEdit.value);
     setHtml(newHtml);
+    selection.setStyleValue(prop, value);
     void queueDocumentSave(styleEdit.value);
   };
 
@@ -432,12 +479,12 @@ export function EditorShell({
             if (i > 0) pdf.addPage("a5", "portrait");
             pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
           }
-          pdf.save(`${projectTitle}.pdf`);
+          pdf.save(`${displayTitle}.pdf`);
         } else {
           for (let i = 0; i < pages.length; i++) {
             const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
             const link = document.createElement("a");
-            link.download = `${projectTitle}-page-${i + 1}.${format}`;
+            link.download = `${displayTitle}-page-${i + 1}.${format}`;
             link.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
             link.click();
           }
@@ -457,62 +504,127 @@ export function EditorShell({
     scrollToPage(index);
   }, [scrollToPage]);
 
+  const clearPreviewSelection = useCallback(() => {
+    const doc = iframeRef.current?.contentDocument;
+    if (doc) {
+      clearEditorSelectionFromDocument(doc);
+    }
+    selection.clearSelection();
+  }, [selection]);
+
+  const handleModeChange = useCallback((mode: EditorMode) => {
+    editorModeRef.current = mode;
+    setEditorMode(mode);
+    if (mode === "view") {
+      clearPreviewSelection();
+    }
+  }, [clearPreviewSelection]);
+
+  const handleWizardGenerated = useCallback((project: ProjectRecord) => {
+    const nextDocument = project.profile.ebookDocument
+      ? normalizeEbookDocument(project.profile.ebookDocument)
+      : null;
+    const nextHtml = nextDocument
+      ? compileEbookDocumentToHtml(nextDocument)
+      : normalizeEditorHtml(project.profile.ebookHtml ?? "");
+
+    latestDocumentRef.current = nextDocument;
+    setDisplayTitle(project.title);
+    setEbookDocument(nextDocument);
+    setHtml(nextHtml);
+    setCurrentSlide(0);
+    selection.clearSelection();
+    editorModeRef.current = "view";
+    setEditorMode("view");
+    setSetupOpen(false);
+  }, [latestDocumentRef, selection]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#f3f2ef", fontFamily: "'Geist', sans-serif", overflow: "hidden" }}>
       <EditorTopBar
-        projectTitle={projectTitle}
+        projectTitle={displayTitle}
         saving={saving}
         saveError={saveError}
         exportError={exportError}
         exporting={exporting}
         exportOpen={exportOpen}
+        canExport={!setupOpen}
+        showModeToggle={!setupOpen && Boolean(html)}
+        editorMode={editorMode}
         edgeGap={EDITOR_EDGE_GAP}
         topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
+        onModeChange={handleModeChange}
         onToggleExport={() => setExportOpen((open) => !open)}
         onExport={exportAs}
       />
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: "10px", padding: `0 ${EDITOR_EDGE_GAP}px ${EDITOR_EDGE_GAP}px`, boxSizing: "border-box" }}>
-        <EditorPageList
-          slideCount={slideCount}
-          currentSlide={currentSlide}
-          pageSummaries={pageSummaries}
-          onSelectPage={handlePageSelect}
-        />
+        {setupOpen ? (
+          <div
+            style={{
+              flex: 1,
+              minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
+              background: "#ffffff",
+              border: "1px solid rgba(28,25,23,0.08)",
+              borderRadius: "6px",
+              overflow: "auto",
+              padding: "44px 28px 56px",
+              boxSizing: "border-box",
+            }}
+          >
+            <WizardContent
+              projectId={projectId}
+              variant="editor"
+              onGenerated={handleWizardGenerated}
+            />
+          </div>
+        ) : (
+          <>
+            <EditorPageList
+              slideCount={slideCount}
+              currentSlide={currentSlide}
+              pageSummaries={pageSummaries}
+              onSelectPage={handlePageSelect}
+            />
 
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
-            background: "#fff",
-            border: "1px solid rgba(28,25,23,0.08)",
-            borderRadius: "8px",
-            boxShadow: "none",
-            overflow: "hidden",
-          }}
-        >
-          <EditorPreviewPane
-            html={html}
-            width={PREVIEW_WIDTH}
-            iframeHeight={iframeHeight}
-            iframeRef={iframeRef}
-            previewScrollRef={previewScrollRef}
-            onIframeLoad={handleIframeLoad}
-            onPreviewScroll={handlePreviewScroll}
-          />
-        </div>
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                minHeight: `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
+                background: "#fff",
+                border: "1px solid rgba(28,25,23,0.08)",
+                borderRadius: "6px",
+                boxShadow: "none",
+                overflow: "hidden",
+              }}
+            >
+              <EditorPreviewPane
+                html={html}
+                width={PREVIEW_WIDTH}
+                iframeHeight={iframeHeight}
+                iframeRef={iframeRef}
+                previewScrollRef={previewScrollRef}
+                onIframeLoad={handleIframeLoad}
+                onPreviewScroll={handlePreviewScroll}
+              />
+            </div>
 
-        <EditorInspectorPanel
-          selectedElement={selection.selectedElement}
-          inspectorElement={selection.inspectorElement}
-          editValue={selection.editValue}
-          topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
-          edgeGap={EDITOR_EDGE_GAP}
-          onTextChange={selection.setEditValue}
-          onApplyText={applyEdit}
-          onStyleChange={applyStyleToSelectedElement}
-        />
+            {editorMode === "edit" && (
+              <EditorInspectorPanel
+                selectedElement={selection.selectedElement}
+                inspectorElement={selection.inspectorElement}
+                editValue={selection.editValue}
+                styleValues={selection.styleValues}
+                topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
+                edgeGap={EDITOR_EDGE_GAP}
+                onTextChange={selection.setEditValue}
+                onApplyText={applyEdit}
+                onStyleChange={applyStyleToSelectedElement}
+              />
+            )}
+          </>
+        )}
       </div>
     </div>
   );

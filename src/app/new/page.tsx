@@ -1,11 +1,11 @@
-import Link from "next/link";
+import { NewProjectLauncher } from "@/components/dashboard/NewProjectLauncher";
 import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
-import { WizardContent } from "@/components/wizard/WizardContent";
+import { CelionButtonLink } from "@/components/ui/celion-controls";
 import { getPageSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewEbookPage() {
+export default async function NewProjectPage() {
   const session = await getPageSession();
   const isSignedIn = Boolean(session?.user);
 
@@ -15,16 +15,16 @@ export default async function NewEbookPage() {
       isSignedIn={isSignedIn}
       initialUserName={session?.user?.name ?? null}
       initialUserEmail={session?.user?.email ?? null}
-      breadcrumbCurrent="Brief"
+      breadcrumbCurrent="New project"
     >
       <div style={{ maxWidth: "56rem", width: "100%", margin: "0 auto" }}>
         {isSignedIn ? (
-          <WizardContent isSignedIn={isSignedIn} />
+          <NewProjectLauncher />
         ) : (
           <section
             style={{
               border: "1px dashed #DEDAD3",
-              borderRadius: "4px",
+              borderRadius: "6px",
               background: "#f8f7f4",
               padding: "56px 32px",
               textAlign: "center",
@@ -40,7 +40,7 @@ export default async function NewEbookPage() {
                 color: "#111",
               }}
             >
-              Sign in to create an ebook
+              Sign in to create a project
             </h2>
             <p
               style={{
@@ -51,27 +51,15 @@ export default async function NewEbookPage() {
                 color: "#71717A",
               }}
             >
-              Celion saves drafts to your workspace, so the wizard starts after your account is ready.
+              Celion saves projects to your workspace, so the setup starts after your account is ready.
             </p>
-            <Link
+            <CelionButtonLink
               href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: "38px",
-                padding: "0 18px",
-                background: "#111",
-                color: "#fff",
-                borderRadius: "4px",
-                textDecorationLine: "none",
-                fontSize: "13px",
-                fontWeight: 500,
-                fontFamily: "'Geist', sans-serif",
-              }}
+              variant="primary"
+              style={{ minHeight: "38px", padding: "0 18px" }}
             >
               Return to sign in
-            </Link>
+            </CelionButtonLink>
           </section>
         )}
       </div>

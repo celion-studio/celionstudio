@@ -18,7 +18,7 @@ function muteConsoleWarn() {
   };
 }
 
-function validBlueprint(slideCount = 10, recommendedSlideCount = slideCount) {
+function validPlan(slideCount = 10, recommendedSlideCount = slideCount) {
   return {
     title: "Source-led guide",
     subtitle: "A practical guide from the source",
@@ -184,7 +184,7 @@ const baseArgs = {
   accentColor: "#111111",
 };
 
-test("generateEbookHtml throws instead of saving fallback when blueprint Gemini is unavailable", async () => {
+test("generateEbookHtml throws instead of saving fallback when plan Gemini is unavailable", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
@@ -232,13 +232,13 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
     await assert.rejects(() => generateEbookHtml(args), /AI ebook planning failed/);
 
     setQueuedGemini([
-      geminiJsonResponse(validBlueprint()),
+      geminiJsonResponse(validPlan()),
       geminiJsonResponse({}),
     ]);
     await assert.rejects(() => generateEbookHtml(args), /Gemini did not return an ebook document/);
 
     setQueuedGemini([
-      geminiJsonResponse(validBlueprint()),
+      geminiJsonResponse(validPlan()),
       geminiJsonResponse({ document: { ...validEbookDocument(), pages: [] } }),
     ]);
     await assert.rejects(() => generateEbookHtml(args), /did not pass Celion document validation/);
@@ -256,7 +256,7 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
   }
 });
 
-test("generateEbookHtml surfaces blueprint Gemini rate limits as retryable generation errors", async () => {
+test("generateEbookHtml surfaces plan Gemini rate limits as retryable generation errors", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
@@ -292,7 +292,7 @@ test("generateEbookHtml surfaces document Gemini rate limits as retryable genera
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     new Response(JSON.stringify({ error: { status: "RESOURCE_EXHAUSTED", message: "Quota exceeded for this model." } }), {
       status: 429,
       statusText: "Too Many Requests",
@@ -317,7 +317,7 @@ test("generateEbookHtml surfaces document Gemini rate limits as retryable genera
   }
 });
 
-test("generateEbookHtml rejects invalid blueprints before HTML generation", async () => {
+test("generateEbookHtml rejects invalid plans before HTML generation", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
@@ -328,7 +328,7 @@ test("generateEbookHtml rejects invalid blueprints before HTML generation", asyn
   try {
     await assert.rejects(
       () => generateEbookHtml(baseArgs),
-      /blueprint with only 0 usable slides/,
+      /plan with only 0 usable slides/,
     );
     assert.equal(calls.length, 1);
   } finally {
@@ -345,7 +345,7 @@ test("generateEbookHtml rejects structurally unusable Gemini document with valid
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({
       document: {
         ...validEbookDocument(),
@@ -388,7 +388,7 @@ test("generateEbookHtml compiles structurally valid Gemini documents into HTML",
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document: validEbookDocument("The core idea") }),
   ]);
 
@@ -423,7 +423,7 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   };
 
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document }),
   ]);
 
@@ -466,7 +466,7 @@ test("generateEbookHtml removes inline style attributes from Gemini page HTML", 
   };
 
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document }),
   ]);
 
@@ -489,7 +489,7 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
   const originalFetch = globalThis.fetch;
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document: validEbookDocument("Source-led insight") }),
   ]);
 
@@ -523,7 +523,7 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
 }`,
   };
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document }),
   ]);
 
@@ -541,14 +541,14 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
   }
 });
 
-test("ebook generation uses Flash-Lite for blueprint and Pro for document design", async () => {
+test("ebook generation uses Flash-Lite for plan and Pro for document design", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const calls: string[] = [];
   const requestBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "test-key";
   const originalFetch = globalThis.fetch;
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint()),
+    geminiJsonResponse(validPlan()),
     geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
 
@@ -557,29 +557,29 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for document design
 
     assert.ok(calls[0]?.includes("/models/gemini-2.5-flash-lite:generateContent"));
     assert.ok(calls[1]?.includes("/models/gemini-3.1-pro-preview:generateContent"));
-    const blueprintRequest = requestBodies[0] as {
+    const planRequest = requestBodies[0] as {
       generationConfig?: { temperature?: number };
       systemInstruction?: { parts?: { text?: string }[] };
       contents?: { parts?: { text?: string }[] }[];
     };
-    const htmlRequest = requestBodies[1] as typeof blueprintRequest;
-    const blueprintSystem = blueprintRequest.systemInstruction?.parts?.[0]?.text ?? "";
-    const blueprintPrompt = blueprintRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+    const htmlRequest = requestBodies[1] as typeof planRequest;
+    const planSystem = planRequest.systemInstruction?.parts?.[0]?.text ?? "";
+    const planPrompt = planRequest.contents?.[0]?.parts?.[0]?.text ?? "";
     const htmlSystem = htmlRequest.systemInstruction?.parts?.[0]?.text ?? "";
     const htmlPrompt = htmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
 
-    assert.equal(blueprintRequest.generationConfig?.temperature, 0.75);
+    assert.equal(planRequest.generationConfig?.temperature, 0.75);
     assert.equal(htmlRequest.generationConfig?.temperature, 1);
-    assert.match(blueprintSystem, /senior editorial strategist/);
-    assert.match(blueprintPrompt, /Create a source-led A5 slide publication blueprint/);
-    assert.match(blueprintPrompt, /Purpose \/ use case/);
-    assert.match(blueprintPrompt, /Source material/);
-    assert.match(blueprintPrompt, /sourceAssessment/);
-    assert.match(blueprintPrompt, /recommendedSlideCount/);
-    assert.match(blueprintPrompt, /sourceAnchors/);
-    assert.doesNotMatch(blueprintPrompt, /Reader and product brief|sellable publication/);
-    assert.match(htmlSystem, /approved editorial blueprint/);
-    assert.match(htmlPrompt, /Approved blueprint/);
+    assert.match(planSystem, /senior editorial strategist/);
+    assert.match(planPrompt, /Create a source-led A5 slide publication plan/);
+    assert.match(planPrompt, /Purpose \/ use case/);
+    assert.match(planPrompt, /Source material/);
+    assert.match(planPrompt, /sourceAssessment/);
+    assert.match(planPrompt, /recommendedSlideCount/);
+    assert.match(planPrompt, /sourceAnchors/);
+    assert.doesNotMatch(planPrompt, /Reader and product brief|sellable publication/);
+    assert.match(htmlSystem, /approved editorial plan/);
+    assert.match(htmlPrompt, /Approved plan/);
     assert.match(htmlPrompt, /Source-led decision 1/);
     assert.match(htmlPrompt, /Technical contract/);
     assert.match(htmlPrompt, /24px vertical space between major content groups/);
@@ -592,7 +592,7 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for document design
     assert.match(htmlPrompt, /Every page CSS selector starts with \[data-celion-page="\{pageId\}"\]/);
     assert.match(htmlPrompt, /Manifest includes every editable element/);
     assert.doesNotMatch(htmlPrompt, /# Market/);
-    assert.doesNotMatch(blueprintPrompt, /Core message:/);
+    assert.doesNotMatch(planPrompt, /Core message:/);
     assert.doesNotMatch(htmlPrompt, /Why this matters now|The core idea|How to apply it/);
     assert.match(htmlPrompt, /Do not use color\(\), color-mix\(\), oklch\(\), lab\(\), or lch\(\)/);
   } finally {
@@ -602,7 +602,7 @@ test("ebook generation uses Flash-Lite for blueprint and Pro for document design
   }
 });
 
-test("ebook blueprint prompt expands the slide budget for long source material", async () => {
+test("ebook plan prompt expands the slide budget for long source material", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const calls: string[] = [];
   const requestBodies: unknown[] = [];
@@ -612,21 +612,21 @@ test("ebook blueprint prompt expands the slide budget for long source material",
     `## Section ${index + 1}\nThis source section includes a concrete method, warning, example, and detail that should not be collapsed into one tiny summary.`,
   ).join("\n\n");
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint(20, 20)),
+    geminiJsonResponse(validPlan(20, 20)),
     geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
 
   try {
     await generateEbookHtml({ ...baseArgs, sourceText: longSource });
-    const blueprintRequest = requestBodies[0] as {
+    const planRequest = requestBodies[0] as {
       contents?: { parts?: { text?: string }[] }[];
     };
-    const blueprintPrompt = blueprintRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+    const planPrompt = planRequest.contents?.[0]?.parts?.[0]?.text ?? "";
 
-    assert.match(blueprintPrompt, /Recommended slide budget: 18-22 slides/);
-    assert.match(blueprintPrompt, /The blueprint must choose recommendedSlideCount after assessing the source/);
-    assert.match(blueprintPrompt, /Do not compress a long source into 10 slides/);
-    assert.doesNotMatch(blueprintPrompt, /Make 8-14 slides total/);
+    assert.match(planPrompt, /Recommended slide budget: 18-22 slides/);
+    assert.match(planPrompt, /The plan must choose recommendedSlideCount after assessing the source/);
+    assert.match(planPrompt, /Do not compress a long source into 10 slides/);
+    assert.doesNotMatch(planPrompt, /Make 8-14 slides total/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -634,13 +634,13 @@ test("ebook blueprint prompt expands the slide budget for long source material",
   }
 });
 
-test("generateEbookHtml rejects blueprints that ignore their own recommended slide count", async () => {
+test("generateEbookHtml rejects plans that ignore their own recommended slide count", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validBlueprint(10, 20)),
+    geminiJsonResponse(validPlan(10, 20)),
   ]);
 
   try {

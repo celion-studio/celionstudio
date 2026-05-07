@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { authClient } from '@/lib/auth-client';
 
-const DASHBOARD_ROUTE = "/dashboard" as Route;
+const WORKSPACE_ROUTE = "/dashboard" as Route;
 const PRICING_ROUTE = "/pricing" as Route;
 
 type MarketingHeaderProps = {
@@ -35,7 +35,7 @@ export function MarketingHeader({
       try {
         const result = await authClient.getSession();
         if (!result?.error && active) {
-          window.location.replace(DASHBOARD_ROUTE);
+          window.location.replace(WORKSPACE_ROUTE);
         }
       } catch (err) {
         console.error("Session verification failed", err);
@@ -62,8 +62,8 @@ export function MarketingHeader({
             </Link>
             {initialSignedIn ? (
               <>
-                <Link href={DASHBOARD_ROUTE} className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecorationLine: 'none' }}>
-                  Dashboard
+                <Link href={WORKSPACE_ROUTE} className="nav-link bg-transparent border-none cursor-pointer" style={{ textDecorationLine: 'none' }}>
+                  Workspace
                 </Link>
                 <div className="nav-avatar">
                   {userInitial}

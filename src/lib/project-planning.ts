@@ -2,7 +2,6 @@ import type {
   ProjectProfile,
   ProjectRecord,
   ProjectSource,
-  ProjectKind,
 } from "@/types/project";
 
 function idPart() {
@@ -19,7 +18,6 @@ function toSlug(input: string) {
 
 export function createProjectRecord(args: {
   title: string;
-  kind?: ProjectKind;
   profile: ProjectProfile;
   sources: ProjectSource[];
 }) {
@@ -29,7 +27,6 @@ export function createProjectRecord(args: {
 
   return {
     id,
-    kind: args.kind ?? "product",
     title,
     status: "draft",
     createdAt: now,

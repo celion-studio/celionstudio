@@ -1,23 +1,58 @@
 "use client";
 
-import { FileText, Trash2, UploadCloud } from "lucide-react";
+import { FileText, Plus, Trash2, UploadCloud } from "lucide-react";
 import {
   SOURCE_FILE_ACCEPT,
   buildProjectSourcesFromFilesPartial,
 } from "@/lib/source-ingestion";
+import { CelionButton, getCelionButtonStyle } from "@/components/ui/celion-controls";
+import type { WizardTone } from "@/store/useProjectWizardStore";
 import type { ProjectSource } from "@/types/project";
+
+const toneOptions: { value: WizardTone; label: string }[] = [
+  {
+    value: "preserve",
+    label: "Keep source voice",
+  },
+  {
+    value: "clear",
+    label: "Clear and concise",
+  },
+  {
+    value: "practical",
+    label: "Practical",
+  },
+  {
+    value: "editorial",
+    label: "Editorial",
+  },
+  {
+    value: "friendly",
+    label: "Friendly",
+  },
+];
 
 type Props = {
   sources: ProjectSource[];
   sourceTextLength: number;
+  tone: WizardTone;
   onSourceFilesChange: (sources: ProjectSource[]) => void;
+  onToneChange: (tone: WizardTone) => void;
   onError: (message: string) => void;
 };
+
+const SOURCE_INPUT_ID = "ebook-source-upload";
+
+function sourceKindLabel(kind: ProjectSource["kind"]) {
+  return kind.replace(/_/g, " ");
+}
 
 export function SourceStepEbook({
   sources,
   sourceTextLength,
+  tone,
   onSourceFilesChange,
+  onToneChange,
   onError,
 }: Props) {
   async function handleFiles(files: File[]) {
@@ -42,37 +77,22 @@ export function SourceStepEbook({
   return (
     <div className="space-y-5">
       <div>
-        <div className="mb-2.5 flex items-center gap-2.5">
-          <UploadCloud size={15} className="text-muted" />
-          <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-            Upload source files
-          </p>
-          <span
-            style={{
-              fontSize: "11px",
-              fontFamily: "'Geist', sans-serif",
-              color: "#b8b4aa",
-              letterSpacing: "0.02em",
-            }}
-          >
-            MD / TXT / DOCX / CSV / JSON / HTML
-          </span>
-        </div>
-
-        <label
+        <div
           style={{
             display: "flex",
-            minHeight: "220px",
+            minHeight: "250px",
             flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "9px",
-            padding: "34px 24px",
+            gap: "16px",
+            padding: "18px",
             border: "1.5px dashed #dbd7cf",
-            borderRadius: "4px",
-            background: "#ffffff",
-            cursor: "pointer",
+            borderRadius: "6px",
+            background: sources.length > 0 ? "#fbfbfa" : "#ffffff",
             transition: "border-color 0.15s ease, background 0.15s ease",
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            void handleFiles(Array.from(event.dataTransfer.files ?? []));
           }}
           onMouseEnter={(event) => {
             event.currentTarget.style.borderColor = "#1a1714";
@@ -80,30 +100,72 @@ export function SourceStepEbook({
           }}
           onMouseLeave={(event) => {
             event.currentTarget.style.borderColor = "#dbd7cf";
-            event.currentTarget.style.background = "#ffffff";
+            event.currentTarget.style.background = sources.length > 0 ? "#fbfbfa" : "#ffffff";
           }}
         >
-          <UploadCloud size={24} style={{ color: "#8f969f" }} strokeWidth={1.7} />
-          <span
-            style={{
-              fontSize: "14px",
-              fontWeight: 600,
-              fontFamily: "'Geist', sans-serif",
-              color: "#1a1714",
-            }}
-          >
-            Choose source files
-          </span>
-          <span
-            style={{
-              fontSize: "12.5px",
-              fontFamily: "'Geist', sans-serif",
-              color: "#858b93",
-            }}
-          >
-            Markdown, DOCX, plain text, CSV, JSON, HTML, or XML
-          </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: 0 }}>
+              <div
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  border: "1px solid #e1e4e8",
+                  background: "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <UploadCloud size={15} style={{ color: "#69707a" }} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: "'Geist', sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: "#17191d",
+                  }}
+                >
+                  Upload source files
+                </p>
+                <p
+                  style={{
+                    margin: "3px 0 0",
+                    fontSize: "12px",
+                    fontFamily: "'Geist', sans-serif",
+                    color: "#858b93",
+                  }}
+                >
+                  Markdown, docx, csv, json, html
+                </p>
+              </div>
+            </div>
+            {sources.length > 0 ? (
+              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                <label
+                  htmlFor={SOURCE_INPUT_ID}
+                  style={getCelionButtonStyle({ size: "sm" })}
+                >
+                  <Plus size={13} />
+                  Add more
+                </label>
+                <CelionButton
+                  onClick={() => onSourceFilesChange([])}
+                  size="sm"
+                >
+                  <Trash2 size={12} />
+                  Clear
+                </CelionButton>
+              </div>
+            ) : null}
+          </div>
+
           <input
+            id={SOURCE_INPUT_ID}
             type="file"
             multiple
             accept={SOURCE_FILE_ACCEPT}
@@ -113,70 +175,152 @@ export function SourceStepEbook({
               event.currentTarget.value = "";
             }}
           />
-        </label>
-      </div>
 
-      {sources.length > 0 ? (
-        <div>
-          <div className="mb-2.5 flex items-center justify-between">
-            <p className="font-display text-[11px] uppercase tracking-[0.18em] text-muted">
-              Added
-            </p>
-            <button
-              type="button"
-              onClick={() => onSourceFilesChange([])}
+          {sources.length === 0 ? (
+            <label
+              htmlFor={SOURCE_INPUT_ID}
               style={{
-                display: "inline-flex",
+                minHeight: "168px",
+                display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: "5px",
-                border: "1px solid #e1e4e8",
-                borderRadius: "4px",
-                background: "#fff",
-                padding: "5px 8px",
-                fontSize: "11.5px",
-                fontFamily: "'Geist', sans-serif",
-                color: "#858b93",
+                justifyContent: "center",
+                gap: "10px",
+                border: "1px solid #eef0f2",
+                borderRadius: "6px",
+                background: "#fbfbfa",
                 cursor: "pointer",
+                textAlign: "center",
               }}
             >
-              <Trash2 size={12} />
-              Clear
-            </button>
-          </div>
-
-          <div className="space-y-1.5">
-            {sources.map((source) => (
               <div
-                key={source.id}
                 style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "6px",
+                  background: "#ffffff",
+                  border: "1px solid #e1e4e8",
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 14px",
-                  border: "1px solid #e1e4e8",
-                  borderRadius: "4px",
-                  background: "#ffffff",
-                  fontSize: "13px",
-                  color: "#4b515a",
-                  fontFamily: "'Geist', sans-serif",
+                  justifyContent: "center",
                 }}
               >
-                <FileText size={14} style={{ color: "#858b93", flexShrink: 0 }} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {source.name}
-                </span>
-                <span style={{ marginLeft: "auto", color: "#b8b4aa", fontSize: "11px", textTransform: "uppercase" }}>
-                  {source.kind}
-                </span>
+                <UploadCloud size={20} style={{ color: "#69707a" }} strokeWidth={1.7} />
               </div>
-            ))}
-          </div>
+              <span
+                style={{
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  fontFamily: "'Geist', sans-serif",
+                  color: "#17191d",
+                }}
+              >
+                Choose source files
+              </span>
+              <span
+                style={{
+                  fontSize: "12.5px",
+                  fontFamily: "'Geist', sans-serif",
+                  color: "#858b93",
+                }}
+              >
+                Drop files here or browse from your computer
+              </span>
+            </label>
+          ) : (
+            <>
+              <div
+                style={{
+                  border: "1px solid #e1e4e8",
+                  borderRadius: "6px",
+                  background: "#ffffff",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    padding: "12px 14px",
+                    borderBottom: "1px solid #eef0f2",
+                    background: "#ffffff",
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontFamily: "'Geist', sans-serif",
+                      fontSize: "12.5px",
+                      fontWeight: 600,
+                      color: "#17191d",
+                    }}
+                  >
+                    Added files
+                  </p>
+                  <p style={{ margin: 0, fontFamily: "'Geist', sans-serif", fontSize: "12px", color: "#858b93" }}>
+                    {sourceTextLength.toLocaleString()} extracted characters
+                  </p>
+                </div>
 
-          <p style={{ marginTop: "8px", fontFamily: "'Geist', sans-serif", fontSize: "12px", color: "#b8b4aa" }}>
-            {sourceTextLength.toLocaleString()} extracted characters
-          </p>
+              <div style={{ padding: "8px" }}>
+                {sources.map((source) => (
+                  <div
+                    key={source.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "9px",
+                      padding: "10px",
+                      border: "1px solid transparent",
+                      borderRadius: "6px",
+                      background: "#ffffff",
+                      fontSize: "13px",
+                      color: "#4b515a",
+                      fontFamily: "'Geist', sans-serif",
+                    }}
+                  >
+                    <FileText size={14} style={{ color: "#858b93", flexShrink: 0 }} />
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {source.name}
+                    </span>
+                    <span style={{ marginLeft: "auto", color: "#b8b4aa", fontSize: "11.5px", whiteSpace: "nowrap" }}>
+                      {sourceKindLabel(source.kind)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              </div>
+            </>
+          )}
         </div>
-      ) : null}
+      </div>
+
+      <div>
+        <div className="wizard-label">
+          <p className="wizard-label-text">Tone and manner</p>
+        </div>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          {toneOptions.map((option) => {
+            const active = tone === option.value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onToneChange(option.value)}
+                className="wizard-tone-card"
+                data-active={active}
+              >
+                <span className="wizard-tone-label">
+                  {option.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

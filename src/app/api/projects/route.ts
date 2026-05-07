@@ -3,12 +3,9 @@ import { z } from "zod";
 import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
 import { isDatabaseUnavailableError } from "@/lib/db";
-import { DESIGN_MODE_IDS, PROJECT_KIND_IDS, SOURCE_KIND_IDS } from "@/types/project";
-
-const projectKindSchema = z.enum(PROJECT_KIND_IDS);
+import { DESIGN_MODE_IDS, SOURCE_KIND_IDS } from "@/types/project";
 
 const createProjectSchema = z.object({
-  kind: projectKindSchema.default("product"),
   title: z.string().trim().min(1),
   profile: z.object({
     author: z.string().default(""),
@@ -16,6 +13,12 @@ const createProjectSchema = z.object({
     purpose: z.string().default(""),
     designMode: z.enum(DESIGN_MODE_IDS).default("balanced"),
     tone: z.string().default(""),
+  }).default({
+    author: "",
+    targetAudience: "",
+    purpose: "",
+    designMode: "balanced",
+    tone: "",
   }),
   sources: z
     .array(
@@ -30,17 +33,14 @@ const createProjectSchema = z.object({
     .default([]),
 });
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   const session = await getRouteSession();
   if (!session?.user?.id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const url = new URL(request.url);
-  const kind = projectKindSchema.catch("product").parse(url.searchParams.get("kind") ?? "product");
-
   try {
-    const projects = await listProjectRecordsForUser(session.user.id, kind);
+    const projects = await listProjectRecordsForUser(session.user.id);
     return NextResponse.json({ projects });
   } catch (error) {
     if (isDatabaseUnavailableError(error)) {
@@ -71,7 +71,6 @@ export async function POST(request: Request) {
   try {
     const p = parsed.data.profile;
     const project = await createProjectForUser(session.user.id, {
-      kind: parsed.data.kind,
       title: parsed.data.title,
       profile: {
         author: p.author,

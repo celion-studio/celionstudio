@@ -11,27 +11,29 @@ The old Tiptap document editor was removed, the page-level ebook document model 
 - `/new` creates an ebook project.
 - Generation writes both `ebook_document` and compiled `ebook_html`.
 - `/editor/[projectId]` opens the editable ebook surface.
-- `/builder/[projectId]` exists only as a legacy redirect to `/editor/[projectId]`.
 - `/dashboard` links directly to `/editor/[projectId]`.
 
 ## Data Model
 
 Kept:
 
-- `projects.project_type`, normalized to `product`.
 - `project_profiles.ebook_document`, the page-level source model.
 - `project_profiles.ebook_html`, the compiled cache used by preview/export compatibility paths.
-- `ebook_generation_logs`, including stage, blueprint, validation, and error details.
+- `ebook_generation_logs`, including stage, plan, validation, and error details.
 
 Removed from active app contract:
 
+- `projects.project_type` and the single-value `ProjectKind = "product"` path.
 - `ProjectKind = "document"`.
 - `ProjectProfile.document`.
 - `ProjectProfile.plan`.
 - `page_format`, `page_width_mm`, and `page_height_mm` profile fields.
+- Legacy generated-HTML object storage columns: `ebook_html_url`, `ebook_html_pathname`, and `ebook_html_size`.
+- Legacy source metadata column: `source_metadata`.
 - Tiptap document backfill and reclassification migrations.
+- The unused `app_migrations` table.
 
-Schema bootstrap now drops legacy profile columns (`plan`, `document`, `blocks`, `page_format`, `page_width_mm`, `page_height_mm`) and constrains `project_type` to `product`.
+Schema bootstrap now drops legacy profile columns (`plan`, `document`, `blocks`, `page_format`, `page_width_mm`, `page_height_mm`, old generated-HTML object storage fields), drops legacy `source_metadata`, and removes the old `project_type` column.
 
 ## Code Cleanup
 
@@ -54,7 +56,7 @@ Renamed:
 ## Current Editor Architecture
 
 - `src/lib/ebook-document.ts` defines the page-level ebook document contract.
-- `src/lib/ebook-generation.ts` creates the blueprint first, then asks Gemini Pro for a complete page-level document JSON.
+- `src/lib/ebook-generation.ts` creates the plan first, then asks Gemini Pro for a complete page-level document JSON.
 - `src/app/api/ebook/save/route.ts` accepts either legacy HTML or the current document payload.
 - `src/components/editor/EditorShell.tsx` loads `ebook_document` first and falls back to compiled HTML.
 - Editor helpers are split into preview, iframe preparation, document edits, save state, selection state, and inspector controls.
@@ -85,6 +87,6 @@ Notes:
 
 ## Follow-Up
 
-- Decide when to remove the `/builder/[projectId]` redirect.
+- The legacy `/builder/[projectId]` redirect has been removed.
 - Consider renaming any user-facing copy that still says "draft" or "manuscript" if the product should present itself only as an ebook editor.
 - Keep `ebook_html` until export and legacy fallback no longer need the compiled cache.

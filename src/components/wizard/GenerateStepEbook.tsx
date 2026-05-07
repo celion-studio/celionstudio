@@ -15,7 +15,7 @@ type Props = {
 export function GenerateStepEbook({ title, author, ebookStyle, accentColor, generating }: Props) {
   return (
     <div className="space-y-5">
-      <div style={{ padding: "18px", borderRadius: "4px", background: "#f7f6f4", border: "1px solid #e8e5e0" }}>
+      <div style={{ padding: "18px", borderRadius: "6px", background: "#f7f6f4", border: "1px solid #e8e5e0" }}>
         <h3 style={{ fontFamily: "'Geist', sans-serif", fontSize: "13px", fontWeight: 600, color: "#1a1714", marginBottom: "12px" }}>
           Summary
         </h3>
@@ -24,7 +24,7 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
             ["Title", title || "-"],
             ["Author", author || "-"],
             ["Style", ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "-"],
-            ["Format", "A5 sales preview"],
+            ["Format", "A5 ebook"],
             ["Accent", accentColor],
           ].map(([label, value]) => (
             <div key={label} style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -50,7 +50,7 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", borderRadius: "4px", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", borderRadius: "6px", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
           <Sparkles size={15} style={{ color: "#16a34a", marginTop: "1px", flexShrink: 0 }} />
           <p style={{ fontFamily: "'Geist', sans-serif", fontSize: "12.5px", color: "#166534", lineHeight: 1.5 }}>
             Celion will render the approved plan into a fixed A5 HTML/CSS sales-preview ebook in the {ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "selected"} style. You can edit the text after generation.

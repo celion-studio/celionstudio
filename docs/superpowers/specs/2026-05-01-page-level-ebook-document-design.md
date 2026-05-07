@@ -11,19 +11,19 @@ Implemented on 2026-05-01.
 - `CelionEbookDocument` is now the editable source of truth for generated ebooks.
 - `ebook_html` remains as the compiled compatibility cache for preview and export.
 - The product surface is named editor in code and routing: `/editor/[projectId]`.
-- `/builder/[projectId]` remains only as a legacy redirect to `/editor/[projectId]`.
+- The previous legacy redirect route has been removed; `/editor/[projectId]` is the active editor route.
 - The old Tiptap document editor, document project kind, and related legacy DB compatibility paths were removed.
 
 The important constraint is cost. The default generation path should stay at two LLM calls:
 
-1. Flash-Lite creates the editorial blueprint and page plan.
+1. Flash-Lite creates the editorial plan.
 2. Gemini Pro creates the complete page-level document JSON.
 
 Per-page LLM calls are reserved for repair, redesign, or user-requested AI edits after the first document exists.
 
 ## Current Context
 
-The current ebook flow has a two-step generation path in `src/lib/ebook-generation.ts`: blueprint first, then page-level document JSON from the blueprint. Project storage writes `project_profiles.ebook_document` as the source model and `project_profiles.ebook_html` as the compiled cache. The editor loads `ebook_document` first, falls back to `ebook_html` for legacy projects, renders in an iframe, lets the user click editable text, applies scoped document patches, recompiles HTML, and saves through `/api/ebook/save`.
+The current ebook flow has a two-step generation path in `src/lib/ebook-generation.ts`: plan first, then page-level document JSON from the plan. Project storage writes `project_profiles.ebook_document` as the source model and `project_profiles.ebook_html` as the compiled cache. The editor loads `ebook_document` first, falls back to `ebook_html` for legacy projects, renders in an iframe, lets the user click editable text, applies scoped document patches, recompiles HTML, and saves through `/api/ebook/save`.
 
 The legacy single-HTML path worked for simple text edits, but it was risky for a real editor:
 
@@ -104,7 +104,7 @@ The existing two-call shape should remain.
 
 ```txt
 Wizard input + sources
-  -> Flash-Lite blueprint/page plan
+  -> Flash-Lite plan
   -> Gemini Pro page-level document JSON
   -> sanitize and validate per page
   -> compile pages into ebook_html

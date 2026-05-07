@@ -24,24 +24,10 @@ export function MarketingFooter() {
             <Link href="/#export">Print PDF</Link>
             <Link href={PRICING_ROUTE}>Pricing</Link>
           </div>
-          <div className="footer-col">
-            <h4>Company</h4>
-            <Link href="#">About</Link>
-            <Link href="#">Changelog</Link>
-            <Link href="#">Contact</Link>
-            <Link href="#">Careers</Link>
-          </div>
-          <div className="footer-col">
-            <h4>Resources</h4>
-            <Link href="#">Help center</Link>
-            <Link href="#">Writing project</Link>
-            <Link href="#">Privacy</Link>
-            <Link href="#">Terms</Link>
-          </div>
         </div>
         <div className="footer-bottom">
           <span>Celion 2026. All rights reserved.</span>
-          <span>Designed for clear drafts and better books.</span>
+          <span>Designed for clear ebooks and better books.</span>
         </div>
       </div>
     </footer>

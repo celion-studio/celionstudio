@@ -1,22 +1,21 @@
 ﻿"use client";
 
-import type { CSSProperties } from "react";
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Clock, FileText } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { BookOpen, FileText } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
-import { WorkspaceStats } from "@/components/dashboard/WorkspaceStats";
+import { useCreateProjectNavigation } from "@/components/dashboard/use-create-project-navigation";
 import {
   CELION_COLOR,
   CELION_FONT,
   CELION_RADIUS,
 } from "@/components/ui/celion-style";
+import { CelionButton, CelionButtonLink } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
-import type { ProjectKind, ProjectRecord } from "@/types/project";
+import type { ProjectRecord } from "@/types/project";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
@@ -26,33 +25,16 @@ type DashboardShellProps = {
 };
 
 const workspaceCopy = {
-  breadcrumbCurrent: "All Drafts",
-  heading: "Your drafts",
-  description: "All your manuscripts and works in progress.",
-  primaryActionLabel: "New ebook",
-  blankTitle: "Untitled Draft",
-  emptyTitle: "No drafts yet",
-  emptyDescription: "Paste notes, upload a transcript, or start fresh. Celion shapes it into a structured draft.",
-  emptyAction: "Create first ebook",
-  loadingLabel: "Loading drafts...",
-  statTotal: "Total drafts",
-  statActive: "In progress",
-  statExported: "Print opened",
+  breadcrumbCurrent: "All projects",
+  heading: "Your projects",
+  description: "All your projects and works in progress.",
+  primaryActionLabel: "New project",
+  blankTitle: "Untitled project",
+  emptyTitle: "No projects yet",
+  emptyDescription: "Upload a source file or start fresh. Celion shapes it into a structured project.",
+  emptyAction: "Create first project",
+  loadingLabel: "Loading projects...",
 } as const;
-
-const dashboardActionStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "6px",
-  padding: "8px 18px",
-  background: CELION_COLOR.ink,
-  color: CELION_COLOR.white,
-  borderRadius: CELION_RADIUS.control,
-  textDecorationLine: "none",
-  fontSize: "13px",
-  fontWeight: 500,
-  fontFamily: CELION_FONT.display,
-};
 
 export function DashboardShell({
   isSignedIn,
@@ -60,8 +42,13 @@ export function DashboardShell({
   initialUserEmail,
   activeItem = "workspace",
 }: DashboardShellProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const {
+    createAndOpenProject,
+    createProjectError,
+    creatingProject,
+    setCreateProjectError,
+  } = useCreateProjectNavigation();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
   const resolvedSignedIn = isSignedIn;
   const resolvedUserName = initialUserName;
@@ -71,12 +58,12 @@ export function DashboardShell({
   const [loading, setLoading] = useState(isSignedIn || hasVerifier);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
+  const visibleError = error || createProjectError;
   const showLoading = loading;
   const copy = workspaceCopy;
-  const projectKind: ProjectKind = "product";
 
   async function fetchProjects() {
-    const response = await fetch(`/api/projects?kind=${projectKind}`, {
+    const response = await fetch("/api/projects", {
       method: "GET",
       cache: "no-store",
     });
@@ -87,7 +74,7 @@ export function DashboardShell({
 
     await authClient.getSession();
 
-    return fetch(`/api/projects?kind=${projectKind}`, {
+    return fetch("/api/projects", {
       method: "GET",
       cache: "no-store",
     });
@@ -175,12 +162,7 @@ export function DashboardShell({
     return () => {
       active = false;
     };
-  }, [hasVerifier, projectKind, resolvedSignedIn]);
-
-  const printOpened = projects.filter((project) => project.status === "exported").length;
-  const inProgress = projects.filter(
-    (project) => !["draft", "exported"].includes(project.status),
-  ).length;
+  }, [hasVerifier, resolvedSignedIn]);
 
   async function deleteProject(project: ProjectRecord) {
     const label = project.title || copy.blankTitle;
@@ -211,6 +193,12 @@ export function DashboardShell({
     }
   }
 
+  async function handleCreateProject() {
+    setError("");
+    setCreateProjectError("");
+    await createAndOpenProject();
+  }
+
   return (
     <WorkspaceLayout
       activeItem={activeItem}
@@ -218,114 +206,119 @@ export function DashboardShell({
       initialUserName={resolvedUserName}
       initialUserEmail={resolvedUserEmail}
       breadcrumbCurrent={copy.breadcrumbCurrent}
-      primaryAction={{
-        href: "/new",
-        label: copy.primaryActionLabel,
-      }}
     >
-            <div style={{ marginBottom: "28px" }}>
-              <h1
-                style={{
-                  margin: 0,
-                  fontFamily: CELION_FONT.display,
-                  fontSize: "22px",
-                  fontWeight: 600,
-                  letterSpacing: "-0.03em",
-                  color: CELION_COLOR.text,
-                }}
-              >
-                {copy.heading}
-              </h1>
-              <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: CELION_COLOR.muted }}>
-                {copy.description}
-              </p>
-            </div>
+      <div
+        style={{
+          marginBottom: "28px",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontFamily: CELION_FONT.display,
+              fontSize: "22px",
+              fontWeight: 560,
+              letterSpacing: "-0.03em",
+              color: CELION_COLOR.text,
+            }}
+          >
+            {copy.heading}
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: CELION_COLOR.muted }}>
+            {copy.description}
+          </p>
+        </div>
+        {resolvedSignedIn ? (
+          <CelionButton
+            onClick={handleCreateProject}
+            disabled={creatingProject}
+            variant="primary"
+            style={{ padding: "0 18px" }}
+          >
+            {creatingProject ? "Creating..." : copy.primaryActionLabel}
+          </CelionButton>
+        ) : null}
+      </div>
 
-            {resolvedSignedIn && projects.length > 0 ? (
-              <WorkspaceStats
-                stats={[
-                  { label: copy.statTotal, value: projects.length, icon: FileText },
-                  { label: copy.statActive, value: inProgress, icon: Clock },
-                  { label: copy.statExported, value: printOpened, icon: BookOpen },
-                ]}
-              />
-            ) : null}
+      {visibleError ? (
+        <div
+          style={{
+            marginBottom: "20px",
+            padding: "12px 16px",
+            background: "#FFF5F2",
+            borderRadius: CELION_RADIUS.control,
+            border: "1px solid #FEDDCF",
+          }}
+        >
+          <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19" }}>{visibleError}</p>
+        </div>
+      ) : null}
 
-            {error ? (
-              <div
-                style={{
-                  marginBottom: "20px",
-                  padding: "12px 16px",
-                  background: "#FFF5F2",
-                  borderRadius: CELION_RADIUS.control,
-                  border: "1px solid #FEDDCF",
-                }}
-              >
-                <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19" }}>{error}</p>
-              </div>
-            ) : null}
+      {showLoading ? (
+        <div style={{ padding: "72px 0", textAlign: "center" }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "13px",
+              color: CELION_COLOR.mutedSoft,
+              fontFamily: CELION_FONT.display,
+            }}
+          >
+            {copy.loadingLabel}
+          </p>
+        </div>
+      ) : null}
 
-            {showLoading ? (
-              <div style={{ padding: "72px 0", textAlign: "center" }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "13px",
-                    color: CELION_COLOR.mutedSoft,
-                    fontFamily: CELION_FONT.display,
-                  }}
-                >
-                  {copy.loadingLabel}
-                </p>
-              </div>
-            ) : null}
+      {!showLoading && resolvedSignedIn ? (
+        <ProjectList
+          projects={projects}
+          deletingProjectId={deletingProjectId}
+          onDeleteProject={deleteProject}
+        />
+      ) : null}
 
-            {!showLoading && resolvedSignedIn ? (
-              <ProjectList
-                projects={projects}
-                deletingProjectId={deletingProjectId}
-                onDeleteProject={deleteProject}
-              />
-            ) : null}
+      {!showLoading && !resolvedSignedIn ? (
+        <DashboardEmptyState
+          icon={BookOpen}
+          title="Sign in to continue"
+          description="Your workspace is account-backed. Sign in to access your projects."
+          action={
+            <CelionButtonLink
+              href="/"
+              variant="primary"
+              style={{ padding: "0 18px" }}
+            >
+              Return to sign in
+            </CelionButtonLink>
+          }
+        />
+      ) : null}
 
-            {!showLoading && !resolvedSignedIn ? (
-              <DashboardEmptyState
-                icon={BookOpen}
-                title="Sign in to continue"
-                description="Your workspace is account-backed. Sign in to access your manuscripts."
-                action={
-                  <Link
-                    href="/"
-                    style={dashboardActionStyle}
-                  >
-                    Return to sign in
-                  </Link>
-                }
-              />
-            ) : null}
-
-            {!showLoading && resolvedSignedIn && projects.length === 0 ? (
-              <DashboardEmptyState
-                icon={FileText}
-                title={copy.emptyTitle}
-                description={copy.emptyDescription}
-                maxWidth="300px"
-                action={
-                  <button
-                    type="button"
-                    onClick={() => router.push("/new")}
-                    style={{
-                      ...dashboardActionStyle,
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <FileText size={13} strokeWidth={2.2} />
-                    {copy.emptyAction}
-                  </button>
-                }
-              />
-            ) : null}
+      {!showLoading && resolvedSignedIn && projects.length === 0 ? (
+        <DashboardEmptyState
+          icon={FileText}
+          title={copy.emptyTitle}
+          description={copy.emptyDescription}
+          maxWidth="300px"
+          action={
+            <CelionButton
+              onClick={handleCreateProject}
+              disabled={creatingProject}
+              variant="primary"
+              style={{ padding: "0 18px" }}
+            >
+              <FileText size={13} strokeWidth={2.2} />
+              {creatingProject ? "Creating..." : copy.emptyAction}
+            </CelionButton>
+          }
+        />
+      ) : null}
     </WorkspaceLayout>
   );
 }

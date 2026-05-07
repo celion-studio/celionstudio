@@ -1,10 +1,12 @@
 "use client";
 
-import type { RefObject } from "react";
+import { memo, type RefObject } from "react";
 import { ArrowLeft, ChevronDown, Download } from "lucide-react";
 import Link from "next/link";
 import type { CelionEditableElement } from "@/lib/ebook-document";
+import { CelionButton, CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { PageSummary } from "./editor-preview";
+import type { EditorMode, InspectorStyleValues } from "./editor-types";
 import { InspectorControls } from "./inspector-controls";
 
 type ExportFormat = "pdf" | "png" | "jpg";
@@ -16,8 +18,12 @@ type TopBarProps = {
   exportError: string;
   exporting: boolean;
   exportOpen: boolean;
+  canExport?: boolean;
+  showModeToggle?: boolean;
+  editorMode: EditorMode;
   edgeGap: number;
   topRailHeight: number;
+  onModeChange: (mode: EditorMode) => void;
   onToggleExport: () => void;
   onExport: (format: ExportFormat) => void;
 };
@@ -29,50 +35,89 @@ export function EditorTopBar({
   exportError,
   exporting,
   exportOpen,
+  canExport = true,
+  showModeToggle = true,
+  editorMode,
   edgeGap,
   topRailHeight,
+  onModeChange,
   onToggleExport,
   onExport,
 }: TopBarProps) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: `0 ${edgeGap}px`, height: `${topRailHeight}px`, background: "transparent", flexShrink: 0, boxSizing: "border-box" }}>
-      <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", color: "#71717a", textDecoration: "none", fontSize: "13px" }}>
-        <ArrowLeft size={14} />
-        Back
-      </Link>
-      <span style={{ color: "#d4d2cc", fontSize: "13px" }}>/</span>
-      <span style={{ fontSize: "13.5px", fontWeight: 500, color: "#18181b", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectTitle}</span>
-      {saving && <span style={{ fontSize: "12px", color: "#a1a1aa" }}>Saving...</span>}
-      {saveError && <span style={{ fontSize: "12px", color: "#b45309" }}>{saveError}</span>}
-      {exportError && <span style={{ fontSize: "12px", color: "#b45309" }}>{exportError}</span>}
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", gap: "12px", padding: `0 ${edgeGap}px`, height: `${topRailHeight}px`, background: "transparent", flexShrink: 0, boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+        <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", color: "#71717a", textDecoration: "none", fontSize: "13px", flexShrink: 0 }}>
+          <ArrowLeft size={14} />
+          Back
+        </Link>
+        <span style={{ color: "#d4d2cc", fontSize: "13px", flexShrink: 0 }}>/</span>
+        <span style={{ fontSize: "13.5px", fontWeight: 500, color: "#18181b", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectTitle}</span>
+      </div>
 
-      <div style={{ position: "relative" }}>
-        <button
-          onClick={onToggleExport}
-          disabled={exporting}
-          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "4px", background: "#18181b", color: "#ffffff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 500 }}
-        >
-          <Download size={13} />
-          {exporting ? "Exporting..." : "Export"}
-          <ChevronDown size={12} />
-        </button>
-        {exportOpen && (
-          <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "4px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
-            {(["pdf", "png", "jpg"] as const).map((fmt) => (
-              <button
-                key={fmt}
-                onClick={() => onExport(fmt)}
-                style={{ display: "block", width: "100%", padding: "10px 16px", textAlign: "left", fontSize: "13px", color: "#18181b", background: "none", border: "none", cursor: "pointer", fontFamily: "'Geist', sans-serif" }}
-                onMouseEnter={(event) => { event.currentTarget.style.background = "#f4f4f5"; }}
-                onMouseLeave={(event) => { event.currentTarget.style.background = "none"; }}
-              >
-                Export as {fmt.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        )}
+      {showModeToggle ? (
+        <EditorModeToggle mode={editorMode} onModeChange={onModeChange} />
+      ) : (
+        <span aria-hidden="true" />
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", minWidth: 0 }}>
+        {saving && <span style={{ fontSize: "12px", color: "#a1a1aa", whiteSpace: "nowrap" }}>Saving...</span>}
+        {saveError && <span style={{ fontSize: "12px", color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{saveError}</span>}
+        {exportError && <span style={{ fontSize: "12px", color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportError}</span>}
+
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <CelionButton
+            onClick={onToggleExport}
+            disabled={exporting || !canExport}
+            size="sm"
+            variant="primary"
+            style={{ padding: "0 14px" }}
+          >
+            <Download size={13} />
+            {exporting ? "Exporting..." : "Export"}
+            <ChevronDown size={12} />
+          </CelionButton>
+          {exportOpen && (
+            <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "6px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
+              {(["pdf", "png", "jpg"] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  onClick={() => onExport(fmt)}
+                  style={{ display: "block", width: "100%", padding: "10px 16px", textAlign: "left", fontSize: "13px", color: "#18181b", background: "none", border: "none", cursor: "pointer", fontFamily: "'Geist', sans-serif" }}
+                  onMouseEnter={(event) => { event.currentTarget.style.background = "#f4f4f5"; }}
+                  onMouseLeave={(event) => { event.currentTarget.style.background = "none"; }}
+                >
+                  Export as {fmt.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function EditorModeToggle({
+  mode,
+  onModeChange,
+}: {
+  mode: EditorMode;
+  onModeChange: (mode: EditorMode) => void;
+}) {
+  return (
+    <CelionSegmentedControl
+      ariaLabel="Editor mode"
+      onChange={onModeChange}
+      options={[
+        { value: "view", label: "View" },
+        { value: "edit", label: "Edit" },
+      ]}
+      tone="dark"
+      value={mode}
+      width="148px"
+    />
   );
 }
 
@@ -83,7 +128,7 @@ type PageListProps = {
   onSelectPage: (index: number) => void;
 };
 
-export function EditorPageList({
+function EditorPageListComponent({
   slideCount,
   currentSlide,
   pageSummaries,
@@ -92,7 +137,7 @@ export function EditorPageList({
   return (
     <div style={{ width: "220px", background: "transparent", overflowY: "auto", padding: "14px 4px 14px 0", flexShrink: 0 }}>
       <p style={{ fontSize: "10px", fontWeight: 650, letterSpacing: "0.11em", color: "#a1a1aa", textTransform: "uppercase", marginBottom: "10px", paddingLeft: "6px" }}>
-        {slideCount} slides
+        {slideCount} pages
       </p>
       {Array.from({ length: slideCount }).map((_, index) => (
         <button
@@ -104,7 +149,7 @@ export function EditorPageList({
             gap: "8px",
             width: "100%",
             padding: "8px 9px",
-            borderRadius: "4px",
+            borderRadius: "6px",
             border: currentSlide === index ? "1px solid rgba(28,25,23,0.08)" : "1px solid transparent",
             background: currentSlide === index ? "rgba(255,255,255,0.72)" : "transparent",
             cursor: "pointer",
@@ -112,12 +157,12 @@ export function EditorPageList({
             textAlign: "left",
           }}
         >
-          <span style={{ width: "28px", height: "22px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "4px", background: currentSlide === index ? "#18181b" : "rgba(255,255,255,0.56)", color: currentSlide === index ? "#ffffff" : "#71717a", fontSize: "11px", fontWeight: 650, fontFamily: "'Geist', sans-serif", lineHeight: 1 }}>
+          <span style={{ width: "28px", height: "22px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: currentSlide === index ? "#18181b" : "rgba(255,255,255,0.56)", color: currentSlide === index ? "#ffffff" : "#71717a", fontSize: "11px", fontWeight: 650, fontFamily: "'Geist', sans-serif", lineHeight: 1 }}>
             {index + 1}
           </span>
           <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", fontWeight: 560, color: "#3f3f46", lineHeight: 1.25 }}>
-              {pageSummaries[index]?.title || `Slide ${index + 1}`}
+              {pageSummaries[index]?.title || `Page ${index + 1}`}
             </span>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", color: "#a1a1aa", lineHeight: 1.2, textTransform: "uppercase", letterSpacing: "0.04em" }}>
               {pageSummaries[index]?.eyebrow || (index === 0 ? "Cover" : "Content")}
@@ -129,6 +174,8 @@ export function EditorPageList({
   );
 }
 
+export const EditorPageList = memo(EditorPageListComponent);
+
 type PreviewPaneProps = {
   html: string;
   width: number;
@@ -139,7 +186,7 @@ type PreviewPaneProps = {
   onPreviewScroll: () => void;
 };
 
-export function EditorPreviewPane({
+function EditorPreviewPaneComponent({
   html,
   width,
   iframeHeight,
@@ -159,11 +206,11 @@ export function EditorPreviewPane({
             scrolling="no"
             style={{ width: `${width}px`, height: `${iframeHeight}px`, border: "none", display: "block", overflow: "hidden" }}
             sandbox="allow-same-origin"
-            title="Ebook preview"
+            title="Project preview"
           />
         ) : (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", color: "#a1a1aa", fontSize: "14px" }}>
-            No ebook content yet.
+            No content yet.
           </div>
         )}
       </div>
@@ -171,10 +218,13 @@ export function EditorPreviewPane({
   );
 }
 
+export const EditorPreviewPane = memo(EditorPreviewPaneComponent);
+
 type InspectorPanelProps = {
   selectedElement: CelionEditableElement | null;
   inspectorElement: CelionEditableElement | null;
   editValue: string;
+  styleValues: InspectorStyleValues;
   topRailHeight: number;
   edgeGap: number;
   onTextChange: (value: string) => void;
@@ -186,6 +236,7 @@ export function EditorInspectorPanel({
   selectedElement,
   inspectorElement,
   editValue,
+  styleValues,
   topRailHeight,
   edgeGap,
   onTextChange,
@@ -193,7 +244,7 @@ export function EditorInspectorPanel({
   onStyleChange,
 }: InspectorPanelProps) {
   return (
-    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "8px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
+    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "6px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
         <h3 style={{ fontSize: "12px", fontWeight: 650, letterSpacing: "0.06em", textTransform: "uppercase", color: "#71717a", margin: 0 }}>
           Inspector
@@ -205,6 +256,7 @@ export function EditorInspectorPanel({
       <InspectorControls
         element={inspectorElement}
         textValue={editValue}
+        styleValues={styleValues}
         onTextChange={onTextChange}
         onApplyText={onApplyText}
         onStyleChange={onStyleChange}

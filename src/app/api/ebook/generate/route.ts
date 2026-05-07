@@ -1,114 +1,46 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { getRouteSession } from "@/lib/session";
-import { EBOOK_BLUEPRINT_GEMINI_MODEL, EBOOK_GEMINI_MODEL } from "@/lib/ai/gemini";
-import { EbookGenerationError, generateEbookHtmlWithDiagnostics } from "@/lib/ebook-generation";
+import { EBOOK_GEMINI_MODEL, EBOOK_PLAN_GEMINI_MODEL } from "@/lib/ai/gemini";
+import {
+  EbookGenerationError,
+  generateEbookHtmlFromPlan,
+  generateEbookHtmlWithDiagnostics,
+  normalizePlan,
+  type EbookGenerationDiagnostics,
+} from "@/lib/ebook-generation";
+import { getEbookGenerationArgs, parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
 import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
-import { checkEbookGenerationQuota } from "@/lib/ebook-generation-quota";
-import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
-import { formatSourcesForPrompt } from "@/lib/source-ingestion";
-import { createProjectForUser, getEbookPageCountForHtml } from "@/lib/projects";
-import { SOURCE_KIND_IDS } from "@/types/project";
+import { isDatabaseUnavailableError } from "@/lib/db";
+import {
+  createProjectForUser,
+  getEbookPageCountForHtml,
+  updateProjectWithGeneratedEbook,
+} from "@/lib/projects";
+import type { ProjectSource } from "@/types/project";
 
-const MAX_TITLE_LENGTH = 200;
-const MAX_SOURCE_TEXT_LENGTH = 100_000;
-const MAX_SOURCES = 8;
-const MAX_SOURCE_CONTENT_LENGTH = 50_000;
-const MAX_TOTAL_SOURCE_CONTENT_LENGTH = 120_000;
+export { parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
 
-const sourceSchema = z.object({
-  id: z.string().min(1),
-  kind: z.enum(SOURCE_KIND_IDS),
-  name: z.string().min(1),
-  content: z.string().min(1),
-  excerpt: z.string().default(""),
-});
-
-const schema = z.object({
-  title: z.string().min(1),
-  author: z.string().default(""),
-  purpose: z.string().default(""),
-  targetAudience: z.string().default(""),
-  tone: z.string().default(""),
-  sourceText: z.string().default(""),
-  sources: z.array(sourceSchema).default([]),
-  ebookStyle: z.enum(EBOOK_STYLE_IDS),
-  accentColor: z.string().default("#6366f1"),
-});
-
-type GenerateRequestBody = z.infer<typeof schema>;
-
-type ParseGenerateRequestResult =
-  | { ok: true; data: GenerateRequestBody }
-  | { ok: false; message: string };
-
-type EbookGenerationDiagnostics = Awaited<ReturnType<typeof generateEbookHtmlWithDiagnostics>>["diagnostics"];
-
-function validateGenerateRequestLimits(data: GenerateRequestBody): string | null {
-  if (data.title.length > MAX_TITLE_LENGTH) {
-    return `Title is too long. Maximum is ${MAX_TITLE_LENGTH} characters.`;
-  }
-
-  if (data.sourceText.length > MAX_SOURCE_TEXT_LENGTH) {
-    return `Source text is too long. Maximum is ${MAX_SOURCE_TEXT_LENGTH} characters.`;
-  }
-
-  if (data.sources.length > MAX_SOURCES) {
-    return `Too many sources. Maximum is ${MAX_SOURCES}.`;
-  }
-
-  let totalSourceContentLength = 0;
-  for (const source of data.sources) {
-    if (source.content.length > MAX_SOURCE_CONTENT_LENGTH) {
-      return `Source content is too long. Maximum is ${MAX_SOURCE_CONTENT_LENGTH} characters per source.`;
-    }
-    totalSourceContentLength += source.content.length;
-  }
-
-  if (totalSourceContentLength > MAX_TOTAL_SOURCE_CONTENT_LENGTH) {
-    return `Total source content is too long. Maximum is ${MAX_TOTAL_SOURCE_CONTENT_LENGTH} characters.`;
-  }
-
-  return null;
+function logStageFor(error: unknown) {
+  if (!(error instanceof EbookGenerationError)) return "unknown";
+  return error.stage ?? "unknown";
 }
 
-function sanitizeBlueprintForLog(blueprint: EbookGenerationDiagnostics["blueprint"]) {
+function logReasonFor(error: unknown) {
+  if (!(error instanceof EbookGenerationError)) return undefined;
+  return error.reason;
+}
+
+function sanitizePlanForLog(plan: EbookGenerationDiagnostics["plan"]) {
   return {
-    ...blueprint,
-    slideCount: blueprint.slides.length,
-    slides: blueprint.slides.map((slide) => ({
+    ...plan,
+    slideCount: plan.slides.length,
+    slides: plan.slides.map((slide) => ({
       role: slide.role,
       eyebrow: slide.eyebrow,
       headline: slide.headline,
       visualDirection: slide.visualDirection,
     })),
   };
-}
-
-export async function parseEbookGenerateRequest(
-  request: Request,
-): Promise<ParseGenerateRequestResult> {
-  let json: unknown;
-  try {
-    json = await request.json();
-  } catch {
-    return { ok: false, message: "Invalid JSON" };
-  }
-
-  const parsed = schema.safeParse(json);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: parsed.error.issues[0]?.message ?? "Invalid request",
-    };
-  }
-
-  const limitError = validateGenerateRequestLimits(parsed.data);
-  if (limitError) {
-    return { ok: false, message: limitError };
-  }
-
-  return { ok: true, data: parsed.data };
 }
 
 export async function POST(request: Request) {
@@ -122,37 +54,45 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
 
-  const quota = await checkEbookGenerationQuota(session.user.id);
-  if (!quota.ok) {
-    return NextResponse.json({ message: quota.message }, { status: quota.status });
-  }
-
   const d = parsed.data;
-  const sourceText = formatSourcesForPrompt(d.sources, d.sourceText);
+  const generationArgs = getEbookGenerationArgs(d);
+  const sourceText = generationArgs.sourceText;
 
   let html: string;
   let diagnostics: EbookGenerationDiagnostics;
   try {
-    const result = await generateEbookHtmlWithDiagnostics({
-      title: d.title,
-      author: d.author,
-      purpose: d.purpose,
-      targetAudience: d.targetAudience,
-      tone: d.tone,
-      sourceText,
-      ebookStyle: d.ebookStyle,
-      accentColor: d.accentColor,
-    });
-    html = result.html;
-    diagnostics = result.diagnostics;
+    if (d.plan) {
+      const plan = normalizePlan(d.plan, generationArgs);
+      const rendered = await generateEbookHtmlFromPlan(generationArgs, plan);
+      html = rendered.html;
+      diagnostics = {
+        planModel: "approved-plan",
+        htmlModel: EBOOK_GEMINI_MODEL,
+        plan,
+        ebookDocument: rendered.ebookDocument,
+        validation: rendered.validation,
+        htmlLength: rendered.html.length,
+        slideCount: rendered.validation.slideCount,
+      };
+    } else {
+      const result = await generateEbookHtmlWithDiagnostics(generationArgs);
+      html = result.html;
+      diagnostics = result.diagnostics;
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to generate ebook";
-    const status = error instanceof EbookGenerationError && error.status === 429 ? 429 : 500;
+    const submittedPlanInvalid = Boolean(d.plan) &&
+      error instanceof EbookGenerationError &&
+      error.reason === "plan_invalid";
+    const status = submittedPlanInvalid
+      ? 400
+      : error instanceof EbookGenerationError && error.status === 429 ? 429 : 500;
     await recordEbookGenerationLog({
       userId: session.user.id,
       status: "failure",
-      stage: error instanceof EbookGenerationError ? error.stage ?? "unknown" : "unknown",
-      blueprintModel: EBOOK_BLUEPRINT_GEMINI_MODEL,
+      stage: logStageFor(error),
+      projectId: d.projectId,
+      planModel: EBOOK_PLAN_GEMINI_MODEL,
       htmlModel: EBOOK_GEMINI_MODEL,
       title: d.title,
       purpose: d.purpose,
@@ -162,7 +102,7 @@ export async function POST(request: Request) {
       sourceCount: d.sources.length,
       sourceTextLength: sourceText.length,
       validation: error instanceof EbookGenerationError ? error.validation : undefined,
-      errorReason: error instanceof EbookGenerationError ? error.reason : undefined,
+      errorReason: logReasonFor(error),
       errorMessage: message,
       errorStatus: status,
       slideCount: error instanceof EbookGenerationError ? error.pageCount : undefined,
@@ -170,14 +110,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ message }, { status });
   }
 
-  const project = await createProjectForUser(session.user.id, {
-    kind: "product",
+  const projectSources: ProjectSource[] = d.sources.length > 0
+    ? d.sources
+    : sourceText.trim()
+      ? [{ id: crypto.randomUUID(), kind: "pasted_text", name: "Source", content: sourceText, excerpt: sourceText.slice(0, 180) }]
+      : [];
+
+  const projectInput = {
     title: d.title,
     profile: {
       author: d.author,
       targetAudience: d.targetAudience,
       purpose: d.purpose,
-      designMode: "balanced",
+      designMode: "balanced" as const,
       tone: d.tone,
       ebookStyle: d.ebookStyle,
       ebookHtml: html,
@@ -185,15 +130,51 @@ export async function POST(request: Request) {
       ebookPageCount: getEbookPageCountForHtml(html),
       accentColor: d.accentColor,
     },
-    sources: d.sources.length > 0
-      ? d.sources
-      : sourceText.trim()
-        ? [{ id: crypto.randomUUID(), kind: "pasted_text", name: "Source", content: sourceText, excerpt: sourceText.slice(0, 180) }]
-        : [],
-  });
+    sources: projectSources,
+  };
+
+  let project: Awaited<ReturnType<typeof createProjectForUser>>;
+  try {
+    project = d.projectId
+      ? await updateProjectWithGeneratedEbook(session.user.id, d.projectId, projectInput)
+      : await createProjectForUser(session.user.id, projectInput);
+  } catch (error) {
+    if (!isDatabaseUnavailableError(error)) {
+      throw error;
+    }
+
+    const message = "Database is temporarily unavailable. Please retry in a moment.";
+    await recordEbookGenerationLog({
+      userId: session.user.id,
+      projectId: d.projectId,
+      status: "failure",
+      stage: "persist",
+      planModel: diagnostics.planModel,
+      htmlModel: diagnostics.htmlModel,
+      title: d.title,
+      purpose: d.purpose,
+      targetAudience: d.targetAudience,
+      ebookStyle: d.ebookStyle,
+      accentColor: d.accentColor,
+      sourceCount: d.sources.length,
+      sourceTextLength: sourceText.length,
+      plan: sanitizePlanForLog(diagnostics.plan),
+      validation: diagnostics.validation,
+      errorReason: "database_unavailable",
+      errorMessage: error instanceof Error ? error.message : message,
+      errorStatus: 503,
+      htmlLength: diagnostics.htmlLength,
+      slideCount: diagnostics.slideCount,
+    });
+
+    return NextResponse.json({ message }, { status: 503 });
+  }
 
   if (!project) {
-    return NextResponse.json({ message: "Failed to create project" }, { status: 500 });
+    return NextResponse.json(
+      { message: d.projectId ? "Project not found" : "Failed to create project" },
+      { status: d.projectId ? 404 : 500 },
+    );
   }
 
   await recordEbookGenerationLog({
@@ -201,7 +182,7 @@ export async function POST(request: Request) {
     projectId: project.id,
     status: "success",
     stage: "complete",
-    blueprintModel: diagnostics.blueprintModel,
+    planModel: diagnostics.planModel,
     htmlModel: diagnostics.htmlModel,
     title: d.title,
     purpose: d.purpose,
@@ -210,11 +191,11 @@ export async function POST(request: Request) {
     accentColor: d.accentColor,
     sourceCount: d.sources.length,
     sourceTextLength: sourceText.length,
-    blueprint: sanitizeBlueprintForLog(diagnostics.blueprint),
+    plan: sanitizePlanForLog(diagnostics.plan),
     validation: diagnostics.validation,
     htmlLength: diagnostics.htmlLength,
     slideCount: diagnostics.slideCount,
   });
 
-  return NextResponse.json({ projectId: project.id });
+  return NextResponse.json({ projectId: project.id, project });
 }

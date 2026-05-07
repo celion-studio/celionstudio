@@ -1,6 +1,6 @@
 import {
-  EBOOK_BLUEPRINT_GEMINI_MODEL,
   EBOOK_GEMINI_MODEL,
+  EBOOK_PLAN_GEMINI_MODEL,
   GeminiProviderError,
   generateJsonWithGemini,
 } from "@/lib/ai/gemini";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/ebook-document";
 import type { EbookStyle } from "@/types/project";
 
-const BLUEPRINT_MODEL = EBOOK_BLUEPRINT_GEMINI_MODEL;
+const PLAN_MODEL = EBOOK_PLAN_GEMINI_MODEL;
 
 const TONE_PROMPTS: Record<string, string> = {
   preserve: "preserve the source's voice and terminology unless clarity requires light editing",
@@ -26,7 +26,7 @@ const TONE_PROMPTS: Record<string, string> = {
   friendly: "make the writing warm, approachable, and easy to keep reading",
 };
 
-type EbookGenerationArgs = {
+export type EbookGenerationArgs = {
   title: string;
   author: string;
   purpose: string;
@@ -37,7 +37,7 @@ type EbookGenerationArgs = {
   accentColor: string;
 };
 
-type EbookBlueprintSlide = {
+export type EbookPlanSlide = {
   role: string;
   eyebrow: string;
   headline: string;
@@ -47,7 +47,7 @@ type EbookBlueprintSlide = {
   visualDirection: string;
 };
 
-type EbookBlueprint = {
+export type EbookPlan = {
   title: string;
   subtitle: string;
   author: string;
@@ -83,32 +83,32 @@ type EbookBlueprint = {
     layoutRhythm: string;
     avoid: string[];
   };
-  slides: EbookBlueprintSlide[];
+  slides: EbookPlanSlide[];
 };
 
 export type EbookGenerationDiagnostics = {
-  blueprintModel: string;
+  planModel: string;
   htmlModel: string;
-  blueprint: EbookBlueprint;
+  plan: EbookPlan;
   ebookDocument: CelionEbookDocument;
   validation: ReturnType<typeof validateUsableEbookHtml>;
   htmlLength: number;
   slideCount: number;
 };
 
-const BLUEPRINT_SYSTEM = `You are a senior editorial strategist for source-led A5 slide publications.
+const PLAN_SYSTEM = `You are a senior editorial strategist for source-led A5 slide publications.
 
 Create the plan and copy before design. Do not write HTML.
 Use the source material as the main authority: extract its argument, examples, numbers, vocabulary, method, warnings, and proof.
-The output must be a specific A5 slide publication blueprint, not a generic outline.
+The output must be a specific A5 slide publication plan, not a generic outline.
 The publication may be for selling, teaching, explaining, organizing expertise, or reporting. Do not assume a sales funnel unless the purpose says so.
 Return JSON only.`;
 
 const HTML_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designer.
 
-You receive an approved editorial blueprint.
+You receive an approved editorial plan.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
-Your job is to turn the blueprint into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
+Your job is to turn the plan into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
 Return JSON only: { "document": { "version": 1, "size": { "width": ${EBOOK_PAGE_SIZE_PX.width}, "height": ${EBOOK_PAGE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "pages": [] } }`;
 
 function tonePromptFor(tone?: string) {
@@ -135,11 +135,11 @@ function estimateSlideBudgetForSource(sourceText: string) {
   return { min: 10, max: 14, detectedSections, sourceChars };
 }
 
-function buildBlueprintPrompt(args: EbookGenerationArgs): string {
+function buildPlanPrompt(args: EbookGenerationArgs): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
   const slideBudget = estimateSlideBudgetForSource(args.sourceText);
 
-  return `Create a source-led A5 slide publication blueprint.
+  return `Create a source-led A5 slide publication plan.
 
 Reader and purpose brief:
 - Working title: ${args.title}
@@ -153,10 +153,10 @@ Reader and purpose brief:
 Source material:
 ${args.sourceText.slice(0, 36000) || "(no source provided)"}
 
-Blueprint requirements:
+Plan requirements:
 - Recommended slide budget: ${slideBudget.min}-${slideBudget.max} slides.
 - Source scale: ${slideBudget.sourceChars} characters, ${slideBudget.detectedSections} detected sections/headings.
-- First assess the source, then decide the page count. The blueprint must choose recommendedSlideCount after assessing the source, not before.
+- First assess the source, then decide the page count. The plan must choose recommendedSlideCount after assessing the source, not before.
 - The slides array should contain approximately recommendedSlideCount slides. If you recommend 20 slides, do not return 10.
 - Do not compress a long source into 10 slides. If the source has many sections, examples, steps, or warnings, preserve coverage by using the higher end of the recommended budget.
 - Cover the source's major sections and methods before summarizing. It is better to make a focused 18-22 slide guide than to discard useful material for artificial brevity.
@@ -218,21 +218,21 @@ Return JSON in exactly this shape:
 }`;
 }
 
-function buildHtmlPrompt(args: EbookGenerationArgs, blueprint: EbookBlueprint): string {
+function buildHtmlPrompt(args: EbookGenerationArgs, plan: EbookPlan): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
 
-  return `Render this approved blueprint as a finished A5 HTML/CSS slide publication.
+  return `Render this approved plan as a finished A5 HTML/CSS slide publication.
 
 Design inputs:
 - Visual mood: ${args.ebookStyle} (${stylePrompt})
 - Accent color: ${args.accentColor}
 - Page size: ${EBOOK_PAGE_SIZE_CSS_PX}
 
-Approved blueprint:
-${JSON.stringify(blueprint, null, 2)}
+Approved plan:
+${JSON.stringify(plan, null, 2)}
 
 Design direction:
-- Follow the blueprint structure and slide order exactly.
+- Follow the plan structure and slide order exactly.
 - Do not rename slide headlines.
 - Use visual hierarchy, spacing, rules, side notes, pull quotes, small tables, timelines, checklists, and typographic contrast when they clarify the content.
 - Make the cover feel intentionally designed for this source, not a fixed slot template.
@@ -277,9 +277,9 @@ function stringArrayValue(value: unknown) {
     : [];
 }
 
-function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBlueprint {
+export function normalizePlan(raw: unknown, args: EbookGenerationArgs): EbookPlan {
   if (typeof raw !== "object" || raw === null) {
-    throw new EbookGenerationError("blueprint_invalid", "Gemini Flash did not return an ebook blueprint object.");
+    throw new EbookGenerationError("plan_invalid", "Gemini Flash did not return an ebook plan object.");
   }
 
   const record = raw as Record<string, unknown>;
@@ -298,7 +298,7 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
   const slides = Array.isArray(record.slides) ? record.slides : [];
 
   const normalizedSlides = slides
-    .map((slide): EbookBlueprintSlide | null => {
+    .map((slide): EbookPlanSlide | null => {
       if (typeof slide !== "object" || slide === null) return null;
       const slideRecord = slide as Record<string, unknown>;
       const headline = stringValue(slideRecord.headline);
@@ -314,12 +314,12 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
         visualDirection: stringValue(slideRecord.visualDirection),
       };
     })
-    .filter((slide): slide is EbookBlueprintSlide => Boolean(slide));
+    .filter((slide): slide is EbookPlanSlide => Boolean(slide));
 
   if (normalizedSlides.length < 8) {
     throw new EbookGenerationError(
-      "blueprint_invalid",
-      `Gemini Flash returned an ebook blueprint with only ${normalizedSlides.length} usable slides.`,
+      "plan_invalid",
+      `Gemini Flash returned an ebook plan with only ${normalizedSlides.length} usable slides.`,
     );
   }
 
@@ -330,9 +330,9 @@ function normalizeBlueprint(raw: unknown, args: EbookGenerationArgs): EbookBluep
   const recommendedSlideCount = Math.min(24, Math.max(8, rawRecommendedSlideCount));
   if (normalizedSlides.length < recommendedSlideCount - 2) {
     throw new EbookGenerationError(
-      "blueprint_invalid",
+      "plan_invalid",
       `Gemini Flash recommended ${recommendedSlideCount} slides but only returned ${normalizedSlides.length} usable slides.`,
-      { stage: "blueprint" },
+      { stage: "plan" },
     );
   }
 
@@ -384,8 +384,8 @@ function validateUsableEbookHtml(html: string) {
   });
 }
 
-type EbookFailureReason = "gemini_call_failed" | "missing_html" | "invalid_html" | "blueprint_invalid";
-type EbookGenerationStage = "blueprint" | "html";
+type EbookFailureReason = "gemini_call_failed" | "missing_html" | "invalid_html" | "plan_invalid";
+type EbookGenerationStage = "plan" | "html";
 type EbookGenerationErrorOptions = {
   status?: number;
   stage?: EbookGenerationStage;
@@ -438,40 +438,40 @@ function failGeneration(
   throw new EbookGenerationError(reason, message, options);
 }
 
-async function generateEbookBlueprint(args: EbookGenerationArgs) {
+export async function generateEbookPlan(args: EbookGenerationArgs) {
   try {
     const raw = await generateJsonWithGemini({
-      system: BLUEPRINT_SYSTEM,
-      user: buildBlueprintPrompt(args),
-      model: BLUEPRINT_MODEL,
+      system: PLAN_SYSTEM,
+      user: buildPlanPrompt(args),
+      model: PLAN_MODEL,
       temperature: 0.75,
     });
-    return normalizeBlueprint(raw, args);
+    return normalizePlan(raw, args);
   } catch (error) {
     if (error instanceof EbookGenerationError) {
-      warnEbookGenerationFailure(error.reason, { stage: "blueprint" });
+      warnEbookGenerationFailure(error.reason, { stage: "plan" });
       throw error;
     }
 
     const details = errorDetails(error);
-    warnEbookGenerationFailure("gemini_call_failed", { stage: "blueprint", ...details });
+    warnEbookGenerationFailure("gemini_call_failed", { stage: "plan", ...details });
     const status = error instanceof GeminiProviderError ? error.status : undefined;
     return failGeneration(
       "gemini_call_failed",
       status === 429
         ? "Gemini rate limit was reached while planning the ebook. Please wait a bit and try again."
-        : "AI ebook planning failed before Gemini returned a usable blueprint.",
-      { status, stage: "blueprint" },
+        : "AI ebook planning failed before Gemini returned a usable plan.",
+      { status, stage: "plan" },
     );
   }
 }
 
-async function generateEbookHtmlFromBlueprint(args: EbookGenerationArgs, blueprint: EbookBlueprint) {
+export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan: EbookPlan) {
   let raw: unknown;
   try {
     raw = await generateJsonWithGemini({
       system: HTML_SYSTEM,
-      user: buildHtmlPrompt(args, blueprint),
+      user: buildHtmlPrompt(args, plan),
       model: EBOOK_GEMINI_MODEL,
       temperature: 1,
     });
@@ -551,14 +551,14 @@ export async function generateEbookHtml(args: EbookGenerationArgs): Promise<stri
 export async function generateEbookHtmlWithDiagnostics(
   args: EbookGenerationArgs,
 ): Promise<{ html: string; diagnostics: EbookGenerationDiagnostics }> {
-  const blueprint = await generateEbookBlueprint(args);
-  const { html, validation, ebookDocument } = await generateEbookHtmlFromBlueprint(args, blueprint);
+  const plan = await generateEbookPlan(args);
+  const { html, validation, ebookDocument } = await generateEbookHtmlFromPlan(args, plan);
   return {
     html,
     diagnostics: {
-      blueprintModel: BLUEPRINT_MODEL,
+      planModel: PLAN_MODEL,
       htmlModel: EBOOK_GEMINI_MODEL,
-      blueprint,
+      plan,
       ebookDocument,
       validation,
       htmlLength: html.length,

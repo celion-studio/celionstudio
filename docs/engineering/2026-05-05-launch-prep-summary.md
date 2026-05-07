@@ -8,7 +8,7 @@ The work focused on:
 
 - Making the marketing and pricing surfaces consistent with the current product.
 - Hardening auth/session handling before public traffic.
-- Adding baseline request and usage protection before expensive model calls.
+- Adding baseline request protection before expensive model calls.
 - Aligning Gemini configuration with the current Gemini Enterprise Agent Platform / Vertex AI path.
 - Capturing the next billing direction around Polar credits.
 
@@ -32,9 +32,8 @@ The work focused on:
   - source count
   - per-source content length
   - total source content length
-- Added a DB-backed per-user daily generation limiter using `ebook_generation_logs`.
-- Added `CELION_DAILY_GENERATION_LIMIT` to `.env.example`.
 - Removed implicit `db:init` from `npm run build:deploy`; schema initialization is now explicit.
+- Removed runtime schema mutation from request paths; schema changes now run through explicit init/migration only.
 - Documented the remaining security posture in `docs/security/security-review-2026-05-05.md`.
 
 ## Gemini / Vertex
@@ -45,8 +44,6 @@ The work focused on:
 - Updated `.env.example` to reflect the production-oriented Gemini Enterprise Agent Platform / Vertex setup.
 
 ## Billing Direction
-
-The daily generation limiter is only a temporary launch fuse.
 
 The intended paid model is credit-based:
 
@@ -77,15 +74,14 @@ The local development server was not started for visual verification because the
 Before deploying, set production environment variables for:
 
 - `VERTEX_AI_LOCATION=global` or `GOOGLE_CLOUD_LOCATION=global`
-- `CELION_DAILY_GENERATION_LIMIT`
 - production Google auth credentials or Workload Identity Federation
 - Cloudflare R2 credentials and public asset base URL
 - Neon database URL and auth configuration
+- Run `npm run db:init` with an owner/admin connection before deploying runtime traffic.
 
 ## Follow-Ups
 
 - Implement Polar credits and webhook sync before paid launch.
-- Replace the temporary daily generation quota with credit balance enforcement.
 - Add generation idempotency keys and reservation semantics.
 - Add CSP in report-only mode, review production reports, then enforce.
 - Add a small credit balance surface in the dashboard once Polar is connected.

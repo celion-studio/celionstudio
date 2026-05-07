@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { CelionEditableElement } from "@/lib/ebook-document";
-import type { RuntimeTextSelection, SelectedElementState } from "./editor-types";
+import type { InspectorStyleValues, RuntimeTextSelection, SelectedElementState } from "./editor-types";
 
 export function useEditorSelection() {
   const [selectedText, setSelectedText] = useState("");
@@ -10,6 +10,7 @@ export function useEditorSelection() {
   const [selectedElement, setSelectedElement] = useState<CelionEditableElement | null>(null);
   const [selectedPageId, setSelectedPageId] = useState("");
   const [selectedRuntimeText, setSelectedRuntimeText] = useState<RuntimeTextSelection | null>(null);
+  const [styleValues, setStyleValues] = useState<InspectorStyleValues>({});
   const [editValue, setEditValue] = useState("");
 
   const clearSelection = useCallback(() => {
@@ -19,6 +20,7 @@ export function useEditorSelection() {
     setSelectedElement(null);
     setSelectedPageId("");
     setSelectedRuntimeText(null);
+    setStyleValues({});
   }, []);
 
   const selectElement = useCallback((selection: SelectedElementState) => {
@@ -28,6 +30,11 @@ export function useEditorSelection() {
     setSelectedElement(selection.element);
     setSelectedSelector(selection.selector);
     setSelectedRuntimeText(selection.runtimeText);
+    setStyleValues(selection.styleValues ?? {});
+  }, []);
+
+  const setStyleValue = useCallback((prop: string, value: string) => {
+    setStyleValues((current) => ({ ...current, [prop]: value }));
   }, []);
 
   const inspectorElement = useMemo(() => selectedElement ?? (selectedText
@@ -47,9 +54,11 @@ export function useEditorSelection() {
     selectedElement,
     selectedPageId,
     selectedRuntimeText,
+    styleValues,
     editValue,
     inspectorElement,
     setEditValue,
+    setStyleValue,
     clearSelection,
     selectElement,
   };

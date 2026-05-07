@@ -13,9 +13,6 @@ export type ProjectStatus =
   | "revising"
   | "exported";
 
-export const PROJECT_KIND_IDS = ["product"] as const;
-export type ProjectKind = (typeof PROJECT_KIND_IDS)[number];
-
 export const SOURCE_KIND_IDS = ["pasted_text", "pdf", "md", "txt", "docx"] as const;
 export type SourceKind = (typeof SOURCE_KIND_IDS)[number];
 
@@ -45,12 +42,10 @@ export type ProjectProfile = {
 
 export type ProjectRecord = {
   id: string;
-  kind: ProjectKind;
   title: string;
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
   sources: ProjectSource[];
   profile: ProjectProfile;
-  revisionPrompt?: string;
 };

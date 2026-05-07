@@ -1,6 +1,6 @@
 export const CELION_RADIUS = {
-  control: "4px",
-  shell: "8px",
+  control: "6px",
+  shell: "6px",
   round: "50%",
 } as const;
 

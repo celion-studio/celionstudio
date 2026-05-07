@@ -99,6 +99,23 @@ export function buildPageSummariesFromDocument(document: CelionEbookDocument): P
   }));
 }
 
+export function buildPageSummariesFromElements(pages: Element[]): PageSummary[] {
+  return pages.map((page, index) => {
+    const title =
+      page.querySelector("h1, h2, h3")?.textContent?.trim() ||
+      page.querySelector("[data-text-editable]")?.textContent?.trim() ||
+      `Page ${index + 1}`;
+    const eyebrow =
+      page.querySelector(".eyebrow, .kicker")?.textContent?.trim() ||
+      formatRole(index === 0 ? "cover" : "", index);
+
+    return {
+      title: title.slice(0, 42),
+      eyebrow: eyebrow.slice(0, 24),
+    };
+  });
+}
+
 export function pickSelectableElement(page: CelionEbookPage, candidateIds: string[]) {
   const manifestById = new Map(page.manifest.editableElements.map((element) => [element.id, element]));
   const candidates = candidateIds

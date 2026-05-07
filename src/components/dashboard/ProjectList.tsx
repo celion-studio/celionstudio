@@ -1,49 +1,122 @@
 "use client";
 
+import type { CSSProperties, MouseEvent } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Trash2 } from "lucide-react";
+import { ArrowRight, Trash2 } from "lucide-react";
 import {
   CELION_COLOR,
   CELION_FONT,
-  CELION_RADIUS,
 } from "@/components/ui/celion-style";
+import { CelionIconButton } from "@/components/ui/celion-controls";
 import type { ProjectRecord } from "@/types/project";
-
-const statusLabel: Record<string, string> = {
-  draft: "Draft",
-  processing_sources: "Processing",
-  generating: "Generating",
-  ready: "Ready",
-  revising: "Revising",
-  exported: "Print opened",
-};
-
-const statusTone: Record<string, { dot: string }> = {
-  draft: { dot: "#b8b4aa" },
-  processing_sources: { dot: "#8f969f" },
-  generating: { dot: "#8f969f" },
-  ready: { dot: "#5f6670" },
-  revising: { dot: "#8f969f" },
-  exported: { dot: "#5f6670" },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const tone = statusTone[status] ?? statusTone.draft;
-
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 9px", borderRadius: CELION_RADIUS.control, fontSize: "11.5px", fontWeight: 500, fontFamily: CELION_FONT.display, background: "#f7f6f3", color: "#5f6670", border: "1px solid #e5e2dc" }}>
-      <span style={{ width: "5px", height: "5px", borderRadius: CELION_RADIUS.round, background: tone.dot, flexShrink: 0 }} />
-      {statusLabel[status] ?? status}
-    </span>
-  );
-}
 
 type ProjectListProps = {
   projects: ProjectRecord[];
   deletingProjectId?: string;
   onDeleteProject?: (project: ProjectRecord) => void;
 };
+
+const PROJECT_CARD_HEIGHT = 138;
+
+const projectGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))",
+  gap: "12px",
+  alignItems: "stretch",
+};
+
+const projectCardStyle: CSSProperties = {
+  height: `${PROJECT_CARD_HEIGHT}px`,
+  position: "relative",
+  border: `1px solid ${CELION_COLOR.lineSoft}`,
+  borderRadius: "6px",
+  background: CELION_COLOR.panel,
+  overflow: "hidden",
+};
+
+const projectLinkStyle: CSSProperties = {
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
+  textDecorationLine: "none",
+};
+
+const projectBodyStyle: CSSProperties = {
+  padding: "16px 48px 14px 16px",
+  flex: "1 1 auto",
+  minHeight: 0,
+};
+
+const projectDateStyle: CSSProperties = {
+  display: "block",
+  marginBottom: "11px",
+  fontSize: "11px",
+  letterSpacing: "0.05em",
+  color: CELION_COLOR.mutedSoft,
+  fontFamily: CELION_FONT.display,
+};
+
+const projectTitleStyle: CSSProperties = {
+  display: "-webkit-box",
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: "vertical",
+  minHeight: "42px",
+  overflow: "hidden",
+  margin: 0,
+  fontSize: "17px",
+  lineHeight: 1.24,
+  fontWeight: 500,
+  fontFamily: CELION_FONT.display,
+  color: CELION_COLOR.text,
+};
+
+const projectActionStyle: CSSProperties = {
+  height: "42px",
+  padding: "0 16px",
+  borderTop: `1px solid ${CELION_COLOR.lineSoft}`,
+  background: CELION_COLOR.panel,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "12px",
+  flexShrink: 0,
+  boxSizing: "border-box",
+};
+
+const projectActionTextStyle: CSSProperties = {
+  fontSize: "12px",
+  color: CELION_COLOR.text,
+  fontWeight: 500,
+  fontFamily: CELION_FONT.display,
+};
+
+function formatProjectDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = date.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+  const year = date.getFullYear();
+
+  return `${day} ${month} ${year}`;
+}
+
+function handleCardEnter(event: MouseEvent<HTMLElement>) {
+  event.currentTarget.style.borderColor = "#d7d2c8";
+}
+
+function handleCardLeave(event: MouseEvent<HTMLElement>) {
+  event.currentTarget.style.borderColor = CELION_COLOR.lineSoft;
+}
+
+function handleSoftActionEnter(event: MouseEvent<HTMLElement>) {
+  event.currentTarget.style.background = CELION_COLOR.panelSoft;
+}
+
+function handleSoftActionLeave(event: MouseEvent<HTMLElement>) {
+  event.currentTarget.style.background = CELION_COLOR.panel;
+}
 
 export function ProjectList({
   projects,
@@ -52,106 +125,61 @@ export function ProjectList({
 }: ProjectListProps) {
   if (projects.length === 0) return null;
 
-  const columns = ["Title", "Audience", "Tone", "Status", ""];
-
   return (
-    <div style={{ overflow: "hidden" }}>
-      <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", padding: "10px 16px", borderBottom: `1px solid ${CELION_COLOR.lineSoft}`, background: CELION_COLOR.panelSoft, borderRadius: `${CELION_RADIUS.control} ${CELION_RADIUS.control} 0 0` }}>
-        {columns.map((col) => (
-          <span key={col || "actions"} style={{ fontSize: "11px", fontWeight: 500, color: CELION_COLOR.mutedSoft, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: CELION_FONT.display }}>
-            {col}
-          </span>
-        ))}
-      </div>
-
-      {projects.map((project, i) => {
-        const isLast = i === projects.length - 1;
+    <div style={projectGridStyle}>
+      {projects.map((project) => {
         const isDeleting = deletingProjectId === project.id;
-        const title = project.title || "Untitled Draft";
-        const updatedDate = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        const updatedDateWithYear = new Date(project.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        const title = project.title || "Untitled project";
+        const updatedDate = formatProjectDate(project.updatedAt);
         const deleteButton = (
-          <button
-            type="button"
+          <CelionIconButton
             disabled={isDeleting}
+            label={`Delete ${title}`}
             title="Delete project"
-            aria-label={`Delete ${title}`}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
               onDeleteProject?.(project);
             }}
-            style={{
-              width: "30px",
-              height: "30px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: `1px solid ${CELION_COLOR.lineSoft}`,
-              borderRadius: CELION_RADIUS.control,
-              background: isDeleting ? "#F7F6F3" : CELION_COLOR.panel,
-              color: isDeleting ? "#C9C3B8" : CELION_COLOR.mutedSoft,
-              cursor: isDeleting ? "not-allowed" : "pointer",
-            }}
+            style={{ position: "absolute", top: "12px", right: "12px" }}
           >
-            <Trash2 size={13} strokeWidth={1.8} />
-          </button>
+            <Trash2 size={13} strokeWidth={1.65} />
+          </CelionIconButton>
         );
 
         return (
-          <div
+          <article
             key={project.id}
-            style={{
-              display: "block",
-              borderBottom: isLast ? "none" : `1px solid ${CELION_COLOR.controlSoft}`,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#fbfaf8")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            style={projectCardStyle}
+            onMouseEnter={handleCardEnter}
+            onMouseLeave={handleCardLeave}
           >
-            <div className="flex sm:hidden" style={{ padding: "14px 16px", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
-              <Link
-                href={`/editor/${project.id}` as Route}
-                style={{ flex: 1, minWidth: 0, textDecorationLine: "none" }}
-              >
-                <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, fontFamily: CELION_FONT.display, color: CELION_COLOR.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <Link
+              href={`/editor/${project.id}` as Route}
+              style={projectLinkStyle}
+            >
+              <div style={projectBodyStyle}>
+                {updatedDate ? (
+                  <time dateTime={project.updatedAt} style={projectDateStyle}>
+                    {updatedDate}
+                  </time>
+                ) : null}
+                <p style={projectTitleStyle}>
                   {title}
                 </p>
-                <p style={{ margin: "4px 0 0", fontSize: "12px", color: CELION_COLOR.mutedSoft }}>
-                  {project.profile.targetAudience.slice(0, 24)} / {updatedDate}
-                </p>
-              </Link>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                <StatusBadge status={project.status} />
-                {deleteButton}
               </div>
-            </div>
 
-            <div className="hidden sm:grid" style={{ gridTemplateColumns: "1fr 130px 130px 110px 44px", alignItems: "center", padding: "14px 16px" }}>
-              <Link
-                href={`/editor/${project.id}` as Route}
-                style={{ minWidth: 0, textDecorationLine: "none" }}
+              <div
+                onMouseEnter={handleSoftActionEnter}
+                onMouseLeave={handleSoftActionLeave}
+                style={projectActionStyle}
               >
-                <p style={{ margin: 0, fontSize: "13.5px", fontWeight: 500, fontFamily: CELION_FONT.display, color: CELION_COLOR.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "340px" }}>
-                  {title}
-                </p>
-                <p style={{ margin: "3px 0 0", fontSize: "11.5px", color: CELION_COLOR.mutedSoft }}>
-                  Updated {updatedDateWithYear}
-                </p>
-              </Link>
-              <span style={{ fontSize: "12.5px", color: CELION_COLOR.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.profile.targetAudience.slice(0, 18)}
-              </span>
-              <span style={{ fontSize: "12.5px", color: CELION_COLOR.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.profile.tone.slice(0, 18)}
-              </span>
-              <div>
-                <StatusBadge status={project.status} />
+                <span style={projectActionTextStyle}>Open</span>
+                <ArrowRight size={12} strokeWidth={1.75} color={CELION_COLOR.muted} />
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                {deleteButton}
-              </div>
-            </div>
-          </div>
+            </Link>
+            {deleteButton}
+          </article>
         );
       })}
     </div>

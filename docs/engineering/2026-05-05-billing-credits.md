@@ -9,7 +9,6 @@ The recommended launch direction is:
 - Polar owns checkout, subscriptions, customer state, recurring credit grants, top-ups, and usage meter visibility.
 - Celion owns the hot-path enforcement before expensive generation calls.
 - A small local credit ledger tracks reservations, debits, releases, and audit history.
-- The existing daily generation limit remains only as an abuse fuse until paid billing is live.
 
 ## Decision
 
@@ -247,7 +246,7 @@ Use "credits included" in pricing copy, not "generations included".
 
 - Add `credit_ledger`.
 - Replace the global daily quota with local balance enforcement.
-- Keep daily quota as abuse protection.
+- Use explicit credit reservations for enforcement; add abuse protection separately only if needed.
 - Add reservation and release logic around ebook generation.
 
 ### Phase 2 - Polar Sync
@@ -271,7 +270,3 @@ Use "credits included" in pricing copy, not "generations included".
 - Whether Team plans get shared organization balance or per-user balance.
 - Whether failed generations ever cost a small retry fee.
 - Whether page count, source size, or token usage should be the primary V1 pricing driver.
-
-## Current Launch Note
-
-The existing `CELION_DAILY_GENERATION_LIMIT` is not the final billing model. It is a temporary launch fuse that should remain until the credit system is enforcing requests before model calls.
