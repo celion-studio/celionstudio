@@ -85,3 +85,9 @@ Before deploying, set production environment variables for:
 - Add generation idempotency keys and reservation semantics.
 - Add CSP in report-only mode, review production reports, then enforce.
 - Add a small credit balance surface in the dashboard once Polar is connected.
+
+## 2026-05-07 MVP Hardening Update
+
+The CEL-6 hardening pass added MVP-focused protections around project writes, AI generation lifecycle, save payload limits, dashboard payload size, route error handling, CSP report-only headers, and core auth/wizard/editor accessibility.
+
+See `docs/engineering/2026-05-07-mvp-hardening.md` for the detailed summary, verification notes, and remaining follow-ups.
