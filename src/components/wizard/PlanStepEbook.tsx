@@ -116,6 +116,7 @@ export function PlanStepEbook({
 
   const visiblePlan = editing && draftPlan ? draftPlan : plan;
   const visibleAssessment = visiblePlan.sourceAssessment;
+  const cover = visiblePlan.cover;
   const strategy = visiblePlan.editorialStrategy;
   const design = visiblePlan.designBrief;
 
@@ -240,6 +241,19 @@ export function PlanStepEbook({
           <div style={{ background: "#ffffff", padding: "14px 16px" }}>
             <Field label="Language" value={visiblePlan.language} />
           </div>
+        </div>
+      </section>
+
+      <section style={{ border: "1px solid #e5e7eb", borderRadius: "6px", padding: "16px", background: "#ffffff" }}>
+        <h3 style={{ margin: "0 0 12px", fontFamily: "'Geist', sans-serif", fontSize: "13px", fontWeight: 600, color: "#17191d" }}>
+          Cover
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "12px" }}>
+          <Field label="Eyebrow" value={cover.eyebrow} />
+          <Field label="Title" value={cover.title} />
+          <Field label="Subtitle" value={cover.subtitle} />
+          <Field label="Promise" value={cover.promise} />
+          <Field label="Visual direction" value={cover.visualDirection} />
         </div>
       </section>
 

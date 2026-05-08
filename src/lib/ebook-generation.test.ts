@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EbookGenerationError, generateEbookHtml, generateEbookHtmlWithDiagnostics } from "./ebook-generation";
+import {
+  EbookGenerationError,
+  generateEbookHtml,
+  generateEbookHtmlFromPlan,
+  generateEbookHtmlWithDiagnostics,
+} from "./ebook-generation";
 import type { CelionEbookDocument } from "./ebook-document";
 import { setGeminiClientFactoryForTests } from "./ai/gemini";
 
@@ -76,13 +81,13 @@ function geminiJsonResponse(value: unknown, init: ResponseInit = {}) {
   );
 }
 
-function validEbookDocument(titlePrefix = "Founder decision"): CelionEbookDocument {
+function validEbookDocument(titlePrefix = "Founder decision", pageCount = 10): CelionEbookDocument {
   return {
     version: 1,
     title: "Source-led guide",
     size: { width: 559, height: 794, unit: "px" },
     themeCss: "",
-    pages: Array.from({ length: 10 }, (_, index) => {
+    pages: Array.from({ length: pageCount }, (_, index) => {
       const pageId = `page-${index + 1}`;
       const titleId = `${pageId}-title`;
       const bodyId = `${pageId}-body`;
@@ -90,7 +95,7 @@ function validEbookDocument(titlePrefix = "Founder decision"): CelionEbookDocume
         id: pageId,
         index,
         title: `${titlePrefix} ${index + 1}`,
-        role: index === 0 ? "cover" : index === 9 ? "cta" : "insight",
+        role: index === 0 ? "cover" : index === pageCount - 1 ? "cta" : "insight",
         version: 1,
         html: `<section data-celion-page="${pageId}" class="celion-page">
   <h1 data-celion-id="${titleId}" data-role="title" data-editable="true">${titlePrefix} ${index + 1}</h1>
@@ -147,7 +152,10 @@ function setQueuedGemini(responses: Response[], calls: string[] = [], requestBod
       async generateContent(params) {
         calls.push(`/models/${params.model}:generateContent`);
         requestBodies.push({
-          generationConfig: { temperature: params.config.temperature },
+          generationConfig: {
+            temperature: params.config.temperature,
+            httpOptions: params.config.httpOptions,
+          },
           systemInstruction: { parts: [{ text: params.config.systemInstruction }] },
           contents: [{ parts: [{ text: params.contents }] }],
         });
@@ -430,8 +438,8 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
 
-    assert.match(result.html, /cov-eyebrow/);
-    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "cov-eyebrow"));
+    assert.match(result.html, /page-1-cov-eyebrow/);
+    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "page-1-cov-eyebrow"));
   } finally {
     restoreWarn();
     globalThis.fetch = originalFetch;
@@ -501,6 +509,28 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
     assert.equal(result.diagnostics.ebookDocument.version, 1);
     assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
     assert.equal(result.diagnostics.ebookDocument.pages[0]?.id, "page-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtmlWithDiagnostics caps extra document pages to the MVP count", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  process.env.GEMINI_API_KEY = "test-key";
+  setQueuedGemini([
+    geminiJsonResponse(validPlan()),
+    geminiJsonResponse({ document: validEbookDocument("Extra page", 12) }),
+  ]);
+
+  try {
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+
+    assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
+    assert.match(result.html, /Extra page 10/i);
+    assert.doesNotMatch(result.html, /Extra page 11/i);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -585,6 +615,9 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.match(htmlPrompt, /24px vertical space between major content groups/);
     assert.match(htmlPrompt, /line-height 1\.55-1\.75/);
     assert.match(htmlPrompt, /If content feels crowded, shorten the copy/);
+    assert.match(htmlPrompt, /polished editorial card/);
+    assert.match(htmlPrompt, /one memorable visual idea/);
+    assert.match(htmlPrompt, /concrete visual structures/);
     assert.match(htmlPrompt, /Output only JSON with one "document" field/);
     assert.match(htmlPrompt, /Generate all pages in one response/);
     assert.match(htmlPrompt, /data-celion-page="\{pageId\}"/);
@@ -595,6 +628,81 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.doesNotMatch(planPrompt, /Core message:/);
     assert.doesNotMatch(htmlPrompt, /Why this matters now|The core idea|How to apply it/);
     assert.match(htmlPrompt, /Do not use color\(\), color-mix\(\), oklch\(\), lab\(\), or lch\(\)/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtmlFromPlan generates long plans in 10-page batches", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const calls: string[] = [];
+  const requestBodies: unknown[] = [];
+  process.env.GEMINI_API_KEY = "test-key";
+  const longPlan = validPlan(21, 21);
+  const longBody = "BODY_DETAIL_SHOULD_BE_COMPACTED ".repeat(160);
+  const longEvidence = "EVIDENCE_DETAIL_SHOULD_BE_COMPACTED ".repeat(120);
+  const longVisualDirection = "VISUAL_DETAIL_SHOULD_BE_COMPACTED ".repeat(90);
+  longPlan.slides = longPlan.slides.map((slide) => ({
+    ...slide,
+    body: longBody,
+    evidence: longEvidence,
+    sourceAnchors: Array.from({ length: 10 }, (_, index) => `anchor ${index + 1}`),
+    visualDirection: longVisualDirection,
+  }));
+  setQueuedGemini([
+    geminiJsonResponse({ document: validEbookDocument("Batch one", 10) }),
+    geminiJsonResponse({ document: validEbookDocument("Batch two", 10) }),
+    geminiJsonResponse({ document: validEbookDocument("Batch three", 1) }),
+  ], calls, requestBodies);
+
+  try {
+    const result = await generateEbookHtmlFromPlan(baseArgs, longPlan);
+
+    type HtmlRequestBody = {
+      generationConfig?: { httpOptions?: { timeout?: number } };
+      contents?: { parts?: { text?: string }[] }[];
+    };
+    const htmlRequests = requestBodies.slice(0, 3) as HtmlRequestBody[];
+    const htmlPrompts = htmlRequests.map((request) => request.contents?.[0]?.parts?.[0]?.text ?? "");
+
+    assert.equal(calls.length, 3);
+    assert.ok(calls.every((call) => call.includes("/models/gemini-3.1-pro-preview:generateContent")));
+    assert.ok(htmlRequests.every((request) => request.generationConfig?.httpOptions === undefined));
+    assert.equal(result.ebookDocument.pages.length, 21);
+    assert.equal(result.generationTrace.length, 3);
+    assert.deepEqual(result.generationTrace.map((trace) => trace.status), ["success", "success", "success"]);
+    assert.deepEqual(result.generationTrace.map((trace) => [trace.slideStart, trace.slideEnd]), [[1, 10], [11, 20], [21, 21]]);
+    assert.deepEqual(result.generationTrace.map((trace) => trace.pageCount), [10, 10, 1]);
+    assert.ok(result.generationTrace.every((trace) => trace.durationMs !== undefined && trace.durationMs >= 0));
+    assert.ok(result.generationTrace.every((trace) => trace.promptLength > 0));
+    assert.equal(result.generationTrace[2]?.slideHeadlines[0], "Source-led decision 21");
+    assert.deepEqual(result.ebookDocument.pages.map((page) => page.id), Array.from({ length: 21 }, (_, index) => `page-${index + 1}`));
+    assert.match(result.html, /Batch one 10/i);
+    assert.match(result.html, /Batch two 10/i);
+    assert.match(result.html, /Batch three 1/i);
+
+    assert.match(htmlPrompts[0] ?? "", /Batch 1 of 3/);
+    assert.match(htmlPrompts[0] ?? "", /Source-led decision 1/);
+    assert.match(htmlPrompts[0] ?? "", /Source-led decision 10/);
+    assert.doesNotMatch(htmlPrompts[0] ?? "", /Source-led decision 11/);
+
+    assert.match(htmlPrompts[1] ?? "", /Batch 2 of 3/);
+    assert.match(htmlPrompts[1] ?? "", /Source-led decision 11/);
+    assert.match(htmlPrompts[1] ?? "", /Source-led decision 20/);
+    assert.doesNotMatch(htmlPrompts[1] ?? "", /Source-led decision 10/);
+
+    assert.match(htmlPrompts[2] ?? "", /Batch 3 of 3/);
+    assert.match(htmlPrompts[2] ?? "", /Source-led decision 21/);
+    assert.doesNotMatch(htmlPrompts[2] ?? "", /Source-led decision 20/);
+
+    assert.match(htmlPrompts[0] ?? "", /BODY_DETAIL_SHOULD_BE_COMPACTED/);
+    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longBody.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longEvidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longVisualDirection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(htmlPrompts[0] ?? "", /anchor 9/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -614,6 +722,7 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
   setQueuedGemini([
     geminiJsonResponse(validPlan(20, 20)),
     geminiJsonResponse({ document: validEbookDocument() }),
+    geminiJsonResponse({ document: validEbookDocument() }),
   ], calls, requestBodies);
 
   try {
@@ -626,7 +735,7 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
     assert.match(planPrompt, /Recommended slide budget: 18-22 slides/);
     assert.match(planPrompt, /The plan must choose recommendedSlideCount after assessing the source/);
     assert.match(planPrompt, /Do not compress a long source into 10 slides/);
-    assert.doesNotMatch(planPrompt, /Make 8-14 slides total/);
+    assert.doesNotMatch(planPrompt, /Return exactly 10 slides|prioritize the source's highest-value sections/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -634,22 +743,37 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
   }
 });
 
-test("generateEbookHtml rejects plans that ignore their own recommended slide count", async () => {
+test("generateEbookHtml batches plans that exceed the generation page count", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
-  const restoreWarn = muteConsoleWarn();
+  const requestBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validPlan(10, 20)),
-  ]);
+    geminiJsonResponse(validPlan(20, 20)),
+    geminiJsonResponse({ document: validEbookDocument("Founder decision", 10) }),
+    geminiJsonResponse({ document: validEbookDocument("Founder decision", 10) }),
+  ], [], requestBodies);
 
   try {
-    await assert.rejects(
-      () => generateEbookHtml(baseArgs),
-      /recommended 20 slides but only returned 10/,
-    );
+    const html = await generateEbookHtml(baseArgs);
+    const firstHtmlRequest = requestBodies[1] as {
+      contents?: { parts?: { text?: string }[] }[];
+    };
+    const secondHtmlRequest = requestBodies[2] as typeof firstHtmlRequest;
+    const firstHtmlPrompt = firstHtmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+    const secondHtmlPrompt = secondHtmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+
+    assert.match(html, /Founder decision 10/);
+    assert.match(html, /data-slide="20"/);
+    const firstBatchHeadlines = firstHtmlPrompt.match(/Source-led decision \d+/g) ?? [];
+    const secondBatchHeadlines = secondHtmlPrompt.match(/Source-led decision \d+/g) ?? [];
+    assert.equal(firstBatchHeadlines.length, 10);
+    assert.equal(secondBatchHeadlines.length, 10);
+    assert.ok(firstBatchHeadlines.includes("Source-led decision 1"));
+    assert.ok(firstBatchHeadlines.includes("Source-led decision 10"));
+    assert.ok(secondBatchHeadlines.includes("Source-led decision 11"));
+    assert.ok(secondBatchHeadlines.includes("Source-led decision 20"));
   } finally {
-    restoreWarn();
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = originalApiKey;

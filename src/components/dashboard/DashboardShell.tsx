@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, FileText } from "lucide-react";
+import { useNeonAuthVerifierRedirect } from "@/components/auth/use-neon-auth-verifier";
 import { authClient } from "@/lib/auth-client";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { ProjectList } from "@/components/dashboard/ProjectList";
@@ -61,6 +62,20 @@ export function DashboardShell({
   const visibleError = error || createProjectError;
   const showLoading = loading;
   const copy = workspaceCopy;
+  const dashboardVerifierRedirect = useCallback(() => {
+    const next = new URLSearchParams(window.location.search);
+    next.delete("neon_auth_session_verifier");
+    return next.size > 0 ? `/dashboard?${next.toString()}` : "/dashboard";
+  }, []);
+  const handleVerifierError = useCallback(() => {
+    setLoading(false);
+  }, []);
+
+  useNeonAuthVerifierRedirect({
+    enabled: hasVerifier,
+    redirectTo: dashboardVerifierRedirect,
+    onError: handleVerifierError,
+  });
 
   async function fetchProjects() {
     const response = await fetch("/api/projects", {
@@ -79,36 +94,6 @@ export function DashboardShell({
       cache: "no-store",
     });
   }
-
-  useEffect(() => {
-    if (!hasVerifier) return;
-
-    let active = true;
-
-    async function finalizeSession() {
-      try {
-        const result = await authClient.getSession();
-
-        if (!result?.error && active) {
-          const next = new URLSearchParams(searchParams.toString());
-          next.delete("neon_auth_session_verifier");
-          const path = next.size > 0 ? `/dashboard?${next.toString()}` : "/dashboard";
-          window.location.replace(path);
-        }
-      } catch {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void finalizeSession();
-
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (hasVerifier) {

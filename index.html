@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>비싼 AI 모델을 계속 써도 될까?</title>
+<style>
+:root {
+  --bg: #F9F6F1;
+  --text: #1C1B18;
+  --accent: #B73B32;
+  --muted: #8F877D;
+  --surface: #F2EDE4;
+  --rule: #D9D2C6;
+  --text-light: #5C5852;
+}
+
+body {
+  margin: 0;
+  padding: 40px 0;
+  background: #F0EBE3;
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.card {
+  width: 559px;
+  height: 794px;
+  background: var(--bg);
+  margin: 0 auto 60px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 30px rgba(0,0,0,0.08);
+  box-sizing: border-box;
+}
+
+/* Typography */
+h1, h2, h3 {
+  font-weight: 800;
+  margin: 0;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--text-light);
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Card 01 - Cover */
+.card-01 {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 72px 56px;
+}
+
+.card-01 .spine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.card-01 .tag {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 44px;
+  letter-spacing: 0.1em;
+}
+
+.card-01 h1 {
+  font-size: 43px;
+  line-height: 1.18;
+  margin-bottom: 26px;
+}
+
+.card-01 .subtitle {
+  font-size: 18px;
+  color: var(--text-light);
+  font-weight: 500;
+  margin-bottom: 56px;
+  line-height: 1.55;
+}
+
+.card-01 .divider {
+  width: 56px;
+  height: 2px;
+  background: var(--rule);
+  margin-bottom: 36px;
+}
+
+.card-01 .meta {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.card-01 .num {
+  position: absolute;
+  bottom: 56px;
+  right: 56px;
+  font-size: 128px;
+  font-weight: 900;
+  color: #EDE7DC;
+  line-height: 1;
+}
+
+/* Card 02 - Problem */
+.card-02 {
+  padding: 52px 52px 60px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-02 .section-label {
+  margin-bottom: 32px;
+}
+
+.card-02 .main {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.35;
+  margin-bottom: 12px;
+}
+
+.card-02 .highlight {
+  font-size: 39px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1.1;
+  margin: 16px 0 28px;
+}
+
+.card-02 .body {
+  font-size: 14.5px;
+  line-height: 1.75;
+  margin-bottom: 28px;
+}
+
+.card-02 .stat {
+  background: #F5EDE8;
+  padding: 22px 24px;
+  margin-bottom: 26px;
+}
+
+.card-02 .stat-number {
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.card-02 .stat-text {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.card-02 .footnote {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.65;
+  border-top: 1px solid var(--rule);
+  padding-top: 20px;
+  margin-top: auto;
+}
+
+/* Card 03 - Insight */
+.card-03 {
+  padding: 52px 52px;
+}
+
+.card-03 .heading {
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.32;
+  margin-bottom: 42px;
+}
+
+.card-03 .bars {
+  margin: 32px 0;
+}
+
+.card-03 .bar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.card-03 .bar-1 { background: var(--surface); color: var(--text-light); }
+.card-03 .bar-2 { background: #F5EDE8; color: var(--text); }
+.card-03 .bar-3 { background: var(--accent); color: #F9F6F1; }
+
+.card-03 .quote {
+  font-family: "Apple SD Gothic Neo", serif;
+  font-size: 16.5px;
+  font-weight: 500;
+  line-height: 1.68;
+  border-top: 2px solid var(--text);
+  padding-top: 26px;
+  margin-top: 38px;
+}
+
+/* Card 04 - Framework */
+.card-04 {
+  padding: 52px 48px;
+}
+
+.card-04 .heading {
+  font-size: 25px;
+  line-height: 1.3;
+  margin-bottom: 38px;
+}
+
+.card-04 .heading span {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-thickness: 2px;
+}
+
+.card-04 .zones {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 36px;
+}
+
+.card-04 .zone {
+  flex: 1;
+  padding: 22px 18px;
+}
+
+.card-04 .zone-low {
+  background: var(--surface);
+  border-left: 3px solid var(--muted);
+}
+
+.card-04 .zone-high {
+  background: #F5EDE8;
+  border-left: 3px solid var(--accent);
+}
+
+.card-04 .zone-header {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.card-04 .zone-body {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-light);
+  margin-bottom: 14px;
+}
+
+.card-04 .zone-tag {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.card-04 .zone-low .zone-tag { color: var(--muted); }
+.card-04 .zone-high .zone-tag { color: var(--accent); }
+
+.card-04 .axiom {
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 20px 18px;
+  background: #F9F6F1;
+  border: 1px solid var(--rule);
+}
+
+/* Card 05 - Comparison */
+.card-05 {
+  padding: 48px 44px;
+}
+
+.card-05 .heading {
+  font-size: 24px;
+  margin-bottom: 30px;
+}
+
+.card-05 table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 30px;
+}
+
+.card-05 th {
+  font-weight: 700;
+  color: var(--text);
+  text-align: left;
+  padding: 12px 8px;
+  border-bottom: 2px solid var(--text);
+}
+
+.card-05 td {
+  padding: 13px 8px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+  line-height: 1.55;
+  color: var(--text-light);
+}
+
+.card-05 .col-accent {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.card-05 .footnote {
+  font-size: 13px;
+  color: var(--text-light);
+  line-height: 1.7;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+/* Card 06 - Architecture */
+.card-06 {
+  padding: 52px 48px;
+}
+
+.card-06 .heading {
+  font-size: 25px;
+  margin-bottom: 36px;
+}
+
+.card-06 .batch-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 36px;
+}
+
+.card-06 .batch {
+  flex: 1;
+  padding: 20px 16px;
+  font-size: 13px;
+}
+
+.card-06 .batch-1 { background: var(--surface); }
+.card-06 .batch-2 { background: #F5EDE8; }
+.card-06 .batch-3 { background: var(--surface); border: 1px dashed var(--muted); }
+
+.card-06 .batch-num {
+  font-size: 27px;
+  font-weight: 900;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.card-06 .step {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 15px;
+}
+
+.card-06 .step-num {
+  width: 22px;
+  height: 22px;
+  background: var(--text);
+  color: #F9F6F1;
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-06 .step-text {
+  font-size: 14px;
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+/* Card 07 - Cost Lens */
+.card-07 {
+  padding: 52px 48px;
+}
+
+.card-07 .heading {
+  font-size: 25px;
+  margin-bottom: 32px;
+}
+
+.card-07 .phase {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 16px 18px;
+  background: var(--surface);
+}
+
+.card-07 .phase:last-child {
+  background: #F5EDE8;
+  border-left: 3px solid var(--accent);
+}
+
+.card-07 .phase-num {
+  width: 28px;
+  height: 28px;
+  background: var(--text);
+  color: #F9F6F1;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-07 .phase-num.accent { background: var(--accent); }
+
+.card-07 .phase-content {
+  flex: 1;
+}
+
+.card-07 .phase-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.card-07 .phase-model {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.card-07 .phase-model.accent { color: var(--accent); }
+
+/* Card 08 - Decision Rule */
+.card-08 {
+  padding: 48px 46px;
+}
+
+.card-08 .heading {
+  font-size: 24px;
+  margin-bottom: 28px;
+}
+
+.card-08 .cols {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.card-08 .col {
+  flex: 1;
+  padding: 20px 16px;
+}
+
+.card-08 .col-yes {
+  background: #F5EDE8;
+  border-top: 3px solid var(--accent);
+}
+
+.card-08 .col-no {
+  background: var(--surface);
+  border-top: 3px solid var(--muted);
+}
+
+.card-08 .col-header {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+
+.card-08 .col-yes .col-header { color: var(--accent); }
+.card-08 .col-no .col-header { color: var(--muted); }
+
+.card-08 ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.card-08 li {
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 8px 0 8px 18px;
+  position: relative;
+  border-bottom: 1px solid var(--rule);
+}
+
+.card-08 li:last-child { border-bottom: none; }
+
+.card-08 li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+}
+
+.card-08 .col-no li::before { background: var(--muted); }
+
+.card-08 .rule {
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 18px 16px;
+  border: 1px solid var(--rule);
+}
+
+/* Card 09 - Practical Setup */
+.card-09 {
+  padding: 52px 48px;
+}
+
+.card-09 .heading {
+  font-size: 26px;
+  margin-bottom: 28px;
+}
+
+.card-09 .combo {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.card-09 .combo-item {
+  flex: 1;
+  padding: 18px 14px;
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.card-09 .combo-item.strong { background: #F5EDE8; }
+.card-09 .combo-item.premium { background: var(--text); color: #F9F6F1; }
+
+.card-09 .combo-badge {
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.card-09 .combo-item.premium .combo-badge { color: #C8BEB3; }
+.card-09 .combo-item.strong .combo-badge { color: var(--accent); }
+
+.card-09 .combo-role {
+  font-size: 19px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.card-09 .combo-item.premium .combo-role { color: #F9F6F1; }
+
+.card-09 .divider {
+  height: 1px;
+  background: var(--rule);
+  margin-bottom: 22px;
+}
+
+.card-09 .checklist-title {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+
+.card-09 .checklist-item {
+  font-size: 13.5px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--text-light);
+}
+
+.card-09 .checklist-item:last-child { border-bottom: none; }
+
+/* Card 10 - Closing */
+.card-10 {
+  background: var(--text);
+  color: #F9F6F1;
+  padding: 64px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.card-10 .spine {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.card-10 .quote-mark {
+  font-size: 68px;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.card-10 .quote {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1.38;
+  margin-bottom: 42px;
+}
+
+.card-10 .quote .accent {
+  color: var(--accent);
+}
+
+.card-10 .divider {
+  width: 52px;
+  height: 2px;
+  background: var(--accent);
+  margin-bottom: 32px;
+}
+
+.card-10 .closing-text {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: #B8B0A5;
+}
+
+.card-10 .footer {
+  position: absolute;
+  bottom: 56px;
+  left: 56px;
+  font-size: 12px;
+  color: rgba(249,246,241,0.35);
+}
+</style>
+</head>
+<body>
+
+<!-- Card 01: Cover -->
+<div class="card card-01">
+  <div class="spine"></div>
+  <div class="tag">MVP AI — 실전 가이드</div>
+  <h1>비싼 AI 모델,<br>계속 써도 될까?</h1>
+  <p class="subtitle">MVP에서 모델 선택을 다시 생각하는 법</p>
+  <div class="divider"></div>
+  <p class="meta">1인 창업자와 작은 팀을 위한<br>실용적 모델 선택 프레임워크</p>
+  <div class="num">01</div>
+</div>
+
+<!-- Card 02: Problem -->
+<div class="card card-02">
+  <div class="label">문제</div>
+  <div class="main">모델 성능보다<br>먼저 터지는 것은</div>
+  <div class="highlight">비용과<br>타임아웃이다</div>
+  <p class="body">MVP 단계에서 가장 흔한 실패 원인은 모델의 지능 부족이 아니다. 사용자가 결과를 기다리다 이탈하고, API 비용이 예상치를 넘기고, 30초가 넘는 응답에 프론트엔드가 멈추는 것이다.</p>
+  <div class="stat">
+    <div class="stat-number">3초</div>
+    <div class="stat-text">응답 지연 1초마다<br>이탈률은 약 7% 증가한다</div>
+  </div>
+  <p class="body" style="margin-bottom: 0;">비싼 모델일수록 latency가 길고, 긴 응답은 실패 확률을 높인다. MVP의 적은 품질 문제가 아니라 <strong style="color:#1C1B18;">시스템 안정성</strong> 문제다.</p>
+  <p class="footnote">* GPT-4o 기준 평균 응답 시간은 3–8초. 긴 컨텍스트나 복잡한 추론이 들어가면 15–30초까지 늘어난다.</p>
+</div>
+
+<!-- Card 03: Insight -->
+<div class="card card-03">
+  <div class="label">인사이트</div>
+  <h2 class="heading">한 번에 큰 결과물을<br>만들수록 비싼 모델도<br>불안정해진다</h2>
+  
+  <div class="bars">
+    <div class="bar bar-1">
+      <span>짧은 응답 (1–2문단)</span>
+      <span style="font-weight:700;">실패율 낮음</span>
+    </div>
+    <div class="bar bar-2">
+      <span>중간 응답 (5–10문단)</span>
+      <span style="font-weight:700;">불안정 구간</span>
+    </div>
+    <div class="bar bar-3">
+      <span>긴 응답 (15문단 이상)</span>
+      <span style="font-weight:700;">실패율 높음</span>
+    </div>
+  </div>
+
+  <div class="quote">
+    “비싼 모델에 긴 결과물을 한 번에 요청하는 것은 마라톤을 전력 질주로 뛰는 것과 같다. 초반에 지쳐 넘어질 확률이 높다.”
+  </div>
+  <p style="margin-top:26px;font-size:12px;color:#8F877D;line-height:1.6;">출력 토큰이 길어질수록 latency는 선형 이상으로 증가하고, 중간에 hallucination이나 구조 이탈이 발생할 확률도 함께 올라간다.</p>
+</div>
+
+<!-- Card 04: Framework -->
+<div class="card card-04">
+  <div class="label">프레임워크</div>
+  <h2 class="heading">모델 선택 기준은<br>“품질”이 아니라<br><span>“실패 비용”이다</span></h2>
+  
+  <div class="zones">
+    <div class="zone zone-low">
+      <div class="zone-header">실패 비용 낮음</div>
+      <p class="zone-body">결과가 틀려도 사용자 경험에 치명적이지 않은 작업. 내부 초안, 아이디어 브레인스토밍, 형식 변환 등.</p>
+      <div class="zone-tag">→ 싼 모델로 충분</div>
+    </div>
+    <div class="zone zone-high">
+      <div class="zone-header">실패 비용 높음</div>
+      <p class="zone-body">결과가 사용자에게 바로 노출되고, 오류가 신뢰를 무너뜨리는 작업. 최종 출력, 고객 응대, 결제 관련 텍스트 등.</p>
+      <div class="zone-tag">→ 고급 모델 검토</div>
+    </div>
+  </div>
+  
+  <div class="axiom">
+    핵심 원칙: 모델을 고르는 기준은 <span style="text-decoration:line-through;color:#8F877D;">얼마나 똑똑한가</span>가 아니라 <strong style="color:#B73B32;">실패했을 때 얼마나 큰 손해인가</strong>이다.
+  </div>
+</div>
+
+<!-- Card 05: Comparison -->
+<div class="card card-05">
+  <div class="label">비교</div>
+  <h2 class="heading">세 가지 모델 역할의<br>분업 구조</h2>
+  
+  <table>
+    <tr>
+      <th></th>
+      <th>Cheap Model</th>
+      <th>Strong Renderer</th>
+      <th class="col-accent">Premium Fallback</th>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:#8F877D;">역할</td>
+      <td>계획·초안·분류</td>
+      <td>핵심 생성·렌더링</td>
+      <td class="col-accent">최종 폴리시·구조 교정</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:#8F877D;">예시 모델</td>
+      <td>GPT-4o mini<br>Claude Haiku</td>
+      <td>GPT-4o<br>Claude Sonnet</td>
+      <td class="col-accent">Claude Opus<br>GPT-4o (고온도)</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:#8F877D;">비용</td>
+      <td>$0.15–0.60/M</td>
+      <td>$3–8/M</td>
+      <td class="col-accent">$15+/M</td>
+    </tr>
+    <tr>
+      <td style="font-weight:700;color:#8F877D;">호출 빈도</td>
+      <td>매 요청마다</td>
+      <td>핵심 경로에서만</td>
+      <td class="col-accent">실패 복구 시에만</td>
+    </tr>
+  </table>
+  
+  <p class="footnote">핵심은 계층화다. 모든 요청을 비싼 모델로 처리하지 않고, 역할에 따라 모델을 분리하면 전체 비용은 70% 이상 줄이면서 품질은 유지할 수 있다.</p>
+</div>
+
+<!-- Card 06: Architecture -->
+<div class="card card-06">
+  <div class="label">아키텍처</div>
+  <h2 class="heading">긴 결과물은<br>3–5장 단위로<br>쪼개야 한다</h2>
+  
+  <div class="batch-row">
+    <div class="batch batch-1">
+      <div class="batch-num">01</div>
+      <div><strong>Batch 1</strong><br>3–5장</div>
+    </div>
+    <div class="batch batch-2">
+      <div class="batch-num">02</div>
+      <div><strong>Batch 2</strong><br>3–5장</div>
+    </div>
+    <div class="batch batch-3">
+      <div class="batch-num">03</div>
+      <div><strong>Batch N</strong><br>3–5장</div>
+    </div>
+  </div>
+  
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-text">각 batch는 독립적으로 처리되므로 하나가 실패해도 전체가 무너지지 않는다.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-text">Batch 단위로 cheap model이 초안을 잡고, strong renderer가 다듬는다.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-text">최종 조립 단계에서만 premium fallback으로 일관성과 톤을 맞춘다.</div>
+  </div>
+  
+  <p style="margin-top:28px;font-size:12px;color:#8F877D;line-height:1.6;">작은 batch 구조는 latency를 예측 가능하게 만들고, 사용자에게 점진적 로딩이라는 더 나은 경험을 제공한다.</p>
+</div>
+
+<!-- Card 07: Cost Lens -->
+<div class="card card-07">
+  <div class="label">비용 관점</div>
+  <h2 class="heading">단계별로 모델을 다르게 쓴다</h2>
+  
+  <div class="phase">
+    <div class="phase-num">01</div>
+    <div class="phase-content">
+      <div class="phase-title">Planning</div>
+      <div style="font-size:13px;color:#5C5852;">구조 설계, 섹션 분할, 프롬프트 체인 설계</div>
+      <div class="phase-model">→ Cheap Model</div>
+    </div>
+  </div>
+  
+  <div class="phase">
+    <div class="phase-num">02</div>
+    <div class="phase-content">
+      <div class="phase-title">Drafting</div>
+      <div style="font-size:13px;color:#5C5852;">Batch 단위 초안 생성, 구조 채우기</div>
+      <div class="phase-model">→ Strong Renderer</div>
+    </div>
+  </div>
+  
+  <div class="phase">
+    <div class="phase-num">03</div>
+    <div class="phase-content">
+      <div class="phase-title">Rendering</div>
+      <div style="font-size:13px;color:#5C5852;">본문 생성, 포맷팅, 톤 일관성 확보</div>
+      <div class="phase-model">→ Strong Renderer</div>
+    </div>
+  </div>
+  
+  <div class="phase">
+    <div class="phase-num accent">04</div>
+    <div class="phase-content">
+      <div class="phase-title">Polishing</div>
+      <div style="font-size:13px;color:#5C5852;">최종 검토, 구조 이탈 교정, edge case 처리</div>
+      <div class="phase-model accent">→ Premium Fallback</div>
+    </div>
+  </div>
+  
+  <p style="margin-top:24px;font-size:12px;color:#8F877D;line-height:1.65;">비용 비율은 대략 planning 5% : drafting 60% : rendering 25% : polishing 10%. Premium model은 전체 토큰의 10% 이내에서만 사용한다.</p>
+</div>
+
+<!-- Card 08: Decision Rule -->
+<div class="card card-08">
+  <div class="label">판단 기준</div>
+  <h2 class="heading">MVP에서<br>Premium Model<br>써도 되는가?</h2>
+  
+  <div class="cols">
+    <div class="col col-yes">
+      <div class="col-header">써도 되는 경우</div>
+      <ul>
+        <li>결과가 사용자에게 최종 노출되는 구간</li>
+        <li>이전 단계에서 cheap/strong 모델이 실패한 fallback</li>
+        <li>전체 결과물의 톤·일관성 교정 (조립 단계)</li>
+        <li>토큰 수가 적고 latency가 짧은 작업</li>
+        <li>오류 발생 시 비즈니스 손실이 큰 영역</li>
+      </ul>
+    </div>
+    <div class="col col-no">
+      <div class="col-header">쓰면 안 되는 경우</div>
+      <ul>
+        <li>모든 요청의 기본 모델로 설정</li>
+        <li>내부 초안·브레인스토밍 용도</li>
+        <li>긴 컨텍스트를 한 번에 처리</li>
+        <li>실시간 응답이 필요한 인터랙션</li>
+        <li>구조가 단순하고 cheap model로도 가능한 작업</li>
+      </ul>
+    </div>
+  </div>
+  
+  <div class="rule">
+    엄지 원칙: premium model은 전체 API 호출의 5–10%를 넘기지 않는다. 넘는다면 파이프라인 설계를 의심하라.
+  </div>
+</div>
+
+<!-- Card 09: Practical Setup -->
+<div class="card card-09">
+  <div class="label">실전 구성</div>
+  <h2 class="heading">추천 조합</h2>
+  
+  <div class="combo">
+    <div class="combo-item">
+      <div class="combo-badge">Cheap</div>
+      <div class="combo-role">Planner</div>
+      <div style="font-size:12px;color:#5C5852;">구조 설계, 청크 분할, 프롬프트 체인 제어</div>
+    </div>
+    <div style="font-size:22px;font-weight:700;color:#8F877D;padding-top:28px;">+</div>
+    <div class="combo-item strong">
+      <div class="combo-badge">Strong</div>
+      <div class="combo-role">Renderer</div>
+      <div style="font-size:12px;color:#5C5852;">Batch 단위 생성, 포맷팅, 기본 품질 확보</div>
+    </div>
+    <div style="font-size:22px;font-weight:700;color:#8F877D;padding-top:28px;">+</div>
+    <div class="combo-item premium">
+      <div class="combo-badge">Premium</div>
+      <div class="combo-role">Fallback</div>
+      <div style="font-size:12px;color:#C8BEB3;">톤 통일, 구조 교정, edge case 복구</div>
+    </div>
+  </div>
+  
+  <div class="divider"></div>
+  
+  <div class="checklist-title">MVP 파이프라인 체크리스트</div>
+  <div class="checklist-item">□ 모든 요청이 cheap model을 기본으로 거치는가?</div>
+  <div class="checklist-item">□ 긴 출력은 3–5장 단위 batch로 분할되는가?</div>
+  <div class="checklist-item">□ Premium model 호출 비율이 10% 미만인가?</div>
+  <div class="checklist-item">□ 각 batch 실패 시 재시도/fallback 경로가 있는가?</div>
+  <div class="checklist-item">□ 사용자에게 점진적 결과를 보여주는가?</div>
+</div>
+
+<!-- Card 10: Closing -->
+<div class="card card-10">
+  <div class="spine"></div>
+  <div class="quote-mark">“</div>
+  <div class="quote">
+    좋은 AI 제품은<br>
+    가장 비싼 모델이 아니라<br>
+    <span class="accent">가장 덜 실패하는</span><br>
+    파이프라인에서 나온다
+  </div>
+  
+  <div class="divider"></div>
+  
+  <p class="closing-text">MVP에서 중요한 것은 모델의 스펙이 아니라 파이프라인의 복원력이다. 싼 모델로 구조를 잡고, strong renderer로 살을 붙이고, premium fallback으로 마지막 광을 내는 3단계 구조가 결국 가장 빠르고, 가장 저렴하고, 가장 안정적이다.</p>
+  
+  <div class="footer">MVP AI 실전 가이드 — 2026</div>
+</div>
+
+</body>
+</html>

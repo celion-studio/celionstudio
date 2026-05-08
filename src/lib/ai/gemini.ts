@@ -8,7 +8,6 @@ export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 export const EBOOK_PLAN_GEMINI_MODEL = "gemini-2.5-flash-lite";
 export const EBOOK_GEMINI_MODEL = "gemini-3.1-pro-preview";
 const DEFAULT_VERTEX_AI_LOCATION = "global";
-const DEFAULT_GEMINI_TIMEOUT_MS = 120_000;
 
 export type GeminiErrorCode =
   | "GEMINI_AUTH_ERROR"
@@ -47,6 +46,8 @@ type GeminiEnv = {
   GCP_SERVICE_ACCOUNT_EMAIL?: string;
   GCP_WORKLOAD_IDENTITY_POOL_ID?: string;
   GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID?: string;
+  VERCEL?: string;
+  VERCEL_ENV?: string;
 };
 
 type GenAiGenerateContentParams = {
@@ -56,7 +57,7 @@ type GenAiGenerateContentParams = {
     systemInstruction: string;
     responseMimeType: string;
     temperature: number;
-    httpOptions: {
+    httpOptions?: {
       timeout: number;
     };
   };
@@ -183,9 +184,14 @@ function wifConfigFromEnv(options: GenerateJsonWithGeminiOptions) {
   return { projectNumber, serviceAccountEmail, poolId, providerId };
 }
 
+function isVercelRuntime(options: GenerateJsonWithGeminiOptions) {
+  return envValue(options, "VERCEL") === "1" || Boolean(envValue(options, "VERCEL_ENV"));
+}
+
 function createVercelWifAuthClient(options: GenerateJsonWithGeminiOptions) {
   const wifConfig = wifConfigFromEnv(options);
   if (!wifConfig) return undefined;
+  if (!isVercelRuntime(options)) return undefined;
 
   const authClient = ExternalAccountClient.fromJSON({
     type: "external_account",
@@ -236,6 +242,9 @@ export async function generateJsonWithGemini(
   const system = trimRequired(options.system, "system");
   const user = trimRequired(options.user, "user");
   const client = createVertexGenAiClient(options);
+  const httpOptions = typeof options.timeoutMs === "number"
+    ? { timeout: options.timeoutMs }
+    : undefined;
 
   let text: string | undefined;
   try {
@@ -246,9 +255,7 @@ export async function generateJsonWithGemini(
         systemInstruction: system,
         responseMimeType: "application/json",
         temperature: options.temperature ?? 0.2,
-        httpOptions: {
-          timeout: options.timeoutMs ?? DEFAULT_GEMINI_TIMEOUT_MS,
-        },
+        ...(httpOptions ? { httpOptions } : {}),
       },
     });
     text = response.text;

@@ -77,9 +77,6 @@ test("generateJsonWithGemini calls the Google Gen AI SDK with Vertex options", a
         systemInstruction: "Return JSON only.",
         responseMimeType: "application/json",
         temperature: 0.2,
-        httpOptions: {
-          timeout: 120000,
-        },
       },
     });
   } finally {
@@ -110,6 +107,7 @@ test("generateJsonWithGemini configures Vercel OIDC Workload Identity Federation
         GCP_SERVICE_ACCOUNT_EMAIL: "vercel@celion-prod.iam.gserviceaccount.com",
         GCP_WORKLOAD_IDENTITY_POOL_ID: "vercel",
         GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: "vercel",
+        VERCEL: "1",
       },
     });
 
@@ -118,6 +116,41 @@ test("generateJsonWithGemini configures Vercel OIDC Workload Identity Federation
     };
     assert.equal(options.googleAuthOptions?.projectId, "celion-prod");
     assert.ok(options.googleAuthOptions?.authClient);
+  } finally {
+    setGeminiClientFactoryForTests(undefined);
+  }
+});
+
+test("generateJsonWithGemini ignores Vercel OIDC config outside Vercel runtime", async () => {
+  const clientOptions: unknown[] = [];
+  setGeminiClientFactoryForTests((options) => {
+    clientOptions.push(options);
+    return {
+      models: {
+        async generateContent() {
+          return { text: '{"ok":true}' };
+        },
+      },
+    };
+  });
+
+  try {
+    await generateJsonWithGemini({
+      system: "Return JSON only.",
+      user: "Build a document.",
+      env: {
+        GCP_PROJECT_ID: "celion-prod",
+        GCP_PROJECT_NUMBER: "123456789012",
+        GCP_SERVICE_ACCOUNT_EMAIL: "vercel@celion-prod.iam.gserviceaccount.com",
+        GCP_WORKLOAD_IDENTITY_POOL_ID: "vercel",
+        GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID: "vercel",
+      },
+    });
+
+    const options = clientOptions[0] as {
+      googleAuthOptions?: unknown;
+    };
+    assert.equal(options.googleAuthOptions, undefined);
   } finally {
     setGeminiClientFactoryForTests(undefined);
   }

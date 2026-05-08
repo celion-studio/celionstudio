@@ -30,6 +30,15 @@ function logReasonFor(error: unknown) {
   return error.reason;
 }
 
+export function ebookGenerationFailureStatus(hasSubmittedPlan: boolean, error: unknown) {
+  if (!(error instanceof EbookGenerationError)) return 500;
+  if (hasSubmittedPlan && error.reason === "plan_invalid") return 400;
+  if (error.status === 408 || error.status === 429 || error.status === 503 || error.status === 504) {
+    return error.status;
+  }
+  return 500;
+}
+
 function sanitizePlanForLog(plan: EbookGenerationDiagnostics["plan"]) {
   return {
     ...plan,
@@ -71,6 +80,7 @@ export async function POST(request: Request) {
         plan,
         ebookDocument: rendered.ebookDocument,
         validation: rendered.validation,
+        generationTrace: rendered.generationTrace,
         htmlLength: rendered.html.length,
         slideCount: rendered.validation.slideCount,
       };
@@ -81,12 +91,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to generate ebook";
-    const submittedPlanInvalid = Boolean(d.plan) &&
-      error instanceof EbookGenerationError &&
-      error.reason === "plan_invalid";
-    const status = submittedPlanInvalid
-      ? 400
-      : error instanceof EbookGenerationError && error.status === 429 ? 429 : 500;
+    const status = ebookGenerationFailureStatus(Boolean(d.plan), error);
     await recordEbookGenerationLog({
       userId: session.user.id,
       status: "failure",
@@ -102,6 +107,7 @@ export async function POST(request: Request) {
       sourceCount: d.sources.length,
       sourceTextLength: sourceText.length,
       validation: error instanceof EbookGenerationError ? error.validation : undefined,
+      generationTrace: error instanceof EbookGenerationError ? error.generationTrace : undefined,
       errorReason: logReasonFor(error),
       errorMessage: message,
       errorStatus: status,
@@ -160,6 +166,7 @@ export async function POST(request: Request) {
       sourceTextLength: sourceText.length,
       plan: sanitizePlanForLog(diagnostics.plan),
       validation: diagnostics.validation,
+      generationTrace: diagnostics.generationTrace,
       errorReason: "database_unavailable",
       errorMessage: error instanceof Error ? error.message : message,
       errorStatus: 503,
@@ -193,6 +200,7 @@ export async function POST(request: Request) {
     sourceTextLength: sourceText.length,
     plan: sanitizePlanForLog(diagnostics.plan),
     validation: diagnostics.validation,
+    generationTrace: diagnostics.generationTrace,
     htmlLength: diagnostics.htmlLength,
     slideCount: diagnostics.slideCount,
   });

@@ -2,9 +2,8 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { AuthModal } from '@/components/auth/AuthModal';
-import { authClient } from '@/lib/auth-client';
+import { useAuthModal } from '@/components/auth/use-auth-modal';
+import { useNeonAuthVerifierRedirect } from '@/components/auth/use-neon-auth-verifier';
 
 const WORKSPACE_ROUTE = "/dashboard" as Route;
 const PRICING_ROUTE = "/pricing" as Route;
@@ -13,38 +12,23 @@ type MarketingHeaderProps = {
   initialSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
+  onStartDraft?: () => void;
 };
 
 export function MarketingHeader({
   initialSignedIn,
   initialUserName,
   initialUserEmail,
+  onStartDraft,
 }: MarketingHeaderProps) {
-  const [showAuth, setShowAuth] = useState(false);
+  const { authModal, openAuthModal } = useAuthModal();
+  const handleStartDraft = onStartDraft ?? openAuthModal;
   const userInitial =
     initialUserName?.charAt(0).toUpperCase() ??
     initialUserEmail?.charAt(0).toUpperCase() ??
     "U";
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    if (!searchParams.has("neon_auth_session_verifier")) return;
-
-    let active = true;
-    async function finalizeSignIn() {
-      try {
-        const result = await authClient.getSession();
-        if (!result?.error && active) {
-          window.location.replace(WORKSPACE_ROUTE);
-        }
-      } catch (err) {
-        console.error("Session verification failed", err);
-      }
-    }
-
-    finalizeSignIn();
-    return () => { active = false; };
-  }, []);
+  useNeonAuthVerifierRedirect({ redirectTo: WORKSPACE_ROUTE });
 
   return (
     <>
@@ -70,7 +54,7 @@ export function MarketingHeader({
                 </div>
               </>
             ) : (
-              <button className="btn btn-light" onClick={() => setShowAuth(true)}>
+              <button className="btn btn-light" onClick={handleStartDraft}>
                 Start a draft
               </button>
             )}
@@ -78,7 +62,7 @@ export function MarketingHeader({
         </div>
       </nav>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {onStartDraft ? null : authModal}
     </>
   );
 }

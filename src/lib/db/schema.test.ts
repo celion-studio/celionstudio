@@ -41,12 +41,18 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
       statement.includes("CREATE TABLE IF NOT EXISTS ebook_generation_logs") &&
       statement.includes("plan_model text") &&
       statement.includes("plan jsonb") &&
-      statement.includes("validation jsonb"),
+      statement.includes("validation jsonb") &&
+      statement.includes("generation_trace jsonb"),
     ),
   );
   assert.ok(
     statements.some((statement) =>
       statement.includes("ADD COLUMN IF NOT EXISTS plan_model"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS generation_trace"),
     ),
   );
   assert.ok(

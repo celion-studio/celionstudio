@@ -1,15 +1,16 @@
 import { z } from "zod";
 import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
+import {
+  MAX_EBOOK_PLAN_SLIDES,
+  MAX_SOURCE_TEXT_LENGTH,
+  MAX_TITLE_LENGTH,
+  MIN_EBOOK_PLAN_SLIDES,
+  validateSourceLimits,
+} from "@/lib/request-limits";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
 import type { EbookGenerationArgs } from "@/lib/ebook-generation";
 import { SOURCE_KIND_IDS } from "@/types/project";
 
-const MAX_TITLE_LENGTH = 200;
-const MAX_SOURCE_TEXT_LENGTH = 100_000;
-const MAX_SOURCES = 8;
-const MAX_SOURCE_CONTENT_LENGTH = 50_000;
-const MAX_TOTAL_SOURCE_CONTENT_LENGTH = 120_000;
-const MAX_PLAN_SLIDES = 24;
 const MAX_PLAN_LIST_ITEMS = 24;
 const MAX_PLAN_ANCHORS = 8;
 const MAX_PLAN_SHORT_TEXT_LENGTH = 500;
@@ -49,7 +50,7 @@ const planSchema = z.object({
     detectedSections: planStringListSchema,
     essentialSections: planStringListSchema,
     compressionRisk: planShortTextSchema,
-    recommendedSlideCount: z.number().int().min(8).max(MAX_PLAN_SLIDES),
+    recommendedSlideCount: z.number().int().min(MIN_EBOOK_PLAN_SLIDES).max(MAX_EBOOK_PLAN_SLIDES),
     coveragePlan: planStringListSchema,
     rationale: planLongTextSchema,
   }),
@@ -73,7 +74,7 @@ const planSchema = z.object({
     layoutRhythm: planLongTextSchema,
     avoid: planStringListSchema,
   }),
-  slides: z.array(planSlideSchema).min(8).max(MAX_PLAN_SLIDES),
+  slides: z.array(planSlideSchema).min(MIN_EBOOK_PLAN_SLIDES).max(MAX_EBOOK_PLAN_SLIDES),
 });
 
 const schema = z.object({
@@ -96,6 +97,126 @@ type ParseGenerateRequestResult =
   | { ok: true; data: EbookGenerateRequestBody }
   | { ok: false; message: string };
 
+function clampNumber(value: unknown, min: number, max: number, fallback?: number) {
+  const numericValue = typeof value === "number"
+    ? value
+    : typeof value === "string" && value.trim()
+      ? Number(value)
+      : Number.NaN;
+
+  return Number.isFinite(numericValue)
+    ? Math.min(max, Math.max(min, Math.round(numericValue)))
+    : fallback;
+}
+
+function truncateString(value: unknown, maxLength: number) {
+  return typeof value === "string" ? value.slice(0, maxLength) : undefined;
+}
+
+function truncateStringList(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .slice(0, MAX_PLAN_LIST_ITEMS)
+    .map((item) => item.slice(0, MAX_PLAN_SHORT_TEXT_LENGTH));
+}
+
+function normalizeApprovedPlanInput(plan: unknown) {
+  if (typeof plan !== "object" || plan === null || Array.isArray(plan)) return plan;
+
+  const record = plan as Record<string, unknown>;
+  const sourceAssessment = typeof record.sourceAssessment === "object" && record.sourceAssessment !== null && !Array.isArray(record.sourceAssessment)
+    ? record.sourceAssessment as Record<string, unknown>
+    : {};
+  const cover = typeof record.cover === "object" && record.cover !== null && !Array.isArray(record.cover)
+    ? record.cover as Record<string, unknown>
+    : {};
+  const editorialStrategy = typeof record.editorialStrategy === "object" && record.editorialStrategy !== null && !Array.isArray(record.editorialStrategy)
+    ? record.editorialStrategy as Record<string, unknown>
+    : {};
+  const designBrief = typeof record.designBrief === "object" && record.designBrief !== null && !Array.isArray(record.designBrief)
+    ? record.designBrief as Record<string, unknown>
+    : {};
+  const slides = record.slides;
+  const normalizedSlides = Array.isArray(slides)
+    ? slides
+        .filter((slide): slide is Record<string, unknown> => (
+          typeof slide === "object" &&
+          slide !== null &&
+          !Array.isArray(slide)
+        ))
+        .slice(0, MAX_EBOOK_PLAN_SLIDES)
+        .map((slideRecord) => ({
+          ...slideRecord,
+          role: truncateString(slideRecord.role, MAX_PLAN_SHORT_TEXT_LENGTH),
+          eyebrow: truncateString(slideRecord.eyebrow, MAX_PLAN_SHORT_TEXT_LENGTH),
+          headline: truncateString(slideRecord.headline, MAX_PLAN_SHORT_TEXT_LENGTH),
+          body: truncateString(slideRecord.body, MAX_PLAN_LONG_TEXT_LENGTH),
+          evidence: truncateString(slideRecord.evidence, MAX_PLAN_LONG_TEXT_LENGTH),
+          sourceAnchors: truncateStringList(slideRecord.sourceAnchors),
+          visualDirection: truncateString(slideRecord.visualDirection, MAX_PLAN_LONG_TEXT_LENGTH),
+        }))
+    : slides;
+  const normalizedSlideCount = Array.isArray(normalizedSlides) ? normalizedSlides.length : undefined;
+  const recommendedSlideCount = clampNumber(
+    sourceAssessment.recommendedSlideCount,
+    MIN_EBOOK_PLAN_SLIDES,
+    MAX_EBOOK_PLAN_SLIDES,
+    normalizedSlideCount
+      ? Math.max(MIN_EBOOK_PLAN_SLIDES, Math.min(MAX_EBOOK_PLAN_SLIDES, normalizedSlideCount))
+      : MIN_EBOOK_PLAN_SLIDES,
+  );
+  const cappedRecommendedSlideCount =
+    typeof recommendedSlideCount === "number" && normalizedSlideCount
+      ? Math.min(recommendedSlideCount, Math.max(MIN_EBOOK_PLAN_SLIDES, normalizedSlideCount))
+      : recommendedSlideCount;
+
+  return {
+    ...record,
+    title: truncateString(record.title, MAX_PLAN_SHORT_TEXT_LENGTH),
+    subtitle: truncateString(record.subtitle, MAX_PLAN_SHORT_TEXT_LENGTH),
+    author: truncateString(record.author, MAX_PLAN_SHORT_TEXT_LENGTH),
+    targetAudience: truncateString(record.targetAudience, MAX_PLAN_SHORT_TEXT_LENGTH),
+    readerPromise: truncateString(record.readerPromise, MAX_PLAN_LONG_TEXT_LENGTH),
+    language: truncateString(record.language, MAX_PLAN_SHORT_TEXT_LENGTH),
+    sourceAssessment: {
+      ...sourceAssessment,
+      sourceScale: truncateString(sourceAssessment.sourceScale, MAX_PLAN_SHORT_TEXT_LENGTH),
+      detectedSections: truncateStringList(sourceAssessment.detectedSections),
+      essentialSections: truncateStringList(sourceAssessment.essentialSections),
+      compressionRisk: truncateString(sourceAssessment.compressionRisk, MAX_PLAN_SHORT_TEXT_LENGTH),
+      recommendedSlideCount: cappedRecommendedSlideCount,
+      coveragePlan: truncateStringList(sourceAssessment.coveragePlan),
+      rationale: truncateString(sourceAssessment.rationale, MAX_PLAN_LONG_TEXT_LENGTH),
+    },
+    cover: {
+      ...cover,
+      eyebrow: truncateString(cover.eyebrow, MAX_PLAN_SHORT_TEXT_LENGTH),
+      title: truncateString(cover.title, MAX_PLAN_SHORT_TEXT_LENGTH),
+      subtitle: truncateString(cover.subtitle, MAX_PLAN_SHORT_TEXT_LENGTH),
+      promise: truncateString(cover.promise, MAX_PLAN_LONG_TEXT_LENGTH),
+      visualDirection: truncateString(cover.visualDirection, MAX_PLAN_LONG_TEXT_LENGTH),
+    },
+    editorialStrategy: {
+      ...editorialStrategy,
+      angle: truncateString(editorialStrategy.angle, MAX_PLAN_LONG_TEXT_LENGTH),
+      readerProblem: truncateString(editorialStrategy.readerProblem, MAX_PLAN_LONG_TEXT_LENGTH),
+      promisedOutcome: truncateString(editorialStrategy.promisedOutcome, MAX_PLAN_LONG_TEXT_LENGTH),
+      narrativeArc: truncateString(editorialStrategy.narrativeArc, MAX_PLAN_LONG_TEXT_LENGTH),
+    },
+    designBrief: {
+      ...designBrief,
+      mood: truncateString(designBrief.mood, MAX_PLAN_SHORT_TEXT_LENGTH),
+      visualSystem: truncateString(designBrief.visualSystem, MAX_PLAN_LONG_TEXT_LENGTH),
+      coverConcept: truncateString(designBrief.coverConcept, MAX_PLAN_LONG_TEXT_LENGTH),
+      layoutRhythm: truncateString(designBrief.layoutRhythm, MAX_PLAN_LONG_TEXT_LENGTH),
+      avoid: truncateStringList(designBrief.avoid),
+    },
+    slides: normalizedSlides,
+  };
+}
+
 function validateGenerateRequestLimits(data: EbookGenerateRequestBody): string | null {
   if (data.title.length > MAX_TITLE_LENGTH) {
     return `Title is too long. Maximum is ${MAX_TITLE_LENGTH} characters.`;
@@ -105,21 +226,8 @@ function validateGenerateRequestLimits(data: EbookGenerateRequestBody): string |
     return `Source text is too long. Maximum is ${MAX_SOURCE_TEXT_LENGTH} characters.`;
   }
 
-  if (data.sources.length > MAX_SOURCES) {
-    return `Too many sources. Maximum is ${MAX_SOURCES}.`;
-  }
-
-  let totalSourceContentLength = 0;
-  for (const source of data.sources) {
-    if (source.content.length > MAX_SOURCE_CONTENT_LENGTH) {
-      return `Source content is too long. Maximum is ${MAX_SOURCE_CONTENT_LENGTH} characters per source.`;
-    }
-    totalSourceContentLength += source.content.length;
-  }
-
-  if (totalSourceContentLength > MAX_TOTAL_SOURCE_CONTENT_LENGTH) {
-    return `Total source content is too long. Maximum is ${MAX_TOTAL_SOURCE_CONTENT_LENGTH} characters.`;
-  }
+  const sourceLimitError = validateSourceLimits(data.sources);
+  if (sourceLimitError) return sourceLimitError;
 
   return null;
 }
@@ -134,7 +242,11 @@ export async function parseEbookGenerateRequest(
     return { ok: false, message: "Invalid JSON" };
   }
 
-  const parsed = schema.safeParse(json);
+  const requestBody = typeof json === "object" && json !== null && !Array.isArray(json)
+    ? { ...(json as Record<string, unknown>), plan: normalizeApprovedPlanInput((json as Record<string, unknown>).plan) }
+    : json;
+
+  const parsed = schema.safeParse(requestBody);
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0];
     return {

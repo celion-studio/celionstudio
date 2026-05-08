@@ -9,7 +9,7 @@ import type { PageSummary } from "./editor-preview";
 import type { EditorMode, InspectorStyleValues } from "./editor-types";
 import { InspectorControls } from "./inspector-controls";
 
-type ExportFormat = "pdf" | "png" | "jpg";
+export type ExportFormat = "pdf" | "png" | "jpg" | "html";
 
 type TopBarProps = {
   projectTitle: string;
@@ -80,7 +80,7 @@ export function EditorTopBar({
           </CelionButton>
           {exportOpen && (
             <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "6px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
-              {(["pdf", "png", "jpg"] as const).map((fmt) => (
+              {(["pdf", "html", "png", "jpg"] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => onExport(fmt)}

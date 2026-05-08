@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { countCelionSlides, normalizeEbookHtmlSlideContract, sanitizeEbookHtmlForCanvas, validateCelionSlideHtml } from "./ebook-html";
-import { parseEbookGenerateRequest } from "../app/api/ebook/generate/route";
+import { ebookGenerationFailureStatus, parseEbookGenerateRequest } from "../app/api/ebook/generate/route";
 import { parseEbookSaveRequest, prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "../app/api/ebook/save/route";
+import { EbookGenerationError } from "./ebook-generation";
 
 const validSlideHtml = `<!doctype html>
 <html>
@@ -305,7 +306,7 @@ test("ebook generate request accepts a bounded approved plan", async () => {
   assert.equal(result.ok, true);
 });
 
-test("ebook generate request rejects oversized approved plans before generation", async () => {
+test("ebook generate request normalizes oversized approved plans before generation", async () => {
   const tooManySlides = new Request("http://example.test", {
     method: "POST",
     body: JSON.stringify({
@@ -313,14 +314,16 @@ test("ebook generate request rejects oversized approved plans before generation"
       sourceText: "Short pasted source",
       sources: [],
       ebookStyle: "minimal",
-      plan: validRequestPlan(25),
+      plan: validRequestPlan(31),
     }),
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(tooManySlides), {
-    ok: false,
-    message: "Plan is too large or invalid.",
-  });
+  const tooManySlidesResult = await parseEbookGenerateRequest(tooManySlides);
+  assert.equal(tooManySlidesResult.ok, true);
+  if (tooManySlidesResult.ok) {
+    assert.equal(tooManySlidesResult.data.plan?.slides.length, 30);
+    assert.equal(tooManySlidesResult.data.plan?.sourceAssessment.recommendedSlideCount, 30);
+  }
 
   const longBodyPlan = validRequestPlan();
   longBodyPlan.slides[0]!.body = "B".repeat(4001);
@@ -335,10 +338,88 @@ test("ebook generate request rejects oversized approved plans before generation"
     }),
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(overlongSlideBody), {
-    ok: false,
-    message: "Plan is too large or invalid.",
+  const overlongSlideBodyResult = await parseEbookGenerateRequest(overlongSlideBody);
+  assert.equal(overlongSlideBodyResult.ok, true);
+  if (overlongSlideBodyResult.ok) {
+    assert.equal(overlongSlideBodyResult.data.plan?.slides[0]?.body.length, 4000);
+  }
+});
+
+test("ebook generation route preserves provider timeout status", () => {
+  assert.equal(
+    ebookGenerationFailureStatus(false, new EbookGenerationError(
+      "gemini_call_failed",
+      "Vertex AI timed out while designing the ebook.",
+      { status: 504, stage: "html" },
+    )),
+    504,
+  );
+  assert.equal(
+    ebookGenerationFailureStatus(true, new EbookGenerationError(
+      "plan_invalid",
+      "Plan is too large or invalid.",
+      { status: 504, stage: "plan" },
+    )),
+    400,
+  );
+});
+
+test("ebook generate request caps approved plan recommendation to actual slide count", async () => {
+  const plan = validRequestPlan(21);
+  plan.sourceAssessment.recommendedSlideCount = 24;
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+      plan,
+    }),
   });
+
+  const result = await parseEbookGenerateRequest(request);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.data.plan?.slides.length, 21);
+    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, 21);
+  }
+});
+
+test("ebook generate request accepts approved plans with nullable optional fields", async () => {
+  const plan = validRequestPlan(21) as unknown as {
+    sourceAssessment: Record<string, unknown>;
+    cover: Record<string, unknown>;
+    slides: Array<Record<string, unknown>>;
+  };
+  plan.sourceAssessment.recommendedSlideCount = "24";
+  plan.sourceAssessment.detectedSections = ["Intro", null, "Offer"];
+  plan.cover.eyebrow = null;
+  plan.slides[0]!.eyebrow = null;
+  plan.slides[0]!.sourceAnchors = ["source-backed detail", null, "another detail"];
+  const request = new Request("http://example.test", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Launch brief",
+      sourceText: "Short pasted source",
+      sources: [],
+      ebookStyle: "minimal",
+      plan,
+    }),
+  });
+
+  const result = await parseEbookGenerateRequest(request);
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.data.plan?.slides.length, 21);
+    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, 21);
+    assert.equal(result.data.plan?.sourceAssessment.detectedSections.length, 2);
+    assert.equal(result.data.plan?.cover.eyebrow, "");
+    assert.equal(result.data.plan?.slides[0]?.eyebrow, "");
+    assert.deepEqual(result.data.plan?.slides[0]?.sourceAnchors, ["source-backed detail", "another detail"]);
+  }
 });
 
 test("prepareEbookHtmlForSave sanitizes and validates Celion A5 slide HTML", () => {
@@ -354,6 +435,20 @@ test("prepareEbookHtmlForSave sanitizes and validates Celion A5 slide HTML", () 
   const invalid = prepareEbookHtmlForSave("<html><body><div class=\"page\">Bad</div></body></html>");
   assert.equal(invalid.ok, false);
   assert.ok(invalid.message.includes("Output must"));
+});
+
+test("prepareEbookHtmlForSave rejects active legacy HTML markup", () => {
+  const scriptResult = prepareEbookHtmlForSave(
+    validSlideHtml.replace("</body>", "<script>alert('x')</script></body>"),
+  );
+  assert.equal(scriptResult.ok, false);
+  assert.match(scriptResult.message, /unsupported <script>/i);
+
+  const eventHandlerResult = prepareEbookHtmlForSave(
+    validSlideHtml.replace("</body>", "<img src=\"x\" onerror=\"alert(1)\" /></body>"),
+  );
+  assert.equal(eventHandlerResult.ok, false);
+  assert.match(eventHandlerResult.message, /event handler/i);
 });
 
 test("prepareEbookDocumentForSave validates and compiles a page-level document", () => {
@@ -387,6 +482,28 @@ test("prepareEbookDocumentForSave validates and compiles a page-level document",
   if (result.ok) {
     assert.doesNotMatch(result.document.pages[0]?.css ?? "", /oklch/i);
   }
+});
+
+test("prepareEbookDocumentForSave rejects oversized save payloads", () => {
+  const result = prepareEbookDocumentForSave({
+    version: 1,
+    title: "Too many pages",
+    size: { width: 559, height: 794, unit: "px" },
+    themeCss: "",
+    pages: Array.from({ length: 31 }, (_, index) => ({
+      id: `page-${index + 1}`,
+      index,
+      title: `Page ${index + 1}`,
+      role: "page",
+      html: `<section data-celion-page="page-${index + 1}"><p>Readable page.</p></section>`,
+      css: "",
+      manifest: { editableElements: [] },
+      version: 1,
+    })),
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /Too many ebook pages/);
 });
 
 test("prepareEbookDocumentForSave rejects malformed document inputs", () => {

@@ -1,8 +1,8 @@
 ﻿'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { AuthModal } from '@/components/auth/AuthModal';
+import { useAuthModal } from '@/components/auth/use-auth-modal';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingHeader } from '@/components/marketing/MarketingHeader';
 
@@ -18,7 +18,7 @@ export function Hero({
   initialUserEmail,
 }: HeroProps) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const [showAuth, setShowAuth] = useState(false);
+  const { authModal, openAuthModal } = useAuthModal();
   const isResolvedSignedIn = initialSignedIn;
 
   // Carousel orbit animation
@@ -69,6 +69,7 @@ export function Hero({
         initialSignedIn={initialSignedIn}
         initialUserName={initialUserName}
         initialUserEmail={initialUserEmail}
+        onStartDraft={openAuthModal}
       />
 
       <main>
@@ -94,7 +95,7 @@ export function Hero({
                       Go to workspace
                     </Link>
                   ) : (
-                    <button className="btn btn-dark hero-cta-primary" onClick={() => setShowAuth(true)}>
+                    <button className="btn btn-dark hero-cta-primary" onClick={openAuthModal}>
                       Start a draft
                     </button>
                   )}
@@ -236,7 +237,7 @@ export function Hero({
                 {isResolvedSignedIn ? (
                   <Link href="/dashboard" className="btn btn-dark" style={{ textDecorationLine: 'none' }}>Go to workspace</Link>
                 ) : (
-                  <button className="btn btn-dark" onClick={() => setShowAuth(true)}>Start a draft</button>
+                  <button className="btn btn-dark" onClick={openAuthModal}>Start a draft</button>
                 )}
               </div>
             </div>
@@ -244,7 +245,7 @@ export function Hero({
         </section>
       </main>
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {authModal}
 
       <MarketingFooter />
     </div>

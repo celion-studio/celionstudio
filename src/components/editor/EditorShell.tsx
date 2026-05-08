@@ -34,6 +34,7 @@ import {
   EditorPageList,
   EditorPreviewPane,
   EditorTopBar,
+  type ExportFormat,
 } from "./editor-shell-panels";
 import type { EditorMode, InspectorStyleValues } from "./editor-types";
 import { clearEditorSelectionFromDocument } from "./export-cleanup";
@@ -55,6 +56,25 @@ type Props = {
   initialHtml: string;
   initialDocument: CelionEbookDocument | null;
 };
+
+function sanitizeExportFilename(value: string) {
+  return (value.trim() || "celion-ebook")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 120);
+}
+
+function downloadTextFile(filename: string, contents: string, type: string) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function EditorShell({
   projectId,
@@ -446,11 +466,24 @@ export function EditorShell({
     void queueDocumentSave(styleEdit.value);
   };
 
-  const exportAs = async (format: "pdf" | "png" | "jpg") => {
+  const exportAs = async (format: ExportFormat) => {
     setExportOpen(false);
     setExporting(true);
     setExportError("");
     try {
+      const filename = sanitizeExportFilename(displayTitle);
+
+      if (format === "html") {
+        const exportHtml = latestDocumentRef.current
+          ? compileEbookDocumentToHtml(latestDocumentRef.current)
+          : html;
+        if (!exportHtml.trim()) {
+          throw new Error("No HTML content was found to export.");
+        }
+        downloadTextFile(`${filename}.html`, exportHtml, "text/html;charset=utf-8");
+        return;
+      }
+
       const iframe = iframeRef.current;
       const doc = iframe?.contentDocument;
       if (!doc) {
@@ -479,12 +512,12 @@ export function EditorShell({
             if (i > 0) pdf.addPage("a5", "portrait");
             pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
           }
-          pdf.save(`${displayTitle}.pdf`);
+          pdf.save(`${filename}.pdf`);
         } else {
           for (let i = 0; i < pages.length; i++) {
             const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
             const link = document.createElement("a");
-            link.download = `${displayTitle}-page-${i + 1}.${format}`;
+            link.download = `${filename}-page-${i + 1}.${format}`;
             link.href = canvas.toDataURL(format === "jpg" ? "image/jpeg" : "image/png", 0.95);
             link.click();
           }

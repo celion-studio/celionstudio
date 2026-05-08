@@ -95,6 +95,7 @@ export async function applyAppSchema(
       source_text_length integer NOT NULL DEFAULT 0,
       plan jsonb,
       validation jsonb,
+      generation_trace jsonb,
       error_reason text,
       error_message text,
       error_status integer,
@@ -112,6 +113,11 @@ export async function applyAppSchema(
   await sql`
     ALTER TABLE ebook_generation_logs
     ADD COLUMN IF NOT EXISTS plan jsonb
+  `;
+
+  await sql`
+    ALTER TABLE ebook_generation_logs
+    ADD COLUMN IF NOT EXISTS generation_trace jsonb
   `;
 
   await executeStatement(

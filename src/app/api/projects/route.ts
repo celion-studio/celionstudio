@@ -3,10 +3,16 @@ import { z } from "zod";
 import { createProjectForUser, listProjectRecordsForUser } from "@/lib/projects";
 import { getRouteSession } from "@/lib/session";
 import { isDatabaseUnavailableError } from "@/lib/db";
+import {
+  MAX_SOURCE_CONTENT_LENGTH,
+  MAX_SOURCES,
+  MAX_TITLE_LENGTH,
+  validateSourceLimits,
+} from "@/lib/request-limits";
 import { DESIGN_MODE_IDS, SOURCE_KIND_IDS } from "@/types/project";
 
 const createProjectSchema = z.object({
-  title: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(MAX_TITLE_LENGTH),
   profile: z.object({
     author: z.string().default(""),
     targetAudience: z.string().default(""),
@@ -26,10 +32,11 @@ const createProjectSchema = z.object({
         id: z.string().min(1),
         kind: z.enum(SOURCE_KIND_IDS),
         name: z.string().min(1),
-        content: z.string().min(1),
+        content: z.string().min(1).max(MAX_SOURCE_CONTENT_LENGTH),
         excerpt: z.string(),
       }),
     )
+    .max(MAX_SOURCES)
     .default([]),
 });
 
@@ -59,13 +66,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const json = await request.json();
+  let json: unknown;
+  try {
+    json = await request.json();
+  } catch {
+    return NextResponse.json({ message: "Invalid JSON" }, { status: 400 });
+  }
+
   const parsed = createProjectSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
       { message: parsed.error.issues[0]?.message ?? "Invalid request body" },
       { status: 400 },
     );
+  }
+
+  const sourceLimitError = validateSourceLimits(parsed.data.sources);
+  if (sourceLimitError) {
+    return NextResponse.json({ message: sourceLimitError }, { status: 400 });
   }
 
   try {
