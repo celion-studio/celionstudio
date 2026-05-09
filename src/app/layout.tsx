@@ -18,9 +18,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Celion | Knowledge, packaged",
+  title: "Celion | Turn source material into editable ebooks",
   description:
-    "Paste notes, upload transcripts, drop a draft. Celion reshapes what you already know into a polished ebook.",
+    "Paste notes, upload transcripts, or add research. Celion plans and drafts editable A5 ebooks from the material you already have.",
 };
 
 export default function RootLayout({

@@ -1,10 +1,6 @@
+import type { CSSProperties } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import {
-  CELION_COLOR,
-  CELION_FONT,
-  CELION_RADIUS,
-} from "@/components/ui/celion-style";
 
 type DashboardEmptyStateProps = {
   icon: LucideIcon;
@@ -23,45 +19,16 @@ export function DashboardEmptyState({
 }: DashboardEmptyStateProps) {
   return (
     <div
-      style={{
-        marginTop: "24px",
-        padding: "72px 32px",
-        textAlign: "center",
-      }}
+      className="dashboard-empty"
+      style={{ "--dashboard-empty-max-width": maxWidth } as CSSProperties}
     >
-      <div
-        style={{
-          width: "44px",
-          height: "44px",
-          background: CELION_COLOR.controlSoft,
-          borderRadius: CELION_RADIUS.control,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          margin: "0 auto 16px",
-        }}
-      >
-        <Icon size={18} color={CELION_COLOR.icon} strokeWidth={1.8} />
+      <div className="dashboard-empty-icon">
+        <Icon size={18} color="currentColor" strokeWidth={1.8} />
       </div>
-      <h3
-        style={{
-          margin: "0 0 8px",
-          fontFamily: CELION_FONT.display,
-          fontSize: "16px",
-          fontWeight: 600,
-          color: CELION_COLOR.text,
-        }}
-      >
+      <h3 className="dashboard-empty-title">
         {title}
       </h3>
-      <p
-        style={{
-          margin: "0 auto 20px",
-          fontSize: "13.5px",
-          color: CELION_COLOR.muted,
-          maxWidth,
-        }}
-      >
+      <p className="dashboard-empty-description">
         {description}
       </p>
       {action}

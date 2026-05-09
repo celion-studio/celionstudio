@@ -1,19 +1,15 @@
 ﻿"use client";
 
+import type { Route } from "next";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BookOpen, FileText } from "lucide-react";
-import { useNeonAuthVerifierRedirect } from "@/components/auth/use-neon-auth-verifier";
-import { authClient } from "@/lib/auth-client";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 import { useCreateProjectNavigation } from "@/components/dashboard/use-create-project-navigation";
-import {
-  CELION_COLOR,
-  CELION_FONT,
-  CELION_RADIUS,
-} from "@/components/ui/celion-style";
+import { authClient } from "@/lib/auth-client";
+import { buildAuthHref, getSafeAuthNext } from "@/lib/auth-redirect";
 import { CelionButton, CelionButtonLink } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
 import type { ProjectRecord } from "@/types/project";
@@ -51,44 +47,22 @@ export function DashboardShell({
     setCreateProjectError,
   } = useCreateProjectNavigation();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
-  const resolvedSignedIn = isSignedIn;
-  const resolvedUserName = initialUserName;
-  const resolvedUserEmail = initialUserEmail;
+  const authNext = getSafeAuthNext(searchParams.get("next"));
+  const [resolvedSignedIn, setResolvedSignedIn] = useState(isSignedIn);
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [loading, setLoading] = useState(isSignedIn || hasVerifier);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingProjectId, setDeletingProjectId] = useState("");
   const visibleError = error || createProjectError;
   const showLoading = loading;
   const copy = workspaceCopy;
-  const dashboardVerifierRedirect = useCallback(() => {
-    const next = new URLSearchParams(window.location.search);
-    next.delete("neon_auth_session_verifier");
-    return next.size > 0 ? `/dashboard?${next.toString()}` : "/dashboard";
-  }, []);
   const handleVerifierError = useCallback(() => {
+    setResolvedSignedIn(false);
     setLoading(false);
   }, []);
 
-  useNeonAuthVerifierRedirect({
-    enabled: hasVerifier,
-    redirectTo: dashboardVerifierRedirect,
-    onError: handleVerifierError,
-  });
-
   async function fetchProjects() {
-    const response = await fetch("/api/projects", {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    if (response.status !== 401) {
-      return response;
-    }
-
-    await authClient.getSession();
-
     return fetch("/api/projects", {
       method: "GET",
       cache: "no-store",
@@ -96,13 +70,40 @@ export function DashboardShell({
   }
 
   useEffect(() => {
-    if (hasVerifier) {
+    if (!hasVerifier) {
       return;
     }
 
-    if (!resolvedSignedIn) {
-      setProjects([]);
-      setLoading(false);
+    let active = true;
+
+    async function finalizeSignIn() {
+      try {
+        const result = await authClient.getSession();
+        if (!active) return;
+
+        if (result?.error) {
+          handleVerifierError();
+          return;
+        }
+
+        window.location.replace(authNext);
+      } catch (err) {
+        console.error("Session verification failed", err);
+        if (active) {
+          handleVerifierError();
+        }
+      }
+    }
+
+    void finalizeSignIn();
+
+    return () => {
+      active = false;
+    };
+  }, [authNext, handleVerifierError, hasVerifier]);
+
+  useEffect(() => {
+    if (hasVerifier) {
       return;
     }
 
@@ -115,6 +116,14 @@ export function DashboardShell({
       try {
         const response = await fetchProjects();
 
+        if (response.status === 401) {
+          if (active) {
+            setResolvedSignedIn(false);
+            setProjects([]);
+          }
+          return;
+        }
+
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as
             | { message?: string }
@@ -125,6 +134,7 @@ export function DashboardShell({
         const payload = (await response.json()) as { projects: ProjectRecord[] };
 
         if (active) {
+          setResolvedSignedIn(true);
           setProjects(payload.projects);
         }
       } catch (caught) {
@@ -147,7 +157,7 @@ export function DashboardShell({
     return () => {
       active = false;
     };
-  }, [hasVerifier, resolvedSignedIn]);
+  }, [hasVerifier]);
 
   async function deleteProject(project: ProjectRecord) {
     const label = project.title || copy.blankTitle;
@@ -188,34 +198,16 @@ export function DashboardShell({
     <WorkspaceLayout
       activeItem={activeItem}
       isSignedIn={resolvedSignedIn}
-      initialUserName={resolvedUserName}
-      initialUserEmail={resolvedUserEmail}
+      initialUserName={initialUserName}
+      initialUserEmail={initialUserEmail}
       breadcrumbCurrent={copy.breadcrumbCurrent}
     >
-      <div
-        style={{
-          marginBottom: "28px",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: "16px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="dashboard-head">
         <div>
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: CELION_FONT.display,
-              fontSize: "22px",
-              fontWeight: 560,
-              letterSpacing: "-0.03em",
-              color: CELION_COLOR.text,
-            }}
-          >
+          <h1 className="dashboard-title">
             {copy.heading}
           </h1>
-          <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: CELION_COLOR.muted }}>
+          <p className="dashboard-description">
             {copy.description}
           </p>
         </div>
@@ -224,7 +216,7 @@ export function DashboardShell({
             onClick={handleCreateProject}
             disabled={creatingProject}
             variant="primary"
-            style={{ padding: "0 18px" }}
+            className="dashboard-primary-button"
           >
             {creatingProject ? "Creating..." : copy.primaryActionLabel}
           </CelionButton>
@@ -232,29 +224,14 @@ export function DashboardShell({
       </div>
 
       {visibleError ? (
-        <div
-          style={{
-            marginBottom: "20px",
-            padding: "12px 16px",
-            background: "#FFF5F2",
-            borderRadius: CELION_RADIUS.control,
-            border: "1px solid #FEDDCF",
-          }}
-        >
-          <p style={{ margin: 0, fontSize: "13px", color: "#9b4c19" }}>{visibleError}</p>
+        <div className="dashboard-error">
+          <p>{visibleError}</p>
         </div>
       ) : null}
 
       {showLoading ? (
-        <div style={{ padding: "72px 0", textAlign: "center" }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: "13px",
-              color: CELION_COLOR.mutedSoft,
-              fontFamily: CELION_FONT.display,
-            }}
-          >
+        <div className="dashboard-loading">
+          <p>
             {copy.loadingLabel}
           </p>
         </div>
@@ -275,9 +252,9 @@ export function DashboardShell({
           description="Your workspace is account-backed. Sign in to access your projects."
           action={
             <CelionButtonLink
-              href="/"
+              href={buildAuthHref("sign-in", "/dashboard") as Route}
               variant="primary"
-              style={{ padding: "0 18px" }}
+              className="dashboard-primary-button"
             >
               Return to sign in
             </CelionButtonLink>
@@ -296,7 +273,7 @@ export function DashboardShell({
               onClick={handleCreateProject}
               disabled={creatingProject}
               variant="primary"
-              style={{ padding: "0 18px" }}
+              className="dashboard-primary-button"
             >
               <FileText size={13} strokeWidth={2.2} />
               {creatingProject ? "Creating..." : copy.emptyAction}

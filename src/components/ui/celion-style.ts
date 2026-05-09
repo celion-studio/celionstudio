@@ -1,27 +1,28 @@
 export const CELION_RADIUS = {
-  control: "6px",
-  shell: "6px",
+  control: "var(--celion-radius-control)",
+  shell: "var(--celion-radius-shell)",
   round: "50%",
 } as const;
 
 export const CELION_FONT = {
-  body: "'Inter', sans-serif",
-  display: "'Geist', sans-serif",
+  body: "var(--celion-font-body)",
+  display: "var(--celion-font-display)",
 } as const;
 
 export const CELION_COLOR = {
-  appBg: "#f3f2ef",
-  ink: "#111",
-  text: "#111",
-  textStrong: "#18181b",
-  white: "#fff",
-  panel: "#fff",
-  panelSoft: "#f8f7f4",
-  controlSoft: "#F0EEE9",
-  muted: "#71717A",
-  mutedSoft: "#A1A1AA",
-  icon: "#555",
-  line: "rgba(28,25,23,0.08)",
-  lineSoft: "#ECEAE5",
-  warmLine: "#ebe7df",
+  appBg: "var(--celion-app-bg)",
+  ink: "var(--celion-ink)",
+  text: "var(--celion-text)",
+  textStrong: "var(--celion-text-strong)",
+  textSecondary: "var(--celion-text-secondary)",
+  white: "var(--celion-white)",
+  panel: "var(--celion-panel)",
+  panelSoft: "var(--celion-panel-soft)",
+  controlSoft: "var(--celion-control-soft)",
+  muted: "var(--celion-muted)",
+  mutedSoft: "var(--celion-muted-soft)",
+  icon: "var(--celion-icon)",
+  line: "var(--celion-line)",
+  lineSoft: "var(--celion-line-soft)",
+  warmLine: "var(--celion-warm-line)",
 } as const;

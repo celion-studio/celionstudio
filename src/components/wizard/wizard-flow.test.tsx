@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import React from "react";
 import type { ReactElement, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { BasicsStep } from "./BasicsStep";
@@ -15,6 +16,8 @@ import {
 import { useProjectWizardStore } from "@/store/useProjectWizardStore";
 import type { EbookPlan } from "@/lib/ebook-generation";
 import type { ProjectSource } from "@/types/project";
+
+globalThis.React = React;
 
 function collectText(node: ReactNode): string {
   if (node == null || typeof node === "boolean") return "";

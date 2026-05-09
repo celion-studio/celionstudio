@@ -4,6 +4,7 @@ import { countCelionSlides, normalizeEbookHtmlSlideContract, sanitizeEbookHtmlFo
 import { ebookGenerationFailureStatus, parseEbookGenerateRequest } from "../app/api/ebook/generate/route";
 import { parseEbookSaveRequest, prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "../app/api/ebook/save/route";
 import { EbookGenerationError } from "./ebook-generation";
+import { MAX_EBOOK_PLAN_SLIDES } from "./request-limits";
 
 const validSlideHtml = `<!doctype html>
 <html>
@@ -321,8 +322,8 @@ test("ebook generate request normalizes oversized approved plans before generati
   const tooManySlidesResult = await parseEbookGenerateRequest(tooManySlides);
   assert.equal(tooManySlidesResult.ok, true);
   if (tooManySlidesResult.ok) {
-    assert.equal(tooManySlidesResult.data.plan?.slides.length, 30);
-    assert.equal(tooManySlidesResult.data.plan?.sourceAssessment.recommendedSlideCount, 30);
+    assert.equal(tooManySlidesResult.data.plan?.slides.length, MAX_EBOOK_PLAN_SLIDES);
+    assert.equal(tooManySlidesResult.data.plan?.sourceAssessment.recommendedSlideCount, MAX_EBOOK_PLAN_SLIDES);
   }
 
   const longBodyPlan = validRequestPlan();
@@ -382,8 +383,8 @@ test("ebook generate request caps approved plan recommendation to actual slide c
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.data.plan?.slides.length, 21);
-    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, 21);
+    assert.equal(result.data.plan?.slides.length, MAX_EBOOK_PLAN_SLIDES);
+    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, MAX_EBOOK_PLAN_SLIDES);
   }
 });
 
@@ -413,8 +414,8 @@ test("ebook generate request accepts approved plans with nullable optional field
 
   assert.equal(result.ok, true);
   if (result.ok) {
-    assert.equal(result.data.plan?.slides.length, 21);
-    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, 21);
+    assert.equal(result.data.plan?.slides.length, MAX_EBOOK_PLAN_SLIDES);
+    assert.equal(result.data.plan?.sourceAssessment.recommendedSlideCount, MAX_EBOOK_PLAN_SLIDES);
     assert.equal(result.data.plan?.sourceAssessment.detectedSections.length, 2);
     assert.equal(result.data.plan?.cover.eyebrow, "");
     assert.equal(result.data.plan?.slides[0]?.eyebrow, "");

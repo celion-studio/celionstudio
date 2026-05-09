@@ -4,7 +4,9 @@ import {
   GeminiProviderError,
   generateJsonWithGemini,
 } from "@/lib/ai/gemini";
-import { validateCelionSlideHtml } from "@/lib/ebook-html";
+import {
+  validateCelionSlideHtml,
+} from "@/lib/ebook-html";
 import { EBOOK_PAGE_SIZE_CSS_PX, EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
 import { EBOOK_STYLE_PROMPTS } from "@/lib/ebook-style";
 import {
@@ -15,18 +17,12 @@ import {
   type CelionEbookDocument,
 } from "@/lib/ebook-document";
 import {
-  MAX_EBOOK_GENERATION_PAGES,
   MAX_EBOOK_PLAN_SLIDES,
   MIN_EBOOK_PLAN_SLIDES,
 } from "@/lib/request-limits";
 import type { EbookStyle } from "@/types/project";
 
 const PLAN_MODEL = EBOOK_PLAN_GEMINI_MODEL;
-const HTML_PLAN_BODY_LIMIT = 900;
-const HTML_PLAN_EVIDENCE_LIMIT = 500;
-const HTML_PLAN_VISUAL_DIRECTION_LIMIT = 500;
-const HTML_PLAN_TEXT_LIMIT = 240;
-const HTML_PLAN_ARRAY_ITEM_LIMIT = 140;
 
 const TONE_PROMPTS: Record<string, string> = {
   preserve: "preserve the source's voice and terminology unless clarity requires light editing",
@@ -148,29 +144,8 @@ function tonePromptFor(tone?: string) {
   return TONE_PROMPTS[tone ?? ""] ?? tone ?? "use the best tone for the source and reader";
 }
 
-function estimateSlideBudgetForSource(sourceText: string) {
-  const trimmedSource = sourceText.trim();
-  const sourceChars = trimmedSource.length;
-  const detectedSections = (trimmedSource.match(/^#{1,3}\s+\S/gm) ?? []).length;
-
-  if (sourceChars >= 12000 || detectedSections >= 18) {
-    return { min: 18, max: 22, detectedSections, sourceChars };
-  }
-
-  if (sourceChars >= 7000 || detectedSections >= 10) {
-    return { min: 14, max: 18, detectedSections, sourceChars };
-  }
-
-  if (sourceChars >= 3000 || detectedSections >= 5) {
-    return { min: 12, max: 16, detectedSections, sourceChars };
-  }
-
-  return { min: 10, max: 14, detectedSections, sourceChars };
-}
-
 function buildPlanPrompt(args: EbookGenerationArgs): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
-  const slideBudget = estimateSlideBudgetForSource(args.sourceText);
 
   return `Create a source-led A5 slide publication plan.
 
@@ -187,18 +162,14 @@ Source material:
 ${args.sourceText.slice(0, 36000) || "(no source provided)"}
 
 Plan requirements:
-- Recommended slide budget: ${slideBudget.min}-${slideBudget.max} slides.
-- Source scale: ${slideBudget.sourceChars} characters, ${slideBudget.detectedSections} detected sections/headings.
-- First assess the source, then decide the page count. The plan must choose recommendedSlideCount after assessing the source, not before.
-- The slides array should contain approximately recommendedSlideCount slides. If you recommend 20 slides, do not return 10.
-- Do not compress a long source into 10 slides. If the source has many sections, examples, steps, or warnings, preserve coverage by using the higher end of the recommended budget.
-- Cover the source's major sections and methods before summarizing. It is better to make a focused 18-22 slide guide than to discard useful material for artificial brevity.
+- Make 8-14 slides total in one self-contained deck. Do not expand into chapters, batches, appendices, or overflow pages.
 - Every slide headline must be specific and reader-facing.
 - Do not use abstract planning labels, generic section names, or numbered duplicate titles.
 - Cover copy must be rewritten as a strong publication concept for the stated purpose, not a paste of the brief fields.
-- Use Korean for visible reader-facing copy when the source or brief is Korean.
 - Include practical substance from the source: examples, steps, distinctions, numbers, scripts, or checklists where supported.
-- Include design direction per slide, but do not write CSS or HTML.
+- Each slide visualDirection must name a concrete visual device, such as an evidence box, three-column framework grid, split comparison, timeline bar, protocol list, roadmap, category bar, score marker, annotated quote, or checklist system.
+- Across the deck, do not allow more than two text-led pages in a row; regularly plan grid, comparison, timeline, evidence-box, or checklist pages.
+- Avoid vague visualDirection values like "clean typography" or "modern layout". Do not write CSS or HTML in the plan.
 
 Return JSON in exactly this shape:
 {
@@ -208,15 +179,6 @@ Return JSON in exactly this shape:
   "targetAudience": "specific reader",
   "readerPromise": "reader-facing purpose, promise, or outcome",
   "language": "primary visible language",
-  "sourceAssessment": {
-    "sourceScale": "short | medium | long | very_long",
-    "detectedSections": ["major source sections, chapters, topics, or methods detected"],
-    "essentialSections": ["source sections or methods that must be represented in the final publication"],
-    "compressionRisk": "low | medium | high",
-    "recommendedSlideCount": 10,
-    "coveragePlan": ["how the slides will preserve the source without over-compressing it"],
-    "rationale": "why this slide count fits the source and purpose"
-  },
   "cover": {
     "eyebrow": "short category cue",
     "title": "cover title",
@@ -251,86 +213,23 @@ Return JSON in exactly this shape:
 }`;
 }
 
-function compactTextForHtmlPrompt(value: string, maxLength: number) {
-  const trimmed = value.trim();
-  if (trimmed.length <= maxLength) return trimmed;
-  return `${trimmed.slice(0, maxLength).trimEnd()}...`;
-}
-
-function compactArrayForHtmlPrompt(values: string[], maxItems: number, maxItemLength = HTML_PLAN_ARRAY_ITEM_LIMIT) {
-  return values
-    .slice(0, maxItems)
-    .map((value) => compactTextForHtmlPrompt(value, maxItemLength))
-    .filter(Boolean);
-}
-
-function compactPlanForHtmlPrompt(plan: EbookPlan) {
+function planForHtmlPrompt(plan: EbookPlan) {
   return {
-    title: compactTextForHtmlPrompt(plan.title, HTML_PLAN_TEXT_LIMIT),
-    subtitle: compactTextForHtmlPrompt(plan.subtitle, HTML_PLAN_TEXT_LIMIT),
-    author: compactTextForHtmlPrompt(plan.author, HTML_PLAN_TEXT_LIMIT),
-    targetAudience: compactTextForHtmlPrompt(plan.targetAudience, HTML_PLAN_TEXT_LIMIT),
-    readerPromise: compactTextForHtmlPrompt(plan.readerPromise, HTML_PLAN_TEXT_LIMIT),
-    language: compactTextForHtmlPrompt(plan.language, 80),
-    sourceAssessment: {
-      sourceScale: compactTextForHtmlPrompt(plan.sourceAssessment.sourceScale, 40),
-      detectedSections: compactArrayForHtmlPrompt(plan.sourceAssessment.detectedSections, 12),
-      essentialSections: compactArrayForHtmlPrompt(plan.sourceAssessment.essentialSections, 12),
-      compressionRisk: compactTextForHtmlPrompt(plan.sourceAssessment.compressionRisk, 40),
-      recommendedSlideCount: plan.sourceAssessment.recommendedSlideCount,
-      coveragePlan: compactArrayForHtmlPrompt(plan.sourceAssessment.coveragePlan, 8, 180),
-      rationale: compactTextForHtmlPrompt(plan.sourceAssessment.rationale, 360),
-    },
-    cover: {
-      eyebrow: compactTextForHtmlPrompt(plan.cover.eyebrow, 80),
-      title: compactTextForHtmlPrompt(plan.cover.title, HTML_PLAN_TEXT_LIMIT),
-      subtitle: compactTextForHtmlPrompt(plan.cover.subtitle, HTML_PLAN_TEXT_LIMIT),
-      promise: compactTextForHtmlPrompt(plan.cover.promise, HTML_PLAN_TEXT_LIMIT),
-      visualDirection: compactTextForHtmlPrompt(plan.cover.visualDirection, HTML_PLAN_VISUAL_DIRECTION_LIMIT),
-    },
-    editorialStrategy: {
-      angle: compactTextForHtmlPrompt(plan.editorialStrategy.angle, 360),
-      readerProblem: compactTextForHtmlPrompt(plan.editorialStrategy.readerProblem, 360),
-      promisedOutcome: compactTextForHtmlPrompt(plan.editorialStrategy.promisedOutcome, 360),
-      narrativeArc: compactTextForHtmlPrompt(plan.editorialStrategy.narrativeArc, 420),
-    },
-    designBrief: {
-      mood: compactTextForHtmlPrompt(plan.designBrief.mood, HTML_PLAN_TEXT_LIMIT),
-      visualSystem: compactTextForHtmlPrompt(plan.designBrief.visualSystem, 420),
-      coverConcept: compactTextForHtmlPrompt(plan.designBrief.coverConcept, 360),
-      layoutRhythm: compactTextForHtmlPrompt(plan.designBrief.layoutRhythm, 420),
-      avoid: compactArrayForHtmlPrompt(plan.designBrief.avoid, 8),
-    },
-    slides: plan.slides.map((slide) => ({
-      role: compactTextForHtmlPrompt(slide.role, 60),
-      eyebrow: compactTextForHtmlPrompt(slide.eyebrow, 80),
-      headline: compactTextForHtmlPrompt(slide.headline, HTML_PLAN_TEXT_LIMIT),
-      body: compactTextForHtmlPrompt(slide.body, HTML_PLAN_BODY_LIMIT),
-      evidence: compactTextForHtmlPrompt(slide.evidence, HTML_PLAN_EVIDENCE_LIMIT),
-      sourceAnchors: compactArrayForHtmlPrompt(slide.sourceAnchors, 4, 120),
-      visualDirection: compactTextForHtmlPrompt(slide.visualDirection, HTML_PLAN_VISUAL_DIRECTION_LIMIT),
-    })),
+    title: plan.title,
+    subtitle: plan.subtitle,
+    author: plan.author,
+    targetAudience: plan.targetAudience,
+    readerPromise: plan.readerPromise,
+    language: plan.language,
+    cover: plan.cover,
+    editorialStrategy: plan.editorialStrategy,
+    designBrief: plan.designBrief,
+    slides: plan.slides,
   };
 }
 
-type HtmlBatchContext = {
-  batchNumber: number;
-  batchCount: number;
-  slideStart: number;
-  slideEnd: number;
-  totalSlides: number;
-};
-
-function buildHtmlPrompt(args: EbookGenerationArgs, plan: EbookPlan, batch?: HtmlBatchContext): string {
+function buildHtmlPrompt(args: EbookGenerationArgs, plan: EbookPlan): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
-  const batchDirection = batch
-    ? `
-Batch:
-- Batch ${batch.batchNumber} of ${batch.batchCount}.
-- This batch covers approved slides ${batch.slideStart}-${batch.slideEnd} of ${batch.totalSlides}.
-- Render only the ${plan.slides.length} slides included in this approved plan batch.
-- Do not create, skip, merge, rename, or summarize slides outside this batch.`
-    : "";
 
   return `Render this approved plan as a finished A5 HTML/CSS slide publication.
 
@@ -338,19 +237,22 @@ Design inputs:
 - Visual mood: ${args.ebookStyle} (${stylePrompt})
 - Accent color: ${args.accentColor}
 - Page size: ${EBOOK_PAGE_SIZE_CSS_PX}
-${batchDirection}
 
 Approved plan:
-${JSON.stringify(compactPlanForHtmlPrompt(plan))}
+${JSON.stringify(planForHtmlPrompt(plan), null, 2)}
 
 Design direction:
 - Follow the plan structure and slide order exactly.
 - Do not rename slide headlines.
 - Treat each page like a polished editorial card, not a plain document page.
-- Use visual hierarchy, spacing, rules, side notes, pull quotes, small tables, timelines, checklists, diagrams, badges, numbered systems, comparison blocks, and typographic contrast when they clarify the content.
+- Honor each slide visualDirection with actual CSS-drawn structure, not just prose.
+- Every non-cover page must express one primary structural device in CSS, such as a grid, comparison, timeline, evidence box, checklist, scorecard, matrix, or annotated quote.
+- Use visual hierarchy, spacing, rules, side notes, pull quotes, small tables, timelines, checklists, diagrams, badges, numbered systems, comparison blocks, and typographic contrast as concrete page structure, not decoration.
 - Each page should have one memorable visual idea: a strong typographic composition, structured framework, comparison, timeline, evidence card, checklist, or editorial diagram.
 - Make the cover feel intentionally designed for this source, not a fixed slot template.
 - Vary layouts across slides. Avoid repeating the same header, eyebrow, title, body, box pattern.
+- Across the first 10 pages, use at least five distinct layout families. Reuse typography, spacing, and color as the system; do not reuse the same layout skeleton.
+- Do not reuse the same "headline + paragraph + one box" skeleton on consecutive pages.
 - Avoid large empty rectangles, generic gradient panels, and flat text-only pages unless the slide is intentionally acting as a dramatic pause.
 - For framework and example pages, create concrete visual structures instead of paragraph-only layouts.
 - Use the accent color as an accent, not the whole palette.
@@ -358,14 +260,14 @@ Design direction:
 - Give every slide deliberate breathing room. Prefer fewer, clearer blocks over dense packing.
 - Keep at least 24px vertical space between major content groups, and at least 14px between a heading and its body.
 - Keep boxed callouts, lists, captions, and following headings visually separated; never let a box sit directly against the next heading or paragraph.
-- Use comfortable Korean/English body typography: line-height 1.55-1.75 for paragraphs and lists, with paragraph margins that make separate ideas visibly distinct.
-- If content feels crowded, shorten the copy, split the idea across another slide, or use a simpler layout. Do not reduce spacing to make everything fit.
+- Use comfortable body typography: line-height 1.55-1.75 for paragraphs and lists, with paragraph margins that make separate ideas visibly distinct.
+- If content feels crowded, trim non-essential copy or simplify the device. Never add pages, merge slides, or fall back to a plain article layout. Do not reduce spacing to make everything fit.
 - Avoid tiny text. Body copy should generally be 14px or larger, and dense notes should still remain readable.
 
 Technical contract:
 - Output only JSON with one "document" field.
-- Generate all pages in one response for this batch. Do not require page-by-page calls.
-- Generate exactly ${plan.slides.length} pages for this batch.
+- Generate all pages in one response. Do not require page-by-page calls.
+- Generate exactly ${plan.slides.length} pages: one page per approved slide, no more and no fewer.
 - The document must have version: 1, title, size: { width: ${EBOOK_PAGE_SIZE_PX.width}, height: ${EBOOK_PAGE_SIZE_PX.height}, unit: "px" }, themeCss, and pages.
 - themeCss may be empty or contain only a single :root block with CSS custom properties such as --accent. Do not put selectors, layout rules, imports, or page styles in themeCss.
 - Each page includes id, index, title, role, html, css, manifest, and version.
@@ -441,18 +343,10 @@ export function normalizePlan(raw: unknown, args: EbookGenerationArgs): EbookPla
     );
   }
 
-  const promptSlideBudget = estimateSlideBudgetForSource(args.sourceText);
   const rawRecommendedSlideCount = typeof sourceAssessment.recommendedSlideCount === "number" && Number.isFinite(sourceAssessment.recommendedSlideCount)
     ? Math.round(sourceAssessment.recommendedSlideCount)
-    : Math.min(promptSlideBudget.max, Math.max(promptSlideBudget.min, normalizedSlides.length));
+    : normalizedSlides.length;
   const recommendedSlideCount = Math.min(MAX_EBOOK_PLAN_SLIDES, Math.max(MIN_EBOOK_PLAN_SLIDES, rawRecommendedSlideCount));
-  if (normalizedSlides.length < recommendedSlideCount - 2) {
-    throw new EbookGenerationError(
-      "plan_invalid",
-      `Gemini Flash recommended ${recommendedSlideCount} slides but only returned ${normalizedSlides.length} usable slides.`,
-      { stage: "plan" },
-    );
-  }
 
   return {
     title: stringValue(record.title, args.title),
@@ -502,25 +396,6 @@ function validateUsableEbookHtml(html: string) {
   });
 }
 
-function chunkSlidesForHtmlGeneration(slides: EbookPlanSlide[]) {
-  const batches: EbookPlanSlide[][] = [];
-  for (let index = 0; index < slides.length; index += MAX_EBOOK_GENERATION_PAGES) {
-    batches.push(slides.slice(index, index + MAX_EBOOK_GENERATION_PAGES));
-  }
-  return batches;
-}
-
-function planForHtmlBatch(plan: EbookPlan, slides: EbookPlanSlide[]): EbookPlan {
-  return {
-    ...plan,
-    sourceAssessment: {
-      ...plan.sourceAssessment,
-      recommendedSlideCount: slides.length,
-    },
-    slides,
-  };
-}
-
 function capEbookDocumentPagesForGeneration(document: CelionEbookDocument, maxPages: number): CelionEbookDocument {
   if (document.pages.length <= maxPages) return document;
 
@@ -530,126 +405,6 @@ function capEbookDocumentPagesForGeneration(document: CelionEbookDocument, maxPa
       ...page,
       index,
     })),
-  });
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function replaceAttributeValue(value: string, attributeName: string, replacements: Map<string, string>) {
-  if (replacements.size === 0) return value;
-
-  const attributePattern = new RegExp(`(${attributeName}\\s*=\\s*)(["'])(.*?)\\2`, "gi");
-  return value.replace(attributePattern, (match, prefix: string, quote: string, currentValue: string) => {
-    const nextValue = replacements.get(currentValue);
-    return nextValue ? `${prefix}${quote}${nextValue}${quote}` : match;
-  });
-}
-
-function htmlEditableIdsForPage(html: string) {
-  return [...html.matchAll(/\sdata-celion-id\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)]
-    .map((match) => match[1] ?? match[2] ?? "")
-    .filter(Boolean);
-}
-
-function editableIdForMergedPage(oldId: string, oldPageId: string, newPageId: string, fallbackIndex: number) {
-  const oldPrefix = `${oldPageId}-`;
-  const suffix = oldId.startsWith(oldPrefix) ? oldId.slice(oldPrefix.length) : oldId;
-  const normalizedSuffix = suffix
-    .replace(/[^\w:-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    || `element-${fallbackIndex + 1}`;
-
-  return normalizedSuffix.startsWith(`${newPageId}-`)
-    ? normalizedSuffix
-    : `${newPageId}-${normalizedSuffix}`;
-}
-
-function buildEditableIdReplacements(page: CelionEbookDocument["pages"][number], newPageId: string) {
-  const replacements = new Map<string, string>();
-  const usedIds = new Set<string>();
-  const htmlIds = htmlEditableIdsForPage(page.html);
-
-  htmlIds.forEach((oldId, index) => {
-    if (replacements.has(oldId)) return;
-
-    const baseId = editableIdForMergedPage(oldId, page.id, newPageId, index);
-    let nextId = baseId;
-    let duplicateIndex = 2;
-    while (usedIds.has(nextId)) {
-      nextId = `${baseId}-${duplicateIndex}`;
-      duplicateIndex += 1;
-    }
-
-    usedIds.add(nextId);
-    replacements.set(oldId, nextId);
-  });
-
-  return replacements;
-}
-
-function replacePageScope(value: string, oldPageId: string, newPageId: string) {
-  const replacements = new Map([[oldPageId, newPageId]]);
-  return replaceAttributeValue(value, "data-celion-page", replacements);
-}
-
-function replaceEditableIds(value: string, replacements: Map<string, string>) {
-  return replaceAttributeValue(value, "data-celion-id", replacements);
-}
-
-function replaceEditableSelectors(value: string, replacements: Map<string, string>) {
-  let nextValue = value;
-
-  for (const [oldId, newId] of replacements) {
-    const oldIdPattern = escapeRegExp(oldId);
-    nextValue = nextValue
-      .replace(new RegExp(`\\[data-celion-id="${oldIdPattern}"\\]`, "g"), `[data-celion-id="${newId}"]`)
-      .replace(new RegExp(`\\[data-celion-id='${oldIdPattern}'\\]`, "g"), `[data-celion-id="${newId}"]`);
-  }
-
-  return nextValue;
-}
-
-function reindexEbookPageForMerge(page: CelionEbookDocument["pages"][number], index: number) {
-  const nextPageId = `page-${index + 1}`;
-  const editableIdReplacements = buildEditableIdReplacements(page, nextPageId);
-  const htmlWithPageScope = replacePageScope(page.html, page.id, nextPageId);
-  const cssWithPageScope = replacePageScope(page.css, page.id, nextPageId);
-
-  return {
-    ...page,
-    id: nextPageId,
-    index,
-    html: replaceEditableIds(htmlWithPageScope, editableIdReplacements),
-    css: replaceEditableSelectors(cssWithPageScope, editableIdReplacements),
-    manifest: {
-      editableElements: page.manifest.editableElements.map((element) => {
-        const nextId = editableIdReplacements.get(element.id) ?? element.id;
-        return {
-          ...element,
-          id: nextId,
-          selector: `[data-celion-id="${nextId}"]`,
-        };
-      }),
-    },
-  };
-}
-
-function mergeEbookDocumentsForGeneration(documents: CelionEbookDocument[], title: string): CelionEbookDocument {
-  const firstDocument = documents[0];
-  const pages = documents.flatMap((document) => document.pages);
-
-  return normalizeEbookDocument({
-    version: 1,
-    title: firstDocument?.title || title,
-    size: firstDocument?.size ?? {
-      width: EBOOK_PAGE_SIZE_PX.width,
-      height: EBOOK_PAGE_SIZE_PX.height,
-      unit: "px",
-    },
-    themeCss: documents.map((document) => document.themeCss.trim()).find(Boolean) ?? "",
-    pages: pages.map(reindexEbookPageForMerge),
   });
 }
 
@@ -738,21 +493,20 @@ export async function generateEbookPlan(args: EbookGenerationArgs) {
   }
 }
 
-async function generateEbookDocumentBatch(
+async function generateCompleteEbookDocument(
   args: EbookGenerationArgs,
   plan: EbookPlan,
-  batch: HtmlBatchContext,
   generationTrace: EbookGenerationBatchTrace[],
-): Promise<CelionEbookDocument> {
+) {
   const startedAtMs = Date.now();
-  const prompt = buildHtmlPrompt(args, plan, batch);
+  const prompt = buildHtmlPrompt(args, plan);
   const trace: EbookGenerationBatchTrace = {
     stage: "html",
-    batchNumber: batch.batchNumber,
-    batchCount: batch.batchCount,
-    slideStart: batch.slideStart,
-    slideEnd: batch.slideEnd,
-    totalSlides: batch.totalSlides,
+    batchNumber: 1,
+    batchCount: 1,
+    slideStart: 1,
+    slideEnd: plan.slides.length,
+    totalSlides: plan.slides.length,
     requestedSlideCount: plan.slides.length,
     model: EBOOK_GEMINI_MODEL,
     promptLength: prompt.length,
@@ -790,7 +544,6 @@ async function generateEbookDocumentBatch(
     });
     warnEbookGenerationFailure("gemini_call_failed", {
       stage: "html",
-      batch: `${batch.batchNumber}/${batch.batchCount}`,
       ...details,
     });
     return failGeneration(
@@ -812,7 +565,6 @@ async function generateEbookDocumentBatch(
     });
     warnEbookGenerationFailure("missing_html", {
       stage: "html",
-      batch: `${batch.batchNumber}/${batch.batchCount}`,
       documentType: typeof result?.document,
     });
     return failGeneration("missing_html", "Gemini did not return an ebook document.", {
@@ -835,7 +587,6 @@ async function generateEbookDocumentBatch(
     });
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",
-      batch: `${batch.batchNumber}/${batch.batchCount}`,
       documentValidationErrors: documentValidation.errors,
       pageCount: ebookDocument.pages.length,
     });
@@ -855,76 +606,27 @@ async function generateEbookDocumentBatch(
     );
   }
 
-  if (ebookDocument.pages.length < plan.slides.length) {
+  if (ebookDocument.pages.length !== plan.slides.length) {
+    const message = `Expected ${plan.slides.length} pages but received ${ebookDocument.pages.length}.`;
     completeTrace("failure", {
       pageCount: ebookDocument.pages.length,
       pageTitles: ebookDocument.pages.map((page) => page.title),
       errorReason: "invalid_html",
-      errorMessage: `Expected ${plan.slides.length} pages but received ${ebookDocument.pages.length}.`,
+      errorMessage: message,
     });
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",
-      batch: `${batch.batchNumber}/${batch.batchCount}`,
       expectedPageCount: plan.slides.length,
       pageCount: ebookDocument.pages.length,
     });
     return failGeneration(
       "invalid_html",
-      `Gemini returned only ${ebookDocument.pages.length} pages for a ${plan.slides.length}-slide batch.`,
+      `Gemini returned ${ebookDocument.pages.length} pages for a ${plan.slides.length}-slide plan.`,
       {
         stage: "html",
         validation: {
           ok: false,
-          errors: [`Expected ${plan.slides.length} pages but received ${ebookDocument.pages.length}.`],
-          pageCount: ebookDocument.pages.length,
-        },
-        pageCount: ebookDocument.pages.length,
-        generationTrace,
-      },
-    );
-  }
-
-  completeTrace("success", {
-    pageCount: ebookDocument.pages.length,
-    pageTitles: ebookDocument.pages.map((page) => page.title),
-  });
-
-  return ebookDocument;
-}
-
-export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan: EbookPlan) {
-  const slideBatches = chunkSlidesForHtmlGeneration(plan.slides);
-  const batchDocuments: CelionEbookDocument[] = [];
-  const generationTrace: EbookGenerationBatchTrace[] = [];
-
-  for (const [batchIndex, slides] of slideBatches.entries()) {
-    const slideStart = batchIndex * MAX_EBOOK_GENERATION_PAGES + 1;
-    const batchPlan = planForHtmlBatch(plan, slides);
-    batchDocuments.push(await generateEbookDocumentBatch(args, batchPlan, {
-      batchNumber: batchIndex + 1,
-      batchCount: slideBatches.length,
-      slideStart,
-      slideEnd: slideStart + slides.length - 1,
-      totalSlides: plan.slides.length,
-    }, generationTrace));
-  }
-
-  const ebookDocument = mergeEbookDocumentsForGeneration(batchDocuments, plan.title || args.title);
-  const documentValidation = validateEbookDocument(ebookDocument);
-  if (!documentValidation.ok) {
-    warnEbookGenerationFailure("invalid_html", {
-      stage: "html",
-      documentValidationErrors: documentValidation.errors,
-      pageCount: ebookDocument.pages.length,
-    });
-    return failGeneration(
-      "invalid_html",
-      `Gemini returned an ebook document, but it did not pass Celion document validation: ${documentValidation.errors[0] ?? "Unknown document validation error."}`,
-      {
-        stage: "html",
-        validation: {
-          ok: false,
-          errors: documentValidation.errors,
+          errors: [message],
           pageCount: ebookDocument.pages.length,
         },
         pageCount: ebookDocument.pages.length,
@@ -935,6 +637,18 @@ export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan:
 
   const html = compileEbookDocumentToHtml(ebookDocument);
   const validation = validateUsableEbookHtml(html);
+
+  completeTrace("success", {
+    pageCount: ebookDocument.pages.length,
+    pageTitles: ebookDocument.pages.map((page) => page.title),
+  });
+
+  return { html, validation, ebookDocument };
+}
+
+export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan: EbookPlan) {
+  const generationTrace: EbookGenerationBatchTrace[] = [];
+  const { html, validation, ebookDocument } = await generateCompleteEbookDocument(args, plan, generationTrace);
   if (!validation.ok) {
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",

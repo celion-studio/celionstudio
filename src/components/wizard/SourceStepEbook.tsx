@@ -5,7 +5,7 @@ import {
   SOURCE_FILE_ACCEPT,
   buildProjectSourcesFromFilesPartial,
 } from "@/lib/source-ingestion";
-import { CelionButton, getCelionButtonStyle } from "@/components/ui/celion-controls";
+import { CelionButton } from "@/components/ui/celion-controls";
 import type { WizardTone } from "@/store/useProjectWizardStore";
 import type { ProjectSource } from "@/types/project";
 
@@ -78,77 +78,33 @@ export function SourceStepEbook({
     <div className="space-y-5">
       <div>
         <div
-          style={{
-            display: "flex",
-            minHeight: "250px",
-            flexDirection: "column",
-            gap: "16px",
-            padding: "18px",
-            border: "1.5px dashed #dbd7cf",
-            borderRadius: "6px",
-            background: sources.length > 0 ? "#fbfbfa" : "#ffffff",
-            transition: "border-color 0.15s ease, background 0.15s ease",
-          }}
+          className="wizard-source-dropzone"
+          data-has-sources={sources.length > 0}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
             event.preventDefault();
             void handleFiles(Array.from(event.dataTransfer.files ?? []));
           }}
-          onMouseEnter={(event) => {
-            event.currentTarget.style.borderColor = "#1a1714";
-            event.currentTarget.style.background = "#f7f8fa";
-          }}
-          onMouseLeave={(event) => {
-            event.currentTarget.style.borderColor = "#dbd7cf";
-            event.currentTarget.style.background = sources.length > 0 ? "#fbfbfa" : "#ffffff";
-          }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "14px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: 0 }}>
-              <div
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "6px",
-                  border: "1px solid #e1e4e8",
-                  background: "#ffffff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <UploadCloud size={15} style={{ color: "#69707a" }} />
+          <div className="wizard-source-header">
+            <div className="wizard-source-title-row">
+              <div className="wizard-source-icon">
+                <UploadCloud size={15} />
               </div>
-              <div style={{ minWidth: 0 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontFamily: "'Geist', sans-serif",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "#17191d",
-                  }}
-                >
+              <div className="wizard-source-copy">
+                <p className="wizard-source-title">
                   Upload source files
                 </p>
-                <p
-                  style={{
-                    margin: "3px 0 0",
-                    fontSize: "12px",
-                    fontFamily: "'Geist', sans-serif",
-                    color: "#858b93",
-                  }}
-                >
+                <p className="wizard-source-subtitle">
                   Markdown, docx, csv, json, html
                 </p>
               </div>
             </div>
             {sources.length > 0 ? (
-              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+              <div className="wizard-source-actions">
                 <label
                   htmlFor={SOURCE_INPUT_ID}
-                  style={getCelionButtonStyle({ size: "sm" })}
+                  className="wizard-source-upload-button"
                 >
                   <Plus size={13} />
                   Add more
@@ -179,113 +135,41 @@ export function SourceStepEbook({
           {sources.length === 0 ? (
             <label
               htmlFor={SOURCE_INPUT_ID}
-              style={{
-                minHeight: "168px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "10px",
-                border: "1px solid #eef0f2",
-                borderRadius: "6px",
-                background: "#fbfbfa",
-                cursor: "pointer",
-                textAlign: "center",
-              }}
+              className="wizard-source-empty"
             >
-              <div
-                style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "6px",
-                  background: "#ffffff",
-                  border: "1px solid #e1e4e8",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <UploadCloud size={20} style={{ color: "#69707a" }} strokeWidth={1.7} />
+              <div className="wizard-source-empty-icon">
+                <UploadCloud size={20} strokeWidth={1.7} />
               </div>
-              <span
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  fontFamily: "'Geist', sans-serif",
-                  color: "#17191d",
-                }}
-              >
+              <span className="wizard-source-empty-title">
                 Choose source files
               </span>
-              <span
-                style={{
-                  fontSize: "12.5px",
-                  fontFamily: "'Geist', sans-serif",
-                  color: "#858b93",
-                }}
-              >
+              <span className="wizard-source-empty-subtitle">
                 Drop files here or browse from your computer
               </span>
             </label>
           ) : (
             <>
-              <div
-                style={{
-                  border: "1px solid #e1e4e8",
-                  borderRadius: "6px",
-                  background: "#ffffff",
-                  overflow: "hidden",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "12px",
-                    padding: "12px 14px",
-                    borderBottom: "1px solid #eef0f2",
-                    background: "#ffffff",
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontFamily: "'Geist', sans-serif",
-                      fontSize: "12.5px",
-                      fontWeight: 600,
-                      color: "#17191d",
-                    }}
-                  >
+              <div className="wizard-file-list">
+                <div className="wizard-file-list-head">
+                  <p className="wizard-file-list-title">
                     Added files
                   </p>
-                  <p style={{ margin: 0, fontFamily: "'Geist', sans-serif", fontSize: "12px", color: "#858b93" }}>
+                  <p className="wizard-file-list-count">
                     {sourceTextLength.toLocaleString()} extracted characters
                   </p>
                 </div>
 
-              <div style={{ padding: "8px" }}>
+              <div className="wizard-file-list-body">
                 {sources.map((source) => (
                   <div
                     key={source.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "9px",
-                      padding: "10px",
-                      border: "1px solid transparent",
-                      borderRadius: "6px",
-                      background: "#ffffff",
-                      fontSize: "13px",
-                      color: "#4b515a",
-                      fontFamily: "'Geist', sans-serif",
-                    }}
+                    className="wizard-file-row"
                   >
-                    <FileText size={14} style={{ color: "#858b93", flexShrink: 0 }} />
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <FileText size={14} className="wizard-file-icon" />
+                    <span className="wizard-file-name">
                       {source.name}
                     </span>
-                    <span style={{ marginLeft: "auto", color: "#b8b4aa", fontSize: "11.5px", whiteSpace: "nowrap" }}>
+                    <span className="wizard-file-kind">
                       {sourceKindLabel(source.kind)}
                     </span>
                   </div>

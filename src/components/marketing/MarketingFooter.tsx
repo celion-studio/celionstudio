@@ -15,19 +15,19 @@ export function MarketingFooter() {
               </svg>
               <span>celion</span>
             </div>
-            <p>Publishing software for founders, agencies, and operators turning raw notes into finished ebooks.</p>
+            <p>Software for turning notes, transcripts, and research into editable ebook drafts.</p>
           </div>
           <div className="footer-col">
             <h4>Product</h4>
             <Link href="/#how-it-works">How it works</Link>
             <Link href="/#preview">Preview</Link>
-            <Link href="/#export">Print PDF</Link>
+            <Link href="/#export">Export</Link>
             <Link href={PRICING_ROUTE}>Pricing</Link>
           </div>
         </div>
         <div className="footer-bottom">
           <span>Celion 2026. All rights reserved.</span>
-          <span>Designed for clear ebooks and better books.</span>
+          <span>Designed for source-led ebooks you can still edit.</span>
         </div>
       </div>
     </footer>

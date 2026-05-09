@@ -438,8 +438,9 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
 
-    assert.match(result.html, /page-1-cov-eyebrow/);
-    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "page-1-cov-eyebrow"));
+    assert.ok(result.diagnostics.ebookDocument);
+    assert.match(result.html, /cov-eyebrow/);
+    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "cov-eyebrow"));
   } finally {
     restoreWarn();
     globalThis.fetch = originalFetch;
@@ -480,6 +481,7 @@ test("generateEbookHtml removes inline style attributes from Gemini page HTML", 
 
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    assert.ok(result.diagnostics.ebookDocument);
     const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
 
     assert.doesNotMatch(storedDocumentJson, /\sstyle\s*=/i);
@@ -506,6 +508,7 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
 
     assert.match(result.html, /class="slide celion-page-shell"/);
     assert.match(result.html, /data-slide="1"/);
+    assert.ok(result.diagnostics.ebookDocument);
     assert.equal(result.diagnostics.ebookDocument.version, 1);
     assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
     assert.equal(result.diagnostics.ebookDocument.pages[0]?.id, "page-1");
@@ -528,10 +531,34 @@ test("generateEbookHtmlWithDiagnostics caps extra document pages to the MVP coun
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
 
+    assert.ok(result.diagnostics.ebookDocument);
     assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
     assert.match(result.html, /Extra page 10/i);
     assert.doesNotMatch(result.html, /Extra page 11/i);
   } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookHtmlWithDiagnostics rejects documents with fewer pages than the approved plan", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  setQueuedGemini([
+    geminiJsonResponse(validPlan(10, 10)),
+    geminiJsonResponse({ document: validEbookDocument("Missing page", 8) }),
+  ]);
+
+  try {
+    await assert.rejects(
+      () => generateEbookHtmlWithDiagnostics(baseArgs),
+      /Gemini returned 8 pages for a 10-slide plan/,
+    );
+  } finally {
+    restoreWarn();
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = originalApiKey;
@@ -559,6 +586,7 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
 
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    assert.ok(result.diagnostics.ebookDocument);
     const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
 
     assert.doesNotMatch(storedDocumentJson, /color-mix|oklch/);
@@ -604,9 +632,10 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.match(planPrompt, /Create a source-led A5 slide publication plan/);
     assert.match(planPrompt, /Purpose \/ use case/);
     assert.match(planPrompt, /Source material/);
-    assert.match(planPrompt, /sourceAssessment/);
-    assert.match(planPrompt, /recommendedSlideCount/);
     assert.match(planPrompt, /sourceAnchors/);
+    assert.match(planPrompt, /Each slide visualDirection must name a concrete visual device/);
+    assert.match(planPrompt, /evidence box, three-column framework grid, split comparison, timeline bar/);
+    assert.match(planPrompt, /do not allow more than two text-led pages in a row/);
     assert.doesNotMatch(planPrompt, /Reader and product brief|sellable publication/);
     assert.match(htmlSystem, /approved editorial plan/);
     assert.match(htmlPrompt, /Approved plan/);
@@ -614,12 +643,17 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.match(htmlPrompt, /Technical contract/);
     assert.match(htmlPrompt, /24px vertical space between major content groups/);
     assert.match(htmlPrompt, /line-height 1\.55-1\.75/);
-    assert.match(htmlPrompt, /If content feels crowded, shorten the copy/);
+    assert.match(htmlPrompt, /If content feels crowded, trim non-essential copy or simplify the device/);
     assert.match(htmlPrompt, /polished editorial card/);
+    assert.match(htmlPrompt, /Honor each slide visualDirection with actual CSS-drawn structure/);
+    assert.match(htmlPrompt, /Every non-cover page must express one primary structural device in CSS/);
     assert.match(htmlPrompt, /one memorable visual idea/);
     assert.match(htmlPrompt, /concrete visual structures/);
+    assert.match(htmlPrompt, /at least five distinct layout families/);
+    assert.match(htmlPrompt, /Do not reuse the same "headline \+ paragraph \+ one box" skeleton on consecutive pages/);
     assert.match(htmlPrompt, /Output only JSON with one "document" field/);
     assert.match(htmlPrompt, /Generate all pages in one response/);
+    assert.match(htmlPrompt, /Generate exactly 10 pages/);
     assert.match(htmlPrompt, /data-celion-page="\{pageId\}"/);
     assert.match(htmlPrompt, /Never put style="" attributes in HTML/);
     assert.match(htmlPrompt, /Every page CSS selector starts with \[data-celion-page="\{pageId\}"\]/);
@@ -635,13 +669,13 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
   }
 });
 
-test("generateEbookHtmlFromPlan generates long plans in 10-page batches", async () => {
+test("generateEbookHtmlFromPlan renders approved plans in one document call", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const calls: string[] = [];
   const requestBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "test-key";
-  const longPlan = validPlan(21, 21);
+  const longPlan = validPlan(14, 14);
   const longBody = "BODY_DETAIL_SHOULD_BE_COMPACTED ".repeat(160);
   const longEvidence = "EVIDENCE_DETAIL_SHOULD_BE_COMPACTED ".repeat(120);
   const longVisualDirection = "VISUAL_DETAIL_SHOULD_BE_COMPACTED ".repeat(90);
@@ -653,9 +687,7 @@ test("generateEbookHtmlFromPlan generates long plans in 10-page batches", async 
     visualDirection: longVisualDirection,
   }));
   setQueuedGemini([
-    geminiJsonResponse({ document: validEbookDocument("Batch one", 10) }),
-    geminiJsonResponse({ document: validEbookDocument("Batch two", 10) }),
-    geminiJsonResponse({ document: validEbookDocument("Batch three", 1) }),
+    geminiJsonResponse({ document: validEbookDocument("Single pass", 14) }),
   ], calls, requestBodies);
 
   try {
@@ -665,44 +697,33 @@ test("generateEbookHtmlFromPlan generates long plans in 10-page batches", async 
       generationConfig?: { httpOptions?: { timeout?: number } };
       contents?: { parts?: { text?: string }[] }[];
     };
-    const htmlRequests = requestBodies.slice(0, 3) as HtmlRequestBody[];
+    const htmlRequests = requestBodies.slice(0, 1) as HtmlRequestBody[];
     const htmlPrompts = htmlRequests.map((request) => request.contents?.[0]?.parts?.[0]?.text ?? "");
 
-    assert.equal(calls.length, 3);
+    assert.equal(calls.length, 1);
     assert.ok(calls.every((call) => call.includes("/models/gemini-3.1-pro-preview:generateContent")));
     assert.ok(htmlRequests.every((request) => request.generationConfig?.httpOptions === undefined));
-    assert.equal(result.ebookDocument.pages.length, 21);
-    assert.equal(result.generationTrace.length, 3);
-    assert.deepEqual(result.generationTrace.map((trace) => trace.status), ["success", "success", "success"]);
-    assert.deepEqual(result.generationTrace.map((trace) => [trace.slideStart, trace.slideEnd]), [[1, 10], [11, 20], [21, 21]]);
-    assert.deepEqual(result.generationTrace.map((trace) => trace.pageCount), [10, 10, 1]);
+    assert.ok(result.ebookDocument);
+    assert.equal(result.ebookDocument.pages.length, 14);
+    assert.equal(result.generationTrace.length, 1);
+    assert.deepEqual(result.generationTrace.map((trace) => trace.status), ["success"]);
+    assert.deepEqual(result.generationTrace.map((trace) => [trace.slideStart, trace.slideEnd]), [[1, 14]]);
+    assert.deepEqual(result.generationTrace.map((trace) => trace.pageCount), [14]);
     assert.ok(result.generationTrace.every((trace) => trace.durationMs !== undefined && trace.durationMs >= 0));
     assert.ok(result.generationTrace.every((trace) => trace.promptLength > 0));
-    assert.equal(result.generationTrace[2]?.slideHeadlines[0], "Source-led decision 21");
-    assert.deepEqual(result.ebookDocument.pages.map((page) => page.id), Array.from({ length: 21 }, (_, index) => `page-${index + 1}`));
-    assert.match(result.html, /Batch one 10/i);
-    assert.match(result.html, /Batch two 10/i);
-    assert.match(result.html, /Batch three 1/i);
+    assert.equal(result.generationTrace[0]?.slideHeadlines[13], "Source-led decision 14");
+    assert.deepEqual(result.ebookDocument.pages.map((page) => page.id), Array.from({ length: 14 }, (_, index) => `page-${index + 1}`));
+    assert.match(result.html, /Single pass 14/i);
 
-    assert.match(htmlPrompts[0] ?? "", /Batch 1 of 3/);
+    assert.doesNotMatch(htmlPrompts[0] ?? "", /Batch 1 of/);
     assert.match(htmlPrompts[0] ?? "", /Source-led decision 1/);
-    assert.match(htmlPrompts[0] ?? "", /Source-led decision 10/);
-    assert.doesNotMatch(htmlPrompts[0] ?? "", /Source-led decision 11/);
-
-    assert.match(htmlPrompts[1] ?? "", /Batch 2 of 3/);
-    assert.match(htmlPrompts[1] ?? "", /Source-led decision 11/);
-    assert.match(htmlPrompts[1] ?? "", /Source-led decision 20/);
-    assert.doesNotMatch(htmlPrompts[1] ?? "", /Source-led decision 10/);
-
-    assert.match(htmlPrompts[2] ?? "", /Batch 3 of 3/);
-    assert.match(htmlPrompts[2] ?? "", /Source-led decision 21/);
-    assert.doesNotMatch(htmlPrompts[2] ?? "", /Source-led decision 20/);
+    assert.match(htmlPrompts[0] ?? "", /Source-led decision 14/);
 
     assert.match(htmlPrompts[0] ?? "", /BODY_DETAIL_SHOULD_BE_COMPACTED/);
-    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longBody.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longEvidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(htmlPrompts[0] ?? "", new RegExp(longVisualDirection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(htmlPrompts[0] ?? "", /anchor 9/);
+    assert.match(htmlPrompts[0] ?? "", new RegExp(longBody.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(htmlPrompts[0] ?? "", new RegExp(longEvidence.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(htmlPrompts[0] ?? "", new RegExp(longVisualDirection.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(htmlPrompts[0] ?? "", /anchor 9/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -710,7 +731,7 @@ test("generateEbookHtmlFromPlan generates long plans in 10-page batches", async 
   }
 });
 
-test("ebook plan prompt expands the slide budget for long source material", async () => {
+test("ebook plan prompt matches the legacy 8-14 slide plan budget", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const calls: string[] = [];
   const requestBodies: unknown[] = [];
@@ -720,9 +741,8 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
     `## Section ${index + 1}\nThis source section includes a concrete method, warning, example, and detail that should not be collapsed into one tiny summary.`,
   ).join("\n\n");
   setQueuedGemini([
-    geminiJsonResponse(validPlan(20, 20)),
-    geminiJsonResponse({ document: validEbookDocument() }),
-    geminiJsonResponse({ document: validEbookDocument() }),
+    geminiJsonResponse(validPlan(14, 14)),
+    geminiJsonResponse({ document: validEbookDocument("Source-led decision", 14) }),
   ], calls, requestBodies);
 
   try {
@@ -732,10 +752,9 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
     };
     const planPrompt = planRequest.contents?.[0]?.parts?.[0]?.text ?? "";
 
-    assert.match(planPrompt, /Recommended slide budget: 18-22 slides/);
-    assert.match(planPrompt, /The plan must choose recommendedSlideCount after assessing the source/);
-    assert.match(planPrompt, /Do not compress a long source into 10 slides/);
-    assert.doesNotMatch(planPrompt, /Return exactly 10 slides|prioritize the source's highest-value sections/);
+    assert.match(planPrompt, /Make 8-14 slides total in one self-contained deck/);
+    assert.match(planPrompt, /Plan requirements/);
+    assert.doesNotMatch(planPrompt, /recommendedSlideCount|capped at 14|lead magnet|Source scale|Recommended slide budget: 18-22 slides|Do not compress a long source into 10 slides/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -743,36 +762,31 @@ test("ebook plan prompt expands the slide budget for long source material", asyn
   }
 });
 
-test("generateEbookHtml batches plans that exceed the generation page count", async () => {
+test("generateEbookHtml renders the normalized plan in a single HTML request", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
   const requestBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "test-key";
   setQueuedGemini([
-    geminiJsonResponse(validPlan(20, 20)),
-    geminiJsonResponse({ document: validEbookDocument("Founder decision", 10) }),
-    geminiJsonResponse({ document: validEbookDocument("Founder decision", 10) }),
+    geminiJsonResponse(validPlan(14, 14)),
+    geminiJsonResponse({ document: validEbookDocument("Founder decision", 14) }),
   ], [], requestBodies);
 
   try {
     const html = await generateEbookHtml(baseArgs);
-    const firstHtmlRequest = requestBodies[1] as {
+    const htmlRequest = requestBodies[1] as {
       contents?: { parts?: { text?: string }[] }[];
     };
-    const secondHtmlRequest = requestBodies[2] as typeof firstHtmlRequest;
-    const firstHtmlPrompt = firstHtmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
-    const secondHtmlPrompt = secondHtmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
+    const htmlPrompt = htmlRequest.contents?.[0]?.parts?.[0]?.text ?? "";
 
-    assert.match(html, /Founder decision 10/);
-    assert.match(html, /data-slide="20"/);
-    const firstBatchHeadlines = firstHtmlPrompt.match(/Source-led decision \d+/g) ?? [];
-    const secondBatchHeadlines = secondHtmlPrompt.match(/Source-led decision \d+/g) ?? [];
-    assert.equal(firstBatchHeadlines.length, 10);
-    assert.equal(secondBatchHeadlines.length, 10);
-    assert.ok(firstBatchHeadlines.includes("Source-led decision 1"));
-    assert.ok(firstBatchHeadlines.includes("Source-led decision 10"));
-    assert.ok(secondBatchHeadlines.includes("Source-led decision 11"));
-    assert.ok(secondBatchHeadlines.includes("Source-led decision 20"));
+    assert.equal(requestBodies.length, 2);
+    assert.match(html, /Founder decision 14/);
+    assert.match(html, /data-slide="14"/);
+    const headlines = htmlPrompt.match(/Source-led decision \d+/g) ?? [];
+    assert.equal(headlines.length, 14);
+    assert.ok(headlines.includes("Source-led decision 1"));
+    assert.ok(headlines.includes("Source-led decision 14"));
+    assert.doesNotMatch(htmlPrompt, /Batch 1 of/);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;

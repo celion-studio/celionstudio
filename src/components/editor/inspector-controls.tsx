@@ -1,6 +1,6 @@
 "use client";
 
-import type { ChangeEvent, FocusEvent, ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from "lucide-react";
 import type { CelionEditableElement } from "@/lib/ebook-document";
 import { CelionSegmentedControl } from "@/components/ui/celion-controls";
@@ -15,59 +15,6 @@ type Props = {
   onStyleChange: (prop: string, value: string) => void;
 };
 
-const controlInputStyle = {
-  width: "100%",
-  height: "30px",
-  padding: "0 8px",
-  borderRadius: "6px",
-  border: "1px solid #dedee3",
-  background: "#ffffff",
-  color: "#18181b",
-  fontSize: "12px",
-  fontFamily: "'Geist', sans-serif",
-  outline: "none",
-  boxSizing: "border-box",
-} as const;
-
-const textareaStyle = {
-  ...controlInputStyle,
-  height: "112px",
-  padding: "8px 9px",
-  lineHeight: 1.45,
-  resize: "vertical",
-} as const;
-
-const sectionStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "9px",
-  padding: "12px 0",
-  borderTop: "1px solid #eeeeef",
-} as const;
-
-const sectionTitleStyle = {
-  margin: 0,
-  color: "#8d9098",
-  fontSize: "10px",
-  fontWeight: 600,
-  letterSpacing: "0.08em",
-  textTransform: "uppercase",
-} as const;
-
-const controlRowStyle = {
-  display: "grid",
-  gridTemplateColumns: "76px minmax(0, 1fr)",
-  alignItems: "center",
-  gap: "9px",
-  minHeight: "30px",
-} as const;
-
-const controlLabelStyle = {
-  color: "#71717a",
-  fontSize: "11.5px",
-  lineHeight: 1.2,
-} as const;
-
 const alignOptions = [
   { value: "left", label: "Align left", Icon: AlignLeft },
   { value: "center", label: "Align center", Icon: AlignCenter },
@@ -80,14 +27,6 @@ function clampValue(value: number, min?: number, max?: number) {
   if (typeof min === "number") nextValue = Math.max(min, nextValue);
   if (typeof max === "number") nextValue = Math.min(max, nextValue);
   return nextValue;
-}
-
-function focusControl(event: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  event.currentTarget.style.borderColor = "#a1a1aa";
-}
-
-function blurControl(event: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  event.currentTarget.style.borderColor = "#dedee3";
 }
 
 function numberFromStyleValue(value: string | undefined, options?: { unitlessOnly?: boolean }) {
@@ -127,9 +66,9 @@ function InspectorSection({
   children: ReactNode;
 }) {
   return (
-    <div style={sectionStyle}>
-      <p style={sectionTitleStyle}>{title}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div className="inspector-section">
+      <p className="inspector-section-title">{title}</p>
+      <div className="inspector-section-body">
         {children}
       </div>
     </div>
@@ -144,8 +83,8 @@ function ControlRow({
   children: ReactNode;
 }) {
   return (
-    <div style={controlRowStyle}>
-      <span style={controlLabelStyle}>{label}</span>
+    <div className="inspector-control-row">
+      <span className="inspector-control-label">{label}</span>
       {children}
     </div>
   );
@@ -179,9 +118,7 @@ function NumberControl({
         placeholder={placeholder}
         defaultValue={value ?? ""}
         onChange={onChange}
-        onFocus={focusControl}
-        onBlur={blurControl}
-        style={controlInputStyle}
+        className="inspector-input"
       />
     </ControlRow>
   );
@@ -202,11 +139,7 @@ function ColorControl({
         type="color"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        style={{
-          ...controlInputStyle,
-          padding: "3px 6px",
-          cursor: "pointer",
-        }}
+        className="inspector-input inspector-color-input"
       />
     </ControlRow>
   );
@@ -246,7 +179,7 @@ export function InspectorControls({
 }: Props) {
   if (!element) {
     return (
-      <p style={{ fontSize: "12.5px", color: "#a1a1aa", lineHeight: 1.6 }}>
+      <p className="inspector-empty">
         Click an editable element in the preview.
       </p>
     );
@@ -269,8 +202,8 @@ export function InspectorControls({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
-      <p style={{ fontSize: "13px", fontWeight: 500, color: "#18181b", margin: "0 0 2px" }}>
+    <div className="inspector-controls">
+      <p className="inspector-element-label">
         {element.label}
       </p>
 
@@ -280,32 +213,12 @@ export function InspectorControls({
             value={textValue}
             onChange={(event) => onTextChange(event.target.value)}
             rows={6}
-            style={textareaStyle}
-            onFocus={focusControl}
-            onBlur={blurControl}
+            className="inspector-input inspector-textarea"
           />
           <button
             onClick={onApplyText}
             disabled={!textValue.trim()}
-            onMouseEnter={(event) => {
-              if (textValue.trim()) event.currentTarget.style.background = "#2f3034";
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.background = "#18181b";
-            }}
-            style={{
-              height: "30px",
-              padding: "0 12px",
-              borderRadius: "6px",
-              background: "#18181b",
-              color: "#ffffff",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 500,
-              fontFamily: "'Geist', sans-serif",
-              opacity: textValue.trim() ? 1 : 0.4,
-            }}
+            className="inspector-apply-button"
           >
             Apply text
           </button>

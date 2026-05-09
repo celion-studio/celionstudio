@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { buildAuthHref } from "@/lib/auth-redirect";
 import { getPageSession } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -119,7 +120,7 @@ const faqs = [
 
 export default async function PricingPage() {
   const session = await getPageSession();
-  const actionHref = (session?.user ? "/new" : "/") as Route;
+  const actionHref = (session?.user ? "/dashboard" : buildAuthHref("sign-up", "/dashboard")) as Route;
 
   return (
     <div className="editorial-landing-page pricing-page">
@@ -184,7 +185,7 @@ export default async function PricingPage() {
                     </a>
                   ) : (
                     <Link className="pricing-card-cta" href={actionHref}>
-                      {plan.name === "Starter" ? "Start free" : "Start a draft"}
+                      {plan.name === "Starter" ? "Start free" : "Create an ebook"}
                       <ArrowRight size={14} aria-hidden="true" />
                     </Link>
                   )}
@@ -232,7 +233,7 @@ export default async function PricingPage() {
           <div className="container pricing-container">
             <h2>Start with a source that deserves a better form.</h2>
             <Link className="btn btn-dark" href={actionHref}>
-              Start a draft
+              Create an ebook
             </Link>
           </div>
         </section>

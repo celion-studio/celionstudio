@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, type RefObject } from "react";
+import { memo, type CSSProperties, type RefObject } from "react";
 import { ArrowLeft, ChevronDown, Download } from "lucide-react";
 import Link from "next/link";
 import type { CelionEditableElement } from "@/lib/ebook-document";
@@ -45,14 +45,20 @@ export function EditorTopBar({
   onExport,
 }: TopBarProps) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", gap: "12px", padding: `0 ${edgeGap}px`, height: `${topRailHeight}px`, background: "transparent", flexShrink: 0, boxSizing: "border-box" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-        <Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: "6px", color: "#71717a", textDecoration: "none", fontSize: "13px", flexShrink: 0 }}>
+    <div
+      className="editor-topbar"
+      style={{
+        "--editor-edge-gap": `${edgeGap}px`,
+        "--editor-top-rail-height": `${topRailHeight}px`,
+      } as CSSProperties}
+    >
+      <div className="editor-topbar-left">
+        <Link href="/dashboard" className="editor-back-link">
           <ArrowLeft size={14} />
           Back
         </Link>
-        <span style={{ color: "#d4d2cc", fontSize: "13px", flexShrink: 0 }}>/</span>
-        <span style={{ fontSize: "13.5px", fontWeight: 500, color: "#18181b", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{projectTitle}</span>
+        <span className="editor-breadcrumb-separator">/</span>
+        <span className="editor-project-title">{projectTitle}</span>
       </div>
 
       {showModeToggle ? (
@@ -61,32 +67,29 @@ export function EditorTopBar({
         <span aria-hidden="true" />
       )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "10px", minWidth: 0 }}>
-        {saving && <span style={{ fontSize: "12px", color: "#a1a1aa", whiteSpace: "nowrap" }}>Saving...</span>}
-        {saveError && <span style={{ fontSize: "12px", color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{saveError}</span>}
-        {exportError && <span style={{ fontSize: "12px", color: "#b45309", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{exportError}</span>}
+      <div className="editor-topbar-right">
+        {saving && <span className="editor-status">Saving...</span>}
+        {saveError && <span className="editor-status editor-status-error">{saveError}</span>}
+        {exportError && <span className="editor-status editor-status-error">{exportError}</span>}
 
-        <div style={{ position: "relative", flexShrink: 0 }}>
+        <div className="editor-export-anchor">
           <CelionButton
             onClick={onToggleExport}
             disabled={exporting || !canExport}
             size="sm"
             variant="primary"
-            style={{ padding: "0 14px" }}
           >
             <Download size={13} />
             {exporting ? "Exporting..." : "Export"}
             <ChevronDown size={12} />
           </CelionButton>
           {exportOpen && (
-            <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "#ffffff", border: "1px solid #e4e4e7", borderRadius: "6px", boxShadow: "none", overflow: "hidden", zIndex: 50, minWidth: "140px" }}>
+            <div className="editor-export-menu">
               {(["pdf", "html", "png", "jpg"] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => onExport(fmt)}
-                  style={{ display: "block", width: "100%", padding: "10px 16px", textAlign: "left", fontSize: "13px", color: "#18181b", background: "none", border: "none", cursor: "pointer", fontFamily: "'Geist', sans-serif" }}
-                  onMouseEnter={(event) => { event.currentTarget.style.background = "#f4f4f5"; }}
-                  onMouseLeave={(event) => { event.currentTarget.style.background = "none"; }}
+                  className="editor-export-option"
                 >
                   Export as {fmt.toUpperCase()}
                 </button>
@@ -135,36 +138,25 @@ function EditorPageListComponent({
   onSelectPage,
 }: PageListProps) {
   return (
-    <div style={{ width: "220px", background: "transparent", overflowY: "auto", padding: "14px 4px 14px 0", flexShrink: 0 }}>
-      <p style={{ fontSize: "10px", fontWeight: 650, letterSpacing: "0.11em", color: "#a1a1aa", textTransform: "uppercase", marginBottom: "10px", paddingLeft: "6px" }}>
+    <div className="editor-page-list">
+      <p className="editor-page-list-count">
         {slideCount} pages
       </p>
       {Array.from({ length: slideCount }).map((_, index) => (
         <button
           key={index}
           onClick={() => onSelectPage(index)}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "28px minmax(0, 1fr)",
-            gap: "8px",
-            width: "100%",
-            padding: "8px 9px",
-            borderRadius: "6px",
-            border: currentSlide === index ? "1px solid rgba(28,25,23,0.08)" : "1px solid transparent",
-            background: currentSlide === index ? "rgba(255,255,255,0.72)" : "transparent",
-            cursor: "pointer",
-            marginBottom: "3px",
-            textAlign: "left",
-          }}
+          className="editor-page-list-item"
+          data-active={currentSlide === index ? "true" : "false"}
         >
-          <span style={{ width: "28px", height: "22px", display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: currentSlide === index ? "#18181b" : "rgba(255,255,255,0.56)", color: currentSlide === index ? "#ffffff" : "#71717a", fontSize: "11px", fontWeight: 650, fontFamily: "'Geist', sans-serif", lineHeight: 1 }}>
+          <span className="editor-page-index">
             {index + 1}
           </span>
-          <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "12px", fontWeight: 560, color: "#3f3f46", lineHeight: 1.25 }}>
+          <span className="editor-page-copy">
+            <span className="editor-page-title">
               {pageSummaries[index]?.title || `Page ${index + 1}`}
             </span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "10px", color: "#a1a1aa", lineHeight: 1.2, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            <span className="editor-page-role">
               {pageSummaries[index]?.eyebrow || (index === 0 ? "Cover" : "Content")}
             </span>
           </span>
@@ -196,20 +188,26 @@ function EditorPreviewPaneComponent({
   onPreviewScroll,
 }: PreviewPaneProps) {
   return (
-    <div ref={previewScrollRef} onScroll={onPreviewScroll} style={{ flex: 1, overflow: "auto", display: "flex", justifyContent: "center", padding: "40px 24px", background: "#f8f7f4" }}>
-      <div style={{ width: `${width}px` }}>
+    <div ref={previewScrollRef} onScroll={onPreviewScroll} className="editor-preview-pane">
+      <div
+        className="editor-preview-page"
+        style={{ "--editor-preview-width": `${width}px` } as CSSProperties}
+      >
         {html ? (
           <iframe
             ref={iframeRef}
             srcDoc={html}
             onLoad={onIframeLoad}
             scrolling="no"
-            style={{ width: `${width}px`, height: `${iframeHeight}px`, border: "none", display: "block", overflow: "hidden" }}
+            className="editor-preview-frame"
+            style={{
+              "--editor-iframe-height": `${iframeHeight}px`,
+            } as CSSProperties}
             sandbox="allow-same-origin"
             title="Project preview"
           />
         ) : (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "400px", color: "#a1a1aa", fontSize: "14px" }}>
+          <div className="editor-preview-empty">
             No content yet.
           </div>
         )}
@@ -244,12 +242,17 @@ export function EditorInspectorPanel({
   onStyleChange,
 }: InspectorPanelProps) {
   return (
-    <div style={{ width: "286px", minHeight: `calc(100vh - ${topRailHeight + edgeGap}px)`, background: "#ffffff", border: "1px solid rgba(28,25,23,0.08)", borderRadius: "6px", padding: "16px", flexShrink: 0, overflowY: "auto", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-        <h3 style={{ fontSize: "12px", fontWeight: 650, letterSpacing: "0.06em", textTransform: "uppercase", color: "#71717a", margin: 0 }}>
+    <div
+      className="editor-inspector-panel"
+      style={{
+        "--editor-inspector-min-height": `calc(100vh - ${topRailHeight + edgeGap}px)`,
+      } as CSSProperties}
+    >
+      <div className="editor-inspector-head">
+        <h3 className="editor-inspector-title">
           Inspector
         </h3>
-        <span style={{ fontSize: "11px", color: "#a1a1aa" }}>
+        <span className="editor-inspector-role">
           {selectedElement?.role || "None"}
         </span>
       </div>

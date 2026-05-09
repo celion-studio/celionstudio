@@ -6,8 +6,7 @@ export const MAX_SOURCES = 8;
 export const MAX_SOURCE_CONTENT_LENGTH = 50_000;
 export const MAX_TOTAL_SOURCE_CONTENT_LENGTH = 120_000;
 export const MIN_EBOOK_PLAN_SLIDES = 8;
-export const MAX_EBOOK_PLAN_SLIDES = 30;
-export const MAX_EBOOK_GENERATION_PAGES = 10;
+export const MAX_EBOOK_PLAN_SLIDES = 14;
 
 export const MAX_SAVE_HTML_LENGTH = 1_000_000;
 export const MAX_EBOOK_DOCUMENT_JSON_LENGTH = 1_250_000;

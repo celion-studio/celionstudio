@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { EBOOK_STYLE_LABELS } from "@/lib/ebook-style";
 import type { EbookStyle } from "@/types/project";
@@ -15,11 +16,11 @@ type Props = {
 export function GenerateStepEbook({ title, author, ebookStyle, accentColor, generating }: Props) {
   return (
     <div className="space-y-5">
-      <div style={{ padding: "18px", borderRadius: "6px", background: "#f7f6f4", border: "1px solid #e8e5e0" }}>
-        <h3 style={{ fontFamily: "'Geist', sans-serif", fontSize: "13px", fontWeight: 600, color: "#1a1714", marginBottom: "12px" }}>
+      <div className="wizard-generate-summary">
+        <h3 className="wizard-generate-title">
           Summary
         </h3>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div className="wizard-generate-summary-list">
           {[
             ["Title", title || "-"],
             ["Author", author || "-"],
@@ -27,12 +28,15 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
             ["Format", "A5 ebook"],
             ["Accent", accentColor],
           ].map(([label, value]) => (
-            <div key={label} style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-              <span style={{ fontFamily: "'Geist', sans-serif", fontSize: "12px", color: "#8a867e", width: "52px", flexShrink: 0 }}>{label}</span>
-              <span style={{ fontFamily: "'Geist', sans-serif", fontSize: "12.5px", color: "#1a1714", fontWeight: 500 }}>
+            <div key={label} className="wizard-generate-summary-row">
+              <span className="wizard-generate-summary-label">{label}</span>
+              <span className="wizard-generate-summary-value">
                 {label === "Accent" ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ width: "12px", height: "12px", borderRadius: "50%", background: value, display: "inline-block", border: "1px solid rgba(0,0,0,0.1)" }} />
+                  <span
+                    className="wizard-generate-accent"
+                    style={{ "--wizard-accent-color": value } as CSSProperties}
+                  >
+                    <span className="wizard-generate-accent-dot" />
                     {value}
                   </span>
                 ) : value}
@@ -43,17 +47,17 @@ export function GenerateStepEbook({ title, author, ebookStyle, accentColor, gene
       </div>
 
       {generating ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "24px 0" }}>
-          <Loader2 size={22} style={{ color: "#1a1714", animation: "spin 1s linear infinite" }} />
-          <p style={{ fontFamily: "'Geist', sans-serif", fontSize: "13.5px", color: "#8a867e", textAlign: "center" }}>
+        <div className="wizard-generate-loading">
+          <Loader2 size={22} className="wizard-generate-spinner" />
+          <p className="wizard-generate-loading-text">
             Generating your ebook. This may take 30-90 seconds...
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px 16px", borderRadius: "6px", background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-          <Sparkles size={15} style={{ color: "#16a34a", marginTop: "1px", flexShrink: 0 }} />
-          <p style={{ fontFamily: "'Geist', sans-serif", fontSize: "12.5px", color: "#166534", lineHeight: 1.5 }}>
-            Celion will render the approved plan into a fixed A5 HTML/CSS sales-preview ebook in the {ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "selected"} style. You can edit the text after generation.
+        <div className="wizard-generate-ready">
+          <Sparkles size={15} className="wizard-generate-ready-icon" />
+          <p className="wizard-generate-ready-text">
+            Celion will render the approved plan into an editable A5 ebook in the {ebookStyle ? EBOOK_STYLE_LABELS[ebookStyle] : "selected"} style. You can edit the text after generation.
           </p>
         </div>
       )}

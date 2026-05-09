@@ -246,85 +246,37 @@ export function WizardContent({
   const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
 
   return (
-    <div
-      style={{
-        width: "100%",
-        maxWidth: "820px",
-        margin: "0 auto",
-      }}
-    >
-      <section style={{ marginBottom: compact ? "34px" : "52px", textAlign: compact ? "left" : "center" }}>
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: "'Geist', sans-serif",
-            fontSize: compact ? "26px" : "34px",
-            lineHeight: compact ? 1.14 : 1.08,
-            letterSpacing: 0,
-            fontWeight: 500,
-            color: "#17191d",
-          }}
-        >
+    <div className="wizard-content-shell">
+      <section className="wizard-hero" data-compact={compact}>
+        <h1 className="wizard-hero-title">
           {STEP_TITLES[currentStepIndex]}
         </h1>
-        <p
-          style={{
-            margin: compact ? "8px 0 0" : "12px auto 0",
-            maxWidth: compact ? "560px" : "420px",
-            fontFamily: "'Geist', sans-serif",
-            fontSize: "13.5px",
-            lineHeight: 1.55,
-            color: "#858b93",
-          }}
-        >
+        <p className="wizard-hero-description">
           {STEP_DESCRIPTIONS[currentStepIndex]}
         </p>
 
-        <div style={{ display: "flex", justifyContent: compact ? "flex-start" : "center", marginTop: compact ? "22px" : "28px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "14px", minWidth: 0, flexWrap: "wrap" }}>
+        <div className="wizard-progress-wrap">
+          <div className="wizard-progress-list">
             {STEP_LABELS.map((label, index) => {
               const stepNumber = index + 1;
               const isActive = step === stepNumber;
               const isDone = step > stepNumber;
+              const canSelectStep = !busy && (isDone || stepNumber === step);
 
               return (
                 <button
                   key={label}
                   type="button"
                   onClick={() => {
-                    if (!busy && (isDone || stepNumber === step)) {
+                    if (canSelectStep) {
                       setStep(stepNumber as WizardStep);
                     }
                   }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    border: "none",
-                    background: "transparent",
-                    padding: 0,
-                    cursor: !busy && (isDone || stepNumber === step) ? "pointer" : "default",
-                    color: isActive ? "#17191d" : isDone ? "#4b515a" : "#b6bbc2",
-                    fontFamily: "'Geist', sans-serif",
-                    fontSize: "11.5px",
-                    fontWeight: isActive ? 600 : 500,
-                  }}
+                  className="wizard-progress-step"
+                  data-state={isActive ? "active" : isDone ? "done" : "upcoming"}
+                  data-clickable={canSelectStep}
                 >
-                  <span
-                    style={{
-                      width: "18px",
-                      height: "18px",
-                      borderRadius: "6px",
-                      border: isActive || isDone ? "1px solid #24272c" : "1px solid #d7dbe0",
-                      background: isDone ? "#24272c" : isActive ? "#ffffff" : "#f6f7f8",
-                      color: isDone ? "#ffffff" : isActive ? "#24272c" : "#858b93",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "10px",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span className="wizard-progress-number">
                     {stepNumber}
                   </span>
                   {label}
@@ -335,7 +287,7 @@ export function WizardContent({
         </div>
       </section>
 
-      <section key={step} className="step-in" style={{ marginTop: "0" }}>
+      <section key={step} className="step-in wizard-step-pane">
         {step === 1 && (
           <BasicsStep
             title={title}
@@ -386,10 +338,10 @@ export function WizardContent({
         )}
       </section>
 
-      <div style={{ marginTop: "32px", paddingTop: "20px", borderTop: "1px solid #eef0f2", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px" }}>
+      <div className="wizard-footer">
           <div>
             {error ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "#5f6670", fontFamily: "'Geist', sans-serif", background: "#f7f6f3", border: "1px solid #e5e2dc", borderRadius: "6px", padding: "5px 10px" }}>
+              <span className="wizard-error-pill">
                 {error}
               </span>
             ) : null}
@@ -402,7 +354,7 @@ export function WizardContent({
                 onClick={handlePrevious}
                 size="md"
                 variant="secondary"
-                style={{ minHeight: "38px", padding: "0 16px" }}
+                className="wizard-nav-button wizard-nav-button-secondary"
               >
                 <ArrowLeft size={12} />
                 Previous
@@ -414,7 +366,7 @@ export function WizardContent({
               onClick={handleNext}
               size="md"
               variant="primary"
-              style={{ minHeight: "38px", padding: "0 20px" }}
+              className="wizard-nav-button wizard-nav-button-primary"
             >
               {ctaLabel}
               {ctaIcon}
