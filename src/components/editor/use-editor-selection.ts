@@ -37,6 +37,11 @@ export function useEditorSelection() {
     setStyleValues((current) => ({ ...current, [prop]: value }));
   }, []);
 
+  const commitTextValue = useCallback((value: string) => {
+    setSelectedText(value);
+    setEditValue(value);
+  }, []);
+
   const inspectorElement = useMemo(() => selectedElement ?? (selectedText
     ? {
         id: "legacy-selected-text",
@@ -59,6 +64,7 @@ export function useEditorSelection() {
     inspectorElement,
     setEditValue,
     setStyleValue,
+    commitTextValue,
     clearSelection,
     selectElement,
   };

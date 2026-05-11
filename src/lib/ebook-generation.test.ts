@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   EbookGenerationError,
+  generateEbookPage,
   generateEbookHtml,
   generateEbookHtmlFromPlan,
   generateEbookHtmlWithDiagnostics,
 } from "./ebook-generation";
-import type { CelionEbookDocument } from "./ebook-document";
+import { validateEbookDocument, type CelionEbookDocument } from "./ebook-document";
 import { setGeminiClientFactoryForTests } from "./ai/gemini";
 
 const originalGoogleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -143,6 +144,22 @@ function validEbookDocument(titlePrefix = "Founder decision", pageCount = 10): C
         },
       };
     }),
+  };
+}
+
+function cleanEbookDocument(titlePrefix = "Clean decision", pageCount = 10): CelionEbookDocument {
+  const document = validEbookDocument(titlePrefix, pageCount);
+  return {
+    ...document,
+    pages: document.pages.map((page) => ({
+      ...page,
+      html: page.html
+        .replace(/\sdata-celion-page="[^"]+"/, "")
+        .replace(/\sdata-celion-id="[^"]+"/g, "")
+        .replace(/\sdata-role="[^"]+"/g, "")
+        .replace(/\sdata-editable="true"/g, ""),
+      manifest: { editableElements: [] },
+    })),
   };
 }
 
@@ -449,6 +466,80 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   }
 });
 
+test("generateEbookHtml decorates clean Gemini HTML without manifest entries", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  setQueuedGemini([
+    geminiJsonResponse(validPlan()),
+    geminiJsonResponse({ document: cleanEbookDocument("Clean source") }),
+  ]);
+
+  try {
+    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const page = result.diagnostics.ebookDocument.pages[0]!;
+    const validation = validateEbookDocument(result.diagnostics.ebookDocument);
+
+    assert.equal(validation.ok, true, validation.errors.join("\n"));
+    assert.match(page.html, /data-celion-page="page-1"/);
+    assert.match(page.html, /data-celion-id="page-1-text-001"/);
+    assert.ok(page.manifest.editableElements.some((element) => element.id === "page-1-text-001"));
+  } finally {
+    restoreWarn();
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
+test("generateEbookPage decorates clean single-page Gemini HTML", async () => {
+  const originalApiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch;
+  const restoreWarn = muteConsoleWarn();
+  process.env.GEMINI_API_KEY = "test-key";
+  const cleanPage = {
+    ...cleanEbookDocument("Added clean page", 1).pages[0]!,
+    id: "ignored",
+    index: 1,
+    css: `[data-celion-page="page-new"] {
+  width: 559px;
+  height: 794px;
+  overflow: hidden;
+  padding: 56px;
+}
+[data-celion-page="page-new"] h1 {
+  font-size: 42px;
+}`,
+  };
+  setQueuedGemini([
+    geminiJsonResponse({ page: cleanPage }),
+  ]);
+
+  try {
+    const result = await generateEbookPage({
+      document: validEbookDocument("Existing page", 2),
+      insertIndex: 1,
+      pageId: "page-new",
+    });
+    const validation = validateEbookDocument({
+      ...validEbookDocument("Shell", 1),
+      pages: [result.page],
+    });
+
+    assert.equal(validation.ok, true, validation.errors.join("\n"));
+    assert.equal(result.page.id, "page-new");
+    assert.match(result.page.html, /data-celion-page="page-new"/);
+    assert.match(result.page.html, /data-celion-id="page-new-text-001"/);
+    assert.ok(result.page.manifest.editableElements.some((element) => element.id === "page-new-text-001"));
+  } finally {
+    restoreWarn();
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = originalApiKey;
+  }
+});
+
 test("generateEbookHtml removes inline style attributes from Gemini page HTML", async () => {
   const originalApiKey = process.env.GEMINI_API_KEY;
   const originalFetch = globalThis.fetch;
@@ -657,7 +748,11 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.match(htmlPrompt, /data-celion-page="\{pageId\}"/);
     assert.match(htmlPrompt, /Never put style="" attributes in HTML/);
     assert.match(htmlPrompt, /Every page CSS selector starts with \[data-celion-page="\{pageId\}"\]/);
-    assert.match(htmlPrompt, /Manifest includes every editable element/);
+    assert.match(htmlPrompt, /Use clean semantic HTML with meaningful class names/);
+    assert.match(htmlPrompt, /Keep editable text, images, card titles, block titles, labels, captions, badges, and list headings as separate DOM nodes/);
+    assert.match(htmlPrompt, /Do not add Celion editor metadata manually/);
+    assert.match(htmlPrompt, /No editable manifest is required from the model/);
+    assert.doesNotMatch(htmlPrompt, /data-celion-id|data-role|data-editable/);
     assert.doesNotMatch(htmlPrompt, /# Market/);
     assert.doesNotMatch(planPrompt, /Core message:/);
     assert.doesNotMatch(htmlPrompt, /Why this matters now|The core idea|How to apply it/);

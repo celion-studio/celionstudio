@@ -11,6 +11,13 @@ export type RuntimeTextSelection = {
 
 export type InspectorStyleValues = Record<string, string>;
 
+export type InspectorLayoutValues = {
+  x: string;
+  y: string;
+  width: string;
+  height: string;
+};
+
 export type ReadyPreviewDocument = {
   doc: Document;
   root: HTMLElement;

@@ -1,12 +1,13 @@
 "use client";
 
 import { memo, type CSSProperties, type RefObject } from "react";
-import { ArrowLeft, ChevronDown, Download } from "lucide-react";
+import { ArrowLeft, ChevronDown, Download, Undo2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import type { CelionEditableElement } from "@/lib/ebook-document";
 import { CelionButton, CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { PageSummary } from "./editor-preview";
-import type { EditorMode, InspectorStyleValues } from "./editor-types";
+import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
 import { InspectorControls } from "./inspector-controls";
 
 export type ExportFormat = "pdf" | "png" | "jpg" | "html";
@@ -21,9 +22,11 @@ type TopBarProps = {
   canExport?: boolean;
   showModeToggle?: boolean;
   editorMode: EditorMode;
+  canUndo: boolean;
   edgeGap: number;
   topRailHeight: number;
   onModeChange: (mode: EditorMode) => void;
+  onUndo: () => void;
   onToggleExport: () => void;
   onExport: (format: ExportFormat) => void;
 };
@@ -38,9 +41,11 @@ export function EditorTopBar({
   canExport = true,
   showModeToggle = true,
   editorMode,
+  canUndo,
   edgeGap,
   topRailHeight,
   onModeChange,
+  onUndo,
   onToggleExport,
   onExport,
 }: TopBarProps) {
@@ -68,6 +73,26 @@ export function EditorTopBar({
       )}
 
       <div className="editor-topbar-right">
+        <AnimatePresence initial={false}>
+          {showModeToggle && editorMode === "edit" && (
+            <motion.div
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 6, scale: 0.98 }}
+              initial={{ opacity: 0, x: 6, scale: 0.98 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <CelionButton
+                onClick={onUndo}
+                disabled={!canUndo}
+                size="sm"
+                variant="ghost"
+              >
+                <Undo2 size={13} />
+                Undo
+              </CelionButton>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {saving && <span className="editor-status">Saving...</span>}
         {saveError && <span className="editor-status editor-status-error">{saveError}</span>}
         {exportError && <span className="editor-status editor-status-error">{exportError}</span>}
@@ -83,8 +108,15 @@ export function EditorTopBar({
             {exporting ? "Exporting..." : "Export"}
             <ChevronDown size={12} />
           </CelionButton>
-          {exportOpen && (
-            <div className="editor-export-menu">
+          <AnimatePresence>
+            {exportOpen && (
+              <motion.div
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                className="editor-export-menu"
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+              >
               {(["pdf", "html", "png", "jpg"] as const).map((fmt) => (
                 <button
                   key={fmt}
@@ -94,8 +126,9 @@ export function EditorTopBar({
                   Export as {fmt.toUpperCase()}
                 </button>
               ))}
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -128,26 +161,121 @@ type PageListProps = {
   slideCount: number;
   currentSlide: number;
   pageSummaries: PageSummary[];
+  addingPage: boolean;
+  addPageError: string;
+  addPageInstruction: string;
+  addPagePanelOpen: boolean;
+  canAddPage: boolean;
   onSelectPage: (index: number) => void;
+  onAddPageInstructionChange: (value: string) => void;
+  onCancelAddPage: () => void;
+  onSubmitAddPage: () => void;
+  onToggleAddPagePanel: () => void;
 };
 
 function EditorPageListComponent({
   slideCount,
   currentSlide,
   pageSummaries,
+  addingPage,
+  addPageError,
+  addPageInstruction,
+  addPagePanelOpen,
+  canAddPage,
   onSelectPage,
+  onAddPageInstructionChange,
+  onCancelAddPage,
+  onSubmitAddPage,
+  onToggleAddPagePanel,
 }: PageListProps) {
   return (
     <div className="editor-page-list">
-      <p className="editor-page-list-count">
-        {slideCount} pages
-      </p>
+      <div className="editor-page-list-head">
+        <p className="editor-page-list-count">
+          {slideCount} pages
+        </p>
+        <motion.button
+          aria-label="Add page after current page"
+          className="editor-page-add-button"
+          disabled={!canAddPage || addingPage}
+          onClick={onToggleAddPagePanel}
+          title="Add page after current page"
+          type="button"
+          whileTap={{ scale: 0.97 }}
+        >
+          +
+        </motion.button>
+      </div>
+      <AnimatePresence initial={false}>
+        {addPagePanelOpen && (
+          <motion.form
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className="editor-page-add-panel"
+            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            initial={{ opacity: 0, y: -4, scale: 0.98 }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSubmitAddPage();
+            }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="editor-page-add-panel-head">
+              <span className="editor-page-add-kicker">
+                After {currentSlide + 1}
+              </span>
+              <button
+                className="editor-page-add-close"
+                disabled={addingPage}
+                onClick={onCancelAddPage}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <textarea
+              className="editor-page-add-input"
+              disabled={addingPage}
+              maxLength={2000}
+              onChange={(event) => onAddPageInstructionChange(event.target.value)}
+              placeholder="Add a comparison page, a checklist, or the next useful step."
+              rows={4}
+              value={addPageInstruction}
+            />
+            <div className="editor-page-add-actions">
+              <button
+                className="editor-page-add-secondary"
+                disabled={addingPage}
+                onClick={() => onAddPageInstructionChange("")}
+                type="button"
+              >
+                Clear
+              </button>
+              <button
+                className="editor-page-add-primary"
+                disabled={!canAddPage || addingPage}
+                type="submit"
+              >
+                {addingPage ? "Adding..." : "Generate"}
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+      {addPageError && (
+        <p className="editor-page-list-error">
+          {addPageError}
+        </p>
+      )}
       {Array.from({ length: slideCount }).map((_, index) => (
-        <button
+        <motion.button
           key={index}
+          layout
           onClick={() => onSelectPage(index)}
           className="editor-page-list-item"
           data-active={currentSlide === index ? "true" : "false"}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          whileHover={{ x: 2 }}
+          whileTap={{ scale: 0.985 }}
         >
           <span className="editor-page-index">
             {index + 1}
@@ -160,7 +288,7 @@ function EditorPageListComponent({
               {pageSummaries[index]?.eyebrow || (index === 0 ? "Cover" : "Content")}
             </span>
           </span>
-        </button>
+        </motion.button>
       ))}
     </div>
   );
@@ -221,6 +349,8 @@ export const EditorPreviewPane = memo(EditorPreviewPaneComponent);
 type InspectorPanelProps = {
   selectedElement: CelionEditableElement | null;
   inspectorElement: CelionEditableElement | null;
+  layoutTargetLabel: string;
+  layoutValues: InspectorLayoutValues | null;
   editValue: string;
   styleValues: InspectorStyleValues;
   topRailHeight: number;
@@ -228,11 +358,15 @@ type InspectorPanelProps = {
   onTextChange: (value: string) => void;
   onApplyText: () => void;
   onStyleChange: (prop: string, value: string) => void;
+  onLayoutChange: (prop: keyof InspectorLayoutValues, value: number) => void;
+  onResetLayout: () => void;
 };
 
 export function EditorInspectorPanel({
   selectedElement,
   inspectorElement,
+  layoutTargetLabel,
+  layoutValues,
   editValue,
   styleValues,
   topRailHeight,
@@ -240,13 +374,19 @@ export function EditorInspectorPanel({
   onTextChange,
   onApplyText,
   onStyleChange,
+  onLayoutChange,
+  onResetLayout,
 }: InspectorPanelProps) {
   return (
-    <div
+    <motion.div
+      animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
       className="editor-inspector-panel"
+      exit={{ opacity: 0, x: 16, filter: "blur(2px)" }}
+      initial={{ opacity: 0, x: 18, filter: "blur(2px)" }}
       style={{
         "--editor-inspector-min-height": `calc(100vh - ${topRailHeight + edgeGap}px)`,
       } as CSSProperties}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
     >
       <div className="editor-inspector-head">
         <h3 className="editor-inspector-title">
@@ -258,12 +398,16 @@ export function EditorInspectorPanel({
       </div>
       <InspectorControls
         element={inspectorElement}
+        layoutTargetLabel={layoutTargetLabel}
+        layoutValues={layoutValues}
         textValue={editValue}
         styleValues={styleValues}
         onTextChange={onTextChange}
         onApplyText={onApplyText}
         onStyleChange={onStyleChange}
+        onLayoutChange={onLayoutChange}
+        onResetLayout={onResetLayout}
       />
-    </div>
+    </motion.div>
   );
 }

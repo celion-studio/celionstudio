@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import type { CSSProperties } from "react";
+import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import type { ProjectRecord, ProjectStatus } from "@/types/project";
 import { WizardContent } from "@/components/wizard/WizardContent";
 import { EBOOK_PAGE_SIZE_PX, EBOOK_PDF_A5_SIZE_PT } from "@/lib/ebook-format";
@@ -9,12 +10,14 @@ import { countCelionSlides } from "@/lib/ebook-html";
 import {
   compileEbookDocumentToHtml,
   normalizeEbookDocument,
+  type CelionEditableElement,
   type CelionEbookDocument,
 } from "@/lib/ebook-document";
 import {
   buildPageSummariesFromDocument,
   buildPageSummariesFromElements,
   estimatePreviewIframeHeight,
+  getRuntimeTextElements,
   normalizeEditorHtml,
   pickSelectableElement,
   pickRuntimeTextElement,
@@ -22,14 +25,22 @@ import {
   type PageSummary,
 } from "./editor-preview";
 import {
+  appendScopedLayoutBoxToDocument,
+  appendScopedLayoutTransformToDocument,
   appendScopedStyleToDocument,
   applyDocumentTextEdit,
   applyLegacyHtmlTextEdit,
+  removeScopedLayoutFromDocument,
 } from "./editor-document-edits";
 import {
   measurePreviewFrameHeight,
   preparePreviewFrame,
 } from "./editor-preview-frame";
+import {
+  createPreviewLayoutChrome,
+  getLayoutTargetElement,
+  type LayoutTarget,
+} from "./editor-layout-chrome";
 import {
   EditorInspectorPanel,
   EditorPageList,
@@ -37,8 +48,8 @@ import {
   EditorTopBar,
   type ExportFormat,
 } from "./editor-shell-panels";
-import type { EditorMode, InspectorStyleValues } from "./editor-types";
-import { clearEditorSelectionFromDocument } from "./export-cleanup";
+import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
+import { clearEditorSelectionFromDocument, stripEditorMetadataFromHtml } from "./export-cleanup";
 import { useEditorSave } from "./use-editor-save";
 import { useEditorSelection } from "./use-editor-selection";
 
@@ -49,6 +60,7 @@ const PDF_A5_WIDTH_PT = EBOOK_PDF_A5_SIZE_PT.width;
 const PDF_A5_HEIGHT_PT = EBOOK_PDF_A5_SIZE_PT.height;
 const EDITOR_TOP_RAIL_HEIGHT = 56;
 const EDITOR_EDGE_GAP = 16;
+const LAYOUT_PROPS = new Set(["transform", "width", "height"]);
 
 type Props = {
   projectId: string;
@@ -57,6 +69,10 @@ type Props = {
   initialHtml: string;
   initialDocument: CelionEbookDocument | null;
 };
+
+type UndoSnapshot =
+  | { type: "document"; document: CelionEbookDocument }
+  | { type: "html"; html: string };
 
 function sanitizeExportFilename(value: string) {
   return (value.trim() || "celion-ebook")
@@ -82,6 +98,90 @@ function downloadBlob(filename: string, blob: Blob) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+function cssPropertyName(prop: string) {
+  return prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function formatLayoutNumber(value: number) {
+  const rounded = Math.round(value);
+  return Object.is(rounded, -0) ? "0" : String(rounded);
+}
+
+function clampLayoutNumber(value: number, min?: number, max?: number) {
+  let nextValue = value;
+  if (typeof min === "number") nextValue = Math.max(min, nextValue);
+  if (typeof max === "number") nextValue = Math.min(max, nextValue);
+  return nextValue;
+}
+
+function parseTranslate(transform: string | undefined) {
+  if (!transform || transform === "none") return { x: 0, y: 0 };
+
+  const matrix3dMatch = transform.match(/^matrix3d\(([^)]+)\)$/);
+  if (matrix3dMatch) {
+    const values = matrix3dMatch[1]!.split(",").map((part) => Number(part.trim()));
+    return {
+      x: Number.isFinite(values[12]) ? values[12]! : 0,
+      y: Number.isFinite(values[13]) ? values[13]! : 0,
+    };
+  }
+
+  const matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
+  if (matrixMatch) {
+    const values = matrixMatch[1]!.split(",").map((part) => Number(part.trim()));
+    return {
+      x: Number.isFinite(values[4]) ? values[4]! : 0,
+      y: Number.isFinite(values[5]) ? values[5]! : 0,
+    };
+  }
+
+  const translateMatch = transform.match(/translate(?:3d)?\(([^)]+)\)/);
+  if (!translateMatch) return { x: 0, y: 0 };
+
+  const [rawX = "0", rawY = "0"] = translateMatch[1]!.split(",");
+  return {
+    x: Number.parseFloat(rawX) || 0,
+    y: Number.parseFloat(rawY) || 0,
+  };
+}
+
+function layoutNumber(value: string | undefined, fallback: number, min?: number, max?: number) {
+  const parsed = Number(value);
+  return clampLayoutNumber(Number.isFinite(parsed) ? parsed : fallback, min, max);
+}
+
+function layoutMarker(pageId: string, elementId: string) {
+  const safePageId = pageId.replace(/\*\//g, "").trim();
+  const safeElementId = elementId.replace(/\*\//g, "").trim();
+  return {
+    start: `/* celion-layout:${safePageId}:${safeElementId} */`,
+    end: `/* /celion-layout:${safePageId}:${safeElementId} */`,
+  };
+}
+
+function removeLiveLayoutCss(doc: Document, pageId: string, element: CelionEditableElement) {
+  const selector = `[data-celion-page="${pageId}"] ${element.selector}`;
+  const markers = layoutMarker(pageId, element.id);
+  const markerPattern = new RegExp(`\\s*${escapeRegex(markers.start)}\\s*\\n?${escapeRegex(selector)}\\s*\\{[^{}]*\\}\\s*\\n?${escapeRegex(markers.end)}\\s*`, "g");
+  const legacyRulePattern = new RegExp(`(^|\\n)\\s*${escapeRegex(selector)}\\s*\\{([^{}]*)\\}\\s*(?=\\n|$)`, "g");
+
+  doc.querySelectorAll<HTMLStyleElement>("style").forEach((style) => {
+    const withoutMarkers = (style.textContent ?? "").replace(markerPattern, "\n");
+    style.textContent = withoutMarkers.replace(legacyRulePattern, (match, prefix: string, rawDeclarations: string) => {
+      const props = rawDeclarations
+        .split(";")
+        .map((declaration) => declaration.split(":")[0]?.trim())
+        .filter(Boolean);
+      const isLayoutOnlyRule = props.length > 0 && props.every((prop) => LAYOUT_PROPS.has(prop));
+      return isLayoutOnlyRule ? prefix : match;
+    });
+  });
+}
+
 export function EditorShell({
   projectId,
   projectTitle,
@@ -95,6 +195,9 @@ export function EditorShell({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const iframeClickCleanupRef = useRef<(() => void) | null>(null);
+  const handleIframeLoadRef = useRef<() => void>(() => undefined);
+  const refreshLayoutChromeRef = useRef<(() => void) | null>(null);
+  const undoStackRef = useRef<UndoSnapshot[]>([]);
   const measureTimeoutRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -119,9 +222,49 @@ export function EditorShell({
   const [pageSummaries, setPageSummaries] = useState<PageSummary[]>([]);
   const selection = useEditorSelection();
   const { selectElement } = selection;
+  const selectedLayoutTargetRef = useRef<LayoutTarget | null>(null);
+  const layoutValuesRef = useRef<InspectorLayoutValues | null>(null);
+  const [layoutTargetLabel, setLayoutTargetLabel] = useState("");
+  const [layoutValues, setLayoutValuesState] = useState<InspectorLayoutValues | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [addingPage, setAddingPage] = useState(false);
+  const [addPageError, setAddPageError] = useState("");
+  const [addPageInstruction, setAddPageInstruction] = useState("");
+  const [addPagePanelOpen, setAddPagePanelOpen] = useState(false);
+
+  const setLayoutValues = useCallback((values: InspectorLayoutValues | null) => {
+    layoutValuesRef.current = values;
+    setLayoutValuesState(values);
+  }, []);
+
+  const setLayoutTarget = useCallback((target: LayoutTarget | null) => {
+    selectedLayoutTargetRef.current = target;
+    setLayoutTargetLabel(target?.element.label ?? "");
+    if (!target) setLayoutValues(null);
+  }, [setLayoutValues]);
+
+  const pushUndoSnapshot = useCallback((document: CelionEbookDocument | null) => {
+    if (!document) return;
+
+    undoStackRef.current = [
+      ...undoStackRef.current.slice(-19),
+      { type: "document", document: structuredClone(document) as CelionEbookDocument },
+    ];
+    setCanUndo(true);
+  }, []);
+
+  const pushHtmlUndoSnapshot = useCallback((currentHtml: string) => {
+    if (!currentHtml.trim()) return;
+
+    undoStackRef.current = [
+      ...undoStackRef.current.slice(-19),
+      { type: "html", html: currentHtml },
+    ];
+    setCanUndo(true);
+  }, []);
 
   const measurePreview = useCallback(() => {
     const height = measurePreviewFrameHeight(iframeRef.current, {
@@ -136,6 +279,7 @@ export function EditorShell({
   const cleanupIframeEffects = useCallback(() => {
     iframeClickCleanupRef.current?.();
     iframeClickCleanupRef.current = null;
+    refreshLayoutChromeRef.current = null;
 
     if (measureTimeoutRef.current !== null) {
       window.clearTimeout(measureTimeoutRef.current);
@@ -160,6 +304,134 @@ export function EditorShell({
 
   useEffect(() => cleanupIframeEffects, [cleanupIframeEffects]);
 
+  const applyLiveStyleToElement = useCallback((element: CelionEditableElement, prop: string, value: string) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    const node = getLayoutTargetElement(doc, element);
+    if (!node) return;
+
+    node.style.setProperty(cssPropertyName(prop), value);
+    refreshLayoutChromeRef.current?.();
+  }, []);
+
+  const applyLiveLayoutTransformToElement = useCallback((element: CelionEditableElement, transform: string) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    const node = getLayoutTargetElement(doc, element);
+    if (!node) return;
+
+    node.style.transform = transform;
+    refreshLayoutChromeRef.current?.();
+  }, []);
+
+  const applyLiveLayoutBoxToElement = useCallback((element: CelionEditableElement, width: string, height: string) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    const node = getLayoutTargetElement(doc, element);
+    if (!node) return;
+
+    node.style.width = width;
+    node.style.height = height;
+    refreshLayoutChromeRef.current?.();
+  }, []);
+
+  const resetLiveLayoutForElement = useCallback((pageId: string, element: CelionEditableElement) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+
+    const node = getLayoutTargetElement(doc, element);
+    if (!node) return;
+
+    removeLiveLayoutCss(doc, pageId, element);
+    node.style.transform = "";
+    node.style.width = "";
+    node.style.height = "";
+    refreshLayoutChromeRef.current?.();
+  }, []);
+
+  const applyLiveTextToSelection = useCallback((value: string) => {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return false;
+
+    let target: HTMLElement | null = null;
+    if (selection.selectedRuntimeText?.mode === "document") {
+      const page = doc.querySelector<HTMLElement>(`[data-celion-page="${selection.selectedRuntimeText.pageId}"]`);
+      target = page
+        ? getRuntimeTextElements(page)[selection.selectedRuntimeText.textIndex] ?? null
+        : null;
+    } else if (selection.selectedRuntimeText?.mode === "legacy") {
+      const page = doc.querySelectorAll<HTMLElement>(".slide")[selection.selectedRuntimeText.pageIndex];
+      target = page
+        ? getRuntimeTextElements(page)[selection.selectedRuntimeText.textIndex] ?? null
+        : null;
+    } else if (selection.selectedElement) {
+      target = getLayoutTargetElement(doc, selection.selectedElement);
+    }
+
+    if (!target) return false;
+
+    target.textContent = value;
+    refreshLayoutChromeRef.current?.();
+    return true;
+  }, [selection.selectedElement, selection.selectedRuntimeText]);
+
+  const applyLayoutTransformToElement = useCallback((
+    pageId: string,
+    element: CelionEditableElement,
+    transform: string,
+  ) => {
+    const currentDocument = latestDocumentRef.current;
+    const layoutEdit = appendScopedLayoutTransformToDocument({
+      document: currentDocument,
+      selectedPageId: pageId,
+      selectedElement: element,
+      transform,
+    });
+    if (!layoutEdit.ok) {
+      if (layoutEdit.reason === "target-missing") {
+        setSaveError("Could not find the selected element. Click it again and retry.");
+      }
+      return;
+    }
+
+    pushUndoSnapshot(currentDocument);
+    latestDocumentRef.current = layoutEdit.value;
+    setEbookDocument(layoutEdit.value);
+    applyLiveLayoutTransformToElement(element, transform);
+    void queueDocumentSave(layoutEdit.value);
+  }, [applyLiveLayoutTransformToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
+
+  const applyLayoutBoxToElement = useCallback((
+    pageId: string,
+    element: CelionEditableElement,
+    width: string,
+    height: string,
+  ) => {
+    const currentDocument = latestDocumentRef.current;
+    const layoutEdit = appendScopedLayoutBoxToDocument({
+      document: currentDocument,
+      selectedPageId: pageId,
+      selectedElement: element,
+      width,
+      height,
+    });
+    if (!layoutEdit.ok) {
+      if (layoutEdit.reason === "target-missing") {
+        setSaveError("Could not find the selected element. Click it again and retry.");
+      }
+      return;
+    }
+
+    pushUndoSnapshot(currentDocument);
+    latestDocumentRef.current = layoutEdit.value;
+    setEbookDocument(layoutEdit.value);
+    applyLiveLayoutBoxToElement(element, width, height);
+    void queueDocumentSave(layoutEdit.value);
+  }, [applyLiveLayoutBoxToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
+
   const handleIframeLoad = useCallback(() => {
     cleanupIframeEffects();
 
@@ -170,8 +442,9 @@ export function EditorShell({
     if (!previewFrame) return;
 
     const { doc, pages } = previewFrame;
+    const currentDocument = latestDocumentRef.current;
     setSlideCount((current) => current === pages.length ? current : pages.length);
-    if (!ebookDocument) {
+    if (!currentDocument) {
       setPageSummaries(buildPageSummariesFromElements(pages));
     }
 
@@ -207,22 +480,130 @@ export function EditorShell({
       };
     };
 
+    const readLayoutValues = (element: HTMLElement): InspectorLayoutValues => {
+      const styles = doc.defaultView?.getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const translate = parseTranslate(styles?.transform ?? element.style.transform);
+
+      return {
+        x: formatLayoutNumber(translate.x),
+        y: formatLayoutNumber(translate.y),
+        width: formatLayoutNumber(rect.width),
+        height: formatLayoutNumber(rect.height),
+      };
+    };
+
+    const layoutChrome = createPreviewLayoutChrome(doc, {
+      getCurrentTarget: () => selectedLayoutTargetRef.current,
+      onMove: (target, transform) => {
+        applyLayoutTransformToElement(target.pageId, target.element, transform);
+      },
+      onResize: (target, width, height) => {
+        applyLayoutBoxToElement(target.pageId, target.element, width, height);
+      },
+    });
+    refreshLayoutChromeRef.current = () => {
+      const currentTarget = selectedLayoutTargetRef.current;
+      if (!currentTarget) return;
+
+      const selectedNode = getLayoutTargetElement(doc, currentTarget.element);
+      const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
+      if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentTarget.pageId) {
+        setLayoutValues(readLayoutValues(selectedNode));
+        layoutChrome.showFor(selectedNode);
+      }
+    };
+
+    let hoverSnapshot: {
+      element: HTMLElement;
+      outline: string;
+      outlineOffset: string;
+      cursor: string;
+    } | null = null;
+
+    const clearHover = () => {
+      if (!hoverSnapshot) return;
+
+      const { element, outline, outlineOffset, cursor } = hoverSnapshot;
+      if (!element.hasAttribute("data-selected")) {
+        element.style.outline = outline;
+        element.style.outlineOffset = outlineOffset;
+        element.style.cursor = cursor;
+      }
+      element.removeAttribute("data-celion-hovered");
+      hoverSnapshot = null;
+    };
+
+    const showHover = (element: HTMLElement, kind: "layout" | "text") => {
+      if (element.hasAttribute("data-selected")) {
+        clearHover();
+        return;
+      }
+      if (hoverSnapshot?.element === element) return;
+
+      clearHover();
+      hoverSnapshot = {
+        element,
+        outline: element.style.outline,
+        outlineOffset: element.style.outlineOffset,
+        cursor: element.style.cursor,
+      };
+      element.setAttribute("data-celion-hovered", kind);
+      element.style.outline = kind === "layout" ? "1px dashed #6366f1" : "1px dashed #0ea5e9";
+      element.style.outlineOffset = "2px";
+      element.style.cursor = "pointer";
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (editorModeRef.current !== "edit") {
+        clearHover();
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      if (!target || target.closest("[data-celion-editor-chrome]")) {
+        clearHover();
+        return;
+      }
+
+      const pointedElements = typeof doc.elementsFromPoint === "function"
+        ? doc.elementsFromPoint(e.clientX, e.clientY)
+        : [target];
+      const layoutHoverTarget = pointedElements
+        .map((element) => element.closest<HTMLElement>("[data-celion-id]"))
+        .find((element): element is HTMLElement => Boolean(element));
+      if (layoutHoverTarget) {
+        showHover(layoutHoverTarget, "layout");
+        return;
+      }
+
+      const textHoverTarget = pickRuntimeTextElement(pointedElements, target)
+        ?? target.closest<HTMLElement>("[data-text-editable]")
+        ?? (target.textContent?.trim() ? target : null);
+      if (textHoverTarget) {
+        showHover(textHoverTarget, "text");
+      } else {
+        clearHover();
+      }
+    };
+
     const handleClick = (e: MouseEvent) => {
       if (editorModeRef.current !== "edit") return;
+      clearHover();
 
       const target = e.target as HTMLElement;
       const pointedElements = typeof doc.elementsFromPoint === "function"
         ? doc.elementsFromPoint(e.clientX, e.clientY)
         : [target];
 
-      if (ebookDocument) {
+      if (currentDocument) {
         const pageEl = (pointedElements.find((element) => element.closest("[data-celion-page]")) ?? target)
           .closest<HTMLElement>("[data-celion-page]");
         const pageId = pageEl?.getAttribute("data-celion-page");
         if (!pageId) return;
 
-        const pageIndex = ebookDocument.pages.findIndex((page) => page.id === pageId);
-        const page = pageIndex >= 0 ? ebookDocument.pages[pageIndex] : null;
+        const pageIndex = currentDocument.pages.findIndex((page) => page.id === pageId);
+        const page = pageIndex >= 0 ? currentDocument.pages[pageIndex] : null;
         if (!page) return;
 
         const candidateIds = pointedElements
@@ -241,6 +622,15 @@ export function EditorShell({
           if (!text) return;
 
           selectPreviewElement(runtimeTextEl);
+          const layoutTargetEl = manifestElement ? getLayoutTargetElement(doc, manifestElement) : null;
+          if (manifestElement && layoutTargetEl) {
+            setLayoutTarget({ pageId, element: manifestElement });
+            setLayoutValues(readLayoutValues(layoutTargetEl));
+            layoutChrome.showFor(layoutTargetEl);
+          } else {
+            setLayoutTarget(null);
+            layoutChrome.hide();
+          }
           selectElement({
             text,
             pageId,
@@ -262,12 +652,15 @@ export function EditorShell({
 
         if (!manifestElement) return;
 
-        const celionEl = doc.querySelector<HTMLElement>(manifestElement.selector);
+        const celionEl = getLayoutTargetElement(doc, manifestElement);
         if (!celionEl) return;
 
         const text = celionEl.textContent?.trim() ?? "";
 
         selectPreviewElement(celionEl);
+        setLayoutTarget({ pageId, element: manifestElement });
+        setLayoutValues(readLayoutValues(celionEl));
+        layoutChrome.showFor(celionEl);
         selectElement({
           text,
           pageId,
@@ -288,6 +681,8 @@ export function EditorShell({
       if (!text) return;
 
       selectPreviewElement(textEl);
+      setLayoutTarget(null);
+      layoutChrome.hide();
 
       const tag = textEl.tagName.toLowerCase();
       const pageEl = textEl.closest(".slide");
@@ -323,10 +718,35 @@ export function EditorShell({
       }
     };
 
+    const handlePointerDown = (e: PointerEvent) => {
+      if (editorModeRef.current !== "edit") return;
+      layoutChrome.handlePointerDown(e);
+    };
+
     doc.addEventListener("click", handleClick);
+    doc.addEventListener("pointermove", handlePointerMove);
+    doc.addEventListener("pointerleave", clearHover);
+    doc.addEventListener("pointerdown", handlePointerDown);
     iframeClickCleanupRef.current = () => {
       doc.removeEventListener("click", handleClick);
+      doc.removeEventListener("pointermove", handlePointerMove);
+      doc.removeEventListener("pointerleave", clearHover);
+      doc.removeEventListener("pointerdown", handlePointerDown);
+      clearHover();
     };
+
+    const currentLayoutTarget = selectedLayoutTargetRef.current;
+    if (editorModeRef.current === "edit" && currentLayoutTarget) {
+      const selectedNode = getLayoutTargetElement(doc, currentLayoutTarget.element);
+      const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
+      if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentLayoutTarget.pageId) {
+        selectPreviewElement(selectedNode);
+        setLayoutValues(readLayoutValues(selectedNode));
+        layoutChrome.showFor(selectedNode);
+      } else {
+        layoutChrome.hide();
+      }
+    }
 
     measureFrameRef.current = window.requestAnimationFrame(() => {
       measureFrameRef.current = null;
@@ -336,7 +756,11 @@ export function EditorShell({
       measureTimeoutRef.current = null;
       measurePreview();
     }, 250);
-  }, [cleanupIframeEffects, ebookDocument, measurePreview, selectElement]);
+  }, [applyLayoutBoxToElement, applyLayoutTransformToElement, cleanupIframeEffects, latestDocumentRef, measurePreview, selectElement, setLayoutTarget, setLayoutValues]);
+
+  useEffect(() => {
+    handleIframeLoadRef.current = handleIframeLoad;
+  }, [handleIframeLoad]);
 
   useEffect(() => {
     if (!html || setupOpen) return;
@@ -347,7 +771,7 @@ export function EditorShell({
 
     prepareFallbackRef.current = window.setTimeout(() => {
       prepareFallbackRef.current = null;
-      handleIframeLoad();
+      handleIframeLoadRef.current();
     }, 120);
 
     return () => {
@@ -356,7 +780,7 @@ export function EditorShell({
         prepareFallbackRef.current = null;
       }
     };
-  }, [handleIframeLoad, html, setupOpen]);
+  }, [html, setupOpen]);
 
   useEffect(() => {
     const count = ebookDocument ? ebookDocument.pages.length : countCelionSlides(html);
@@ -408,19 +832,23 @@ export function EditorShell({
   const applyEdit = () => {
     if (!selection.editValue.trim()) return;
 
+    const nextText = selection.editValue.trim();
+    const currentDocument = latestDocumentRef.current ?? ebookDocument;
     const documentEdit = applyDocumentTextEdit({
-      document: latestDocumentRef.current ?? ebookDocument,
+      document: currentDocument,
       selectedPageId: selection.selectedPageId,
       selectedElement: selection.selectedElement,
       selectedRuntimeText: selection.selectedRuntimeText,
-      editValue: selection.editValue,
+      editValue: nextText,
     });
     if (documentEdit.ok) {
-      const newHtml = compileEbookDocumentToHtml(documentEdit.value);
-      setEbookDocument(documentEdit.value);
-      setHtml(newHtml);
-      selection.clearSelection();
+      pushUndoSnapshot(currentDocument);
       latestDocumentRef.current = documentEdit.value;
+      setEbookDocument(documentEdit.value);
+      if (!applyLiveTextToSelection(nextText)) {
+        setHtml(compileEbookDocumentToHtml(documentEdit.value));
+      }
+      selection.commitTextValue(nextText);
       void queueDocumentSave(documentEdit.value);
       return;
     }
@@ -434,7 +862,7 @@ export function EditorShell({
     const legacyEdit = applyLegacyHtmlTextEdit({
       html,
       selectedSelector: selection.selectedSelector,
-      editValue: selection.editValue,
+      editValue: nextText,
     });
     if (!legacyEdit.ok) {
       if (legacyEdit.reason !== "not-applicable") {
@@ -444,14 +872,16 @@ export function EditorShell({
     }
 
     const newHtml = legacyEdit.value;
+    pushHtmlUndoSnapshot(html);
     setHtml(newHtml);
     selection.clearSelection();
     void saveHtml(newHtml);
   };
 
   const applyStyleToSelectedElement = (prop: string, value: string) => {
+    const currentDocument = latestDocumentRef.current ?? ebookDocument;
     const styleEdit = appendScopedStyleToDocument({
-      document: latestDocumentRef.current ?? ebookDocument,
+      document: currentDocument,
       selectedPageId: selection.selectedPageId,
       selectedElement: selection.selectedElement,
       prop,
@@ -464,13 +894,151 @@ export function EditorShell({
       return;
     }
 
-    const newHtml = compileEbookDocumentToHtml(styleEdit.value);
+    pushUndoSnapshot(currentDocument);
     latestDocumentRef.current = styleEdit.value;
     setEbookDocument(styleEdit.value);
-    setHtml(newHtml);
+    if (selection.selectedElement) {
+      applyLiveStyleToElement(selection.selectedElement, prop, value);
+    }
     selection.setStyleValue(prop, value);
     void queueDocumentSave(styleEdit.value);
   };
+
+  const applyLayoutValueToSelectedElement = useCallback((prop: keyof InspectorLayoutValues, value: number) => {
+    const target = selectedLayoutTargetRef.current;
+    if (!target) return;
+
+    const currentValues = layoutValuesRef.current ?? { x: "0", y: "0", width: "", height: "" };
+    const nextValues = {
+      ...currentValues,
+      [prop]: formatLayoutNumber(value),
+    };
+    setLayoutValues(nextValues);
+
+    if (prop === "x" || prop === "y") {
+      const x = layoutNumber(nextValues.x, 0, -2000, 2000);
+      const y = layoutNumber(nextValues.y, 0, -2000, 2000);
+      applyLayoutTransformToElement(target.pageId, target.element, `translate(${formatLayoutNumber(x)}px, ${formatLayoutNumber(y)}px)`);
+      return;
+    }
+
+    const rawWidth = Number(nextValues.width);
+    const rawHeight = Number(nextValues.height);
+    if (!Number.isFinite(rawWidth) || !Number.isFinite(rawHeight)) return;
+
+    const width = clampLayoutNumber(rawWidth, 24, 2000);
+    const height = clampLayoutNumber(rawHeight, 24, 2000);
+
+    applyLayoutBoxToElement(target.pageId, target.element, `${formatLayoutNumber(width)}px`, `${formatLayoutNumber(height)}px`);
+  }, [applyLayoutBoxToElement, applyLayoutTransformToElement, setLayoutValues]);
+
+  const resetLayoutForSelectedElement = useCallback(() => {
+    const target = selectedLayoutTargetRef.current;
+    if (!target) return;
+
+    const currentDocument = latestDocumentRef.current;
+    const layoutEdit = removeScopedLayoutFromDocument({
+      document: currentDocument,
+      selectedPageId: target.pageId,
+      selectedElement: target.element,
+    });
+    if (!layoutEdit.ok) return;
+
+    pushUndoSnapshot(currentDocument);
+    latestDocumentRef.current = layoutEdit.value;
+    setEbookDocument(layoutEdit.value);
+    resetLiveLayoutForElement(target.pageId, target.element);
+    void queueDocumentSave(layoutEdit.value);
+  }, [latestDocumentRef, pushUndoSnapshot, queueDocumentSave, resetLiveLayoutForElement]);
+
+  const undoLastEdit = useCallback(() => {
+    const snapshot = undoStackRef.current.at(-1);
+    if (!snapshot) return;
+
+    undoStackRef.current = undoStackRef.current.slice(0, -1);
+    setCanUndo(undoStackRef.current.length > 0);
+
+    if (snapshot.type === "html") {
+      latestDocumentRef.current = null;
+      setEbookDocument(null);
+      setHtml(snapshot.html);
+      setLayoutTarget(null);
+      selection.clearSelection();
+      void saveHtml(snapshot.html);
+      return;
+    }
+
+    const restoredDocument = structuredClone(snapshot.document) as CelionEbookDocument;
+    latestDocumentRef.current = restoredDocument;
+    setEbookDocument(restoredDocument);
+    setHtml(compileEbookDocumentToHtml(restoredDocument));
+    setLayoutTarget(null);
+    selection.clearSelection();
+    void queueDocumentSave(restoredDocument);
+  }, [latestDocumentRef, queueDocumentSave, saveHtml, selection, setLayoutTarget]);
+
+  const addPageAfterCurrent = useCallback(async (instruction: string) => {
+    const currentDocument = latestDocumentRef.current ?? ebookDocument;
+    if (!currentDocument || addingPage) return;
+
+    const insertIndex = Math.min(currentSlide + 1, currentDocument.pages.length);
+    setAddingPage(true);
+    setAddPageError("");
+    setSaveError("");
+
+    try {
+      const response = await fetch("/api/ebook/page", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          insertIndex,
+          instruction: instruction.trim() || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => ({})) as {
+        message?: string;
+        pageIndex?: number;
+        project?: ProjectRecord;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.message || "Could not add a page.");
+      }
+
+      const nextDocument = payload.project?.profile.ebookDocument
+        ? normalizeEbookDocument(payload.project.profile.ebookDocument)
+        : null;
+      if (!payload.project || !nextDocument) {
+        throw new Error("The generated page was saved, but the updated document was not returned.");
+      }
+
+      pushUndoSnapshot(currentDocument);
+      latestDocumentRef.current = nextDocument;
+      setDisplayTitle(payload.project.title);
+      setEbookDocument(nextDocument);
+      setHtml(compileEbookDocumentToHtml(nextDocument));
+      setCurrentSlide(Math.min(payload.pageIndex ?? insertIndex, nextDocument.pages.length - 1));
+      setLayoutTarget(null);
+      setAddPageInstruction("");
+      setAddPagePanelOpen(false);
+      selection.clearSelection();
+    } catch (error) {
+      setAddPageError(error instanceof Error ? error.message : "Could not add a page.");
+    } finally {
+      setAddingPage(false);
+    }
+  }, [addingPage, currentSlide, ebookDocument, latestDocumentRef, projectId, pushUndoSnapshot, selection, setLayoutTarget, setSaveError]);
+
+  const submitAddPage = useCallback(() => {
+    void addPageAfterCurrent(addPageInstruction);
+  }, [addPageAfterCurrent, addPageInstruction]);
+
+  const cancelAddPage = useCallback(() => {
+    if (addingPage) return;
+    setAddPagePanelOpen(false);
+    setAddPageError("");
+  }, [addingPage]);
 
   const exportAs = async (format: ExportFormat) => {
     setExportOpen(false);
@@ -486,7 +1054,7 @@ export function EditorShell({
         if (!exportHtml.trim()) {
           throw new Error("No HTML content was found to export.");
         }
-        downloadTextFile(`${filename}.html`, exportHtml, "text/html;charset=utf-8");
+        downloadTextFile(`${filename}.html`, stripEditorMetadataFromHtml(exportHtml), "text/html;charset=utf-8");
         return;
       }
 
@@ -548,12 +1116,13 @@ export function EditorShell({
   }, [scrollToPage]);
 
   const clearPreviewSelection = useCallback(() => {
+    setLayoutTarget(null);
     const doc = iframeRef.current?.contentDocument;
     if (doc) {
       clearEditorSelectionFromDocument(doc);
     }
     selection.clearSelection();
-  }, [selection]);
+  }, [selection, setLayoutTarget]);
 
   const handleModeChange = useCallback((mode: EditorMode) => {
     editorModeRef.current = mode;
@@ -576,11 +1145,17 @@ export function EditorShell({
     setEbookDocument(nextDocument);
     setHtml(nextHtml);
     setCurrentSlide(0);
+    setLayoutTarget(null);
+    undoStackRef.current = [];
+    setCanUndo(false);
     selection.clearSelection();
     editorModeRef.current = "view";
     setEditorMode("view");
     setSetupOpen(false);
-  }, [latestDocumentRef, selection]);
+    setAddPageError("");
+    setAddPageInstruction("");
+    setAddPagePanelOpen(false);
+  }, [latestDocumentRef, selection, setLayoutTarget]);
 
   const handleStartBlankProject = useCallback(() => {
     selection.clearSelection();
@@ -595,7 +1170,8 @@ export function EditorShell({
   } as CSSProperties;
 
   return (
-    <div className="editor-shell" style={editorShellStyle}>
+    <MotionConfig reducedMotion="user">
+      <div className="editor-shell" style={editorShellStyle}>
       <EditorTopBar
         projectTitle={displayTitle}
         saving={saving}
@@ -606,9 +1182,11 @@ export function EditorShell({
         canExport={!setupOpen}
         showModeToggle={!setupOpen && Boolean(html)}
         editorMode={editorMode}
+        canUndo={canUndo}
         edgeGap={EDITOR_EDGE_GAP}
         topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
         onModeChange={handleModeChange}
+        onUndo={undoLastEdit}
         onToggleExport={() => setExportOpen((open) => !open)}
         onExport={exportAs}
       />
@@ -629,10 +1207,30 @@ export function EditorShell({
               slideCount={slideCount}
               currentSlide={currentSlide}
               pageSummaries={pageSummaries}
+              addingPage={addingPage}
+              addPageError={addPageError}
+              addPageInstruction={addPageInstruction}
+              addPagePanelOpen={addPagePanelOpen}
+              canAddPage={Boolean(ebookDocument)}
               onSelectPage={handlePageSelect}
+              onAddPageInstructionChange={setAddPageInstruction}
+              onCancelAddPage={cancelAddPage}
+              onSubmitAddPage={submitAddPage}
+              onToggleAddPagePanel={() => {
+                setAddPageError("");
+                setAddPagePanelOpen((open) => !open);
+              }}
             />
 
-            <div className="editor-preview-shell">
+            <motion.div
+              animate={{
+                opacity: 1,
+                scale: editorMode === "edit" ? 1.006 : 1,
+              }}
+              className="editor-preview-shell"
+              initial={false}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
               <EditorPreviewPane
                 html={html}
                 width={PREVIEW_WIDTH}
@@ -642,24 +1240,32 @@ export function EditorShell({
                 onIframeLoad={handleIframeLoad}
                 onPreviewScroll={handlePreviewScroll}
               />
-            </div>
+            </motion.div>
 
-            {editorMode === "edit" && (
-              <EditorInspectorPanel
-                selectedElement={selection.selectedElement}
-                inspectorElement={selection.inspectorElement}
-                editValue={selection.editValue}
-                styleValues={selection.styleValues}
-                topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
-                edgeGap={EDITOR_EDGE_GAP}
-                onTextChange={selection.setEditValue}
-                onApplyText={applyEdit}
-                onStyleChange={applyStyleToSelectedElement}
-              />
-            )}
+            <AnimatePresence mode="popLayout">
+              {editorMode === "edit" && (
+                <EditorInspectorPanel
+                  key="editor-inspector"
+                  selectedElement={selection.selectedElement}
+                  inspectorElement={selection.inspectorElement}
+                  layoutTargetLabel={layoutTargetLabel}
+                  layoutValues={layoutValues}
+                  editValue={selection.editValue}
+                  styleValues={selection.styleValues}
+                  topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
+                  edgeGap={EDITOR_EDGE_GAP}
+                  onTextChange={selection.setEditValue}
+                  onApplyText={applyEdit}
+                  onStyleChange={applyStyleToSelectedElement}
+                  onLayoutChange={applyLayoutValueToSelectedElement}
+                  onResetLayout={resetLayoutForSelectedElement}
+                />
+              )}
+            </AnimatePresence>
           </>
         )}
       </div>
-    </div>
+      </div>
+    </MotionConfig>
   );
 }

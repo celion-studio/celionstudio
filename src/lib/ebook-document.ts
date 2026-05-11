@@ -55,6 +55,12 @@ export type EbookDocumentValidation = {
   errors: string[];
 };
 
+type InsertEbookDocumentPageInput = {
+  document: CelionEbookDocument;
+  page: CelionEbookPage;
+  insertIndex: number;
+};
+
 const EDITABLE_PROPS = new Set<CelionEditableProp>([
   "text",
   "fontSize",
@@ -75,6 +81,10 @@ const EDITABLE_TYPES = new Set<CelionEditableElement["type"]>(["text", "shape", 
 const FORBIDDEN_TAGS = ["script", "iframe", "object", "embed", "form", "input", "textarea", "button", "video", "audio", "style", "link"];
 const SAFE_BLOCK_AT_RULES = new Set(["media", "supports", "container"]);
 const UNSAFE_CSS_TOKENS = /<\/?style\b|<|>|url\s*\(/i;
+const TEXT_EDITABLE_TAGS = new Set(["h1", "h2", "h3", "p", "li", "span", "strong", "em", "small", "figcaption"]);
+const IMAGE_EDITABLE_TAGS = new Set(["img"]);
+const CONTAINER_EDITABLE_TAGS = new Set(["div", "section", "article", "header", "footer"]);
+const SKIPPED_CONTAINER_CLASSES = new Set(["page", "celion-page"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -139,6 +149,46 @@ function normalizePage(value: unknown, index: number): CelionEbookPage {
   };
 }
 
+function uniquePageId(baseId: string, usedIds: Set<string>) {
+  const normalizedBaseId = (baseId.trim() || "page")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    || "page";
+  let candidate = normalizedBaseId;
+  let suffix = 2;
+
+  while (usedIds.has(candidate)) {
+    candidate = `${normalizedBaseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return candidate;
+}
+
+function rewritePageId(page: CelionEbookPage, nextId: string): CelionEbookPage {
+  if (page.id === nextId) return page;
+
+  const escapedPageId = page.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const quotedPagePattern = new RegExp(`data-celion-page=(["'])${escapedPageId}\\1`, "g");
+  const cssScopePattern = new RegExp(`\\[data-celion-page=(["'])${escapedPageId}\\1\\]`, "g");
+
+  return {
+    ...page,
+    id: nextId,
+    html: page.html.replace(quotedPagePattern, `data-celion-page="${
+      nextId
+    }"`),
+    css: page.css.replace(cssScopePattern, `[data-celion-page="${nextId}"]`),
+  };
+}
+
+function reindexPages(pages: CelionEbookPage[]) {
+  return pages.map((page, index) => ({
+    ...page,
+    index,
+  }));
+}
+
 export function normalizeEbookDocument(input: unknown): CelionEbookDocument {
   const value = isRecord(input) ? input : {};
   const size = isRecord(value.size) ? value.size : {};
@@ -154,6 +204,28 @@ export function normalizeEbookDocument(input: unknown): CelionEbookDocument {
     themeCss: normalizeString(value.themeCss),
     pages: Array.isArray(value.pages) ? value.pages.map(normalizePage) : [],
   };
+}
+
+export function insertEbookDocumentPage({
+  document,
+  page,
+  insertIndex,
+}: InsertEbookDocumentPageInput): CelionEbookDocument {
+  const normalizedDocument = normalizeEbookDocument(document);
+  const normalizedPage = normalizePage(page, insertIndex);
+  const clampedIndex = Math.max(0, Math.min(insertIndex, normalizedDocument.pages.length));
+  const usedIds = new Set(normalizedDocument.pages.map((item) => item.id));
+  const nextPage = rewritePageId(normalizedPage, uniquePageId(normalizedPage.id, usedIds));
+  const pages = [
+    ...normalizedDocument.pages.slice(0, clampedIndex),
+    nextPage,
+    ...normalizedDocument.pages.slice(clampedIndex),
+  ];
+
+  return normalizeEbookDocument({
+    ...normalizedDocument,
+    pages: reindexPages(pages),
+  });
 }
 
 function hasForbiddenTag(html: string) {
@@ -174,6 +246,132 @@ function attributeValue(attrs: string, name: string) {
   const pattern = new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]+)"|'([^']+)'|([^\\s>]+))`, "i");
   const match = attrs.match(pattern);
   return (match?.[1] ?? match?.[2] ?? match?.[3] ?? "").trim();
+}
+
+function hasAttribute(attrs: string, name: string) {
+  return new RegExp(`(?:^|\\s)${name}\\s*=`, "i").test(attrs);
+}
+
+function upsertAttribute(attrs: string, name: string, value: string) {
+  const pattern = new RegExp(`(\\s${name}\\s*=\\s*)(?:"[^"]*"|'[^']*'|[^\\s>]+)`, "i");
+  if (pattern.test(attrs)) {
+    return attrs.replace(pattern, `$1"${value}"`);
+  }
+
+  return `${attrs} ${name}="${value}"`;
+}
+
+function editableTypeForTag(tag: string): CelionEditableElement["type"] | null {
+  const normalizedTag = tag.toLowerCase();
+  if (IMAGE_EDITABLE_TAGS.has(normalizedTag)) return "image";
+  if (TEXT_EDITABLE_TAGS.has(normalizedTag)) return "text";
+  if (CONTAINER_EDITABLE_TAGS.has(normalizedTag)) return "container";
+  return null;
+}
+
+function roleForTag(tag: string, type: CelionEditableElement["type"]) {
+  const normalizedTag = tag.toLowerCase();
+  if (type === "image") return "image";
+  if (type === "container") return normalizedTag === "header" || normalizedTag === "footer" ? normalizedTag : "container";
+  if (normalizedTag === "h1") return "title";
+  if (normalizedTag === "h2" || normalizedTag === "h3") return "heading";
+  if (normalizedTag === "li") return "list-item";
+  if (normalizedTag === "figcaption" || normalizedTag === "small") return "caption";
+  if (normalizedTag === "strong" || normalizedTag === "em") return "emphasis";
+  return "body";
+}
+
+function hasMeaningfulContainerClass(attrs: string) {
+  const classes = attributeValue(attrs, "class")
+    .split(/\s+/)
+    .map((className) => className.trim())
+    .filter(Boolean);
+  return classes.some((className) => !SKIPPED_CONTAINER_CLASSES.has(className));
+}
+
+function shouldDecorateElement(tag: string, attrs: string) {
+  if (hasAttribute(attrs, "data-celion-page")) return false;
+
+  const type = editableTypeForTag(tag);
+  if (!type) return false;
+  if (type === "container") return hasMeaningfulContainerClass(attrs);
+
+  return true;
+}
+
+function editableIdBase(pageId: string, type: CelionEditableElement["type"]) {
+  const normalizedPageId = (pageId.trim() || "page")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    || "page";
+  return `${normalizedPageId}-${type}`;
+}
+
+function nextEditableId(pageId: string, type: CelionEditableElement["type"], usedIds: Set<string>, counters: Record<CelionEditableElement["type"], number>) {
+  const base = editableIdBase(pageId, type);
+  let candidate = "";
+
+  do {
+    counters[type] += 1;
+    candidate = `${base}-${String(counters[type]).padStart(3, "0")}`;
+  } while (usedIds.has(candidate));
+
+  usedIds.add(candidate);
+  return candidate;
+}
+
+function ensurePageRoot(html: string, pageId: string) {
+  if (/\sdata-celion-page\s*=/i.test(html)) {
+    return html.replace(
+      /\sdata-celion-page\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i,
+      ` data-celion-page="${pageId}"`,
+    );
+  }
+
+  const rootPattern = /<(section|article|div|main)\b([^<>]*?)(\/?)>/i;
+  if (rootPattern.test(html)) {
+    return html.replace(rootPattern, (_match, tag: string, attrs = "", selfClosing = "") =>
+      `<${tag}${upsertAttribute(attrs, "data-celion-page", pageId)}${selfClosing}>`,
+    );
+  }
+
+  return `<section data-celion-page="${pageId}" class="celion-page">\n${html}\n</section>`;
+}
+
+function decorateEditableHtml(html: string, pageId: string) {
+  const usedIds = new Set<string>();
+  const counters: Record<CelionEditableElement["type"], number> = {
+    text: 0,
+    shape: 0,
+    image: 0,
+    container: 0,
+  };
+
+  return html.replace(/<([a-z][\w:-]*)\b([^<>]*?)(\/?)>/gi, (match, tag: string, attrs = "", selfClosing = "") => {
+    if (!shouldDecorateElement(tag, attrs)) return match;
+
+    const type = editableTypeForTag(tag);
+    if (!type) return match;
+
+    const existingId = attributeValue(attrs, "data-celion-id");
+    const id = existingId && !usedIds.has(existingId)
+      ? existingId
+      : nextEditableId(pageId, type, usedIds, counters);
+    usedIds.add(id);
+
+    const role = attributeValue(attrs, "data-role") || roleForTag(tag, type);
+    const nextAttrs = upsertAttribute(
+      upsertAttribute(
+        upsertAttribute(attrs, "data-celion-id", id),
+        "data-role",
+        role,
+      ),
+      "data-editable",
+      "true",
+    );
+
+    return `<${tag}${nextAttrs}${selfClosing}>`;
+  });
 }
 
 function editableTypeFromTagAndRole(tag: string, role: string): CelionEditableElement["type"] {
@@ -251,6 +449,20 @@ function repairManifestFromHtml(page: CelionEbookPage): CelionPageManifest {
 
 function stripInlineStyleAttributes(html: string) {
   return html.replace(/\sstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+}
+
+export function decorateEbookPageForEditing(input: CelionEbookPage): CelionEbookPage {
+  const page = normalizePage(input, input.index);
+  const html = decorateEditableHtml(ensurePageRoot(page.html, page.id), page.id);
+
+  return {
+    ...page,
+    html,
+    manifest: repairManifestFromHtml({
+      ...page,
+      html,
+    }),
+  };
 }
 
 function duplicateValues(values: string[]) {
@@ -522,10 +734,7 @@ export function sanitizeEbookDocument(input: unknown): CelionEbookDocument {
       ...page,
       html: stripInlineStyleAttributes(sanitizeEbookHtmlForCanvas(page.html)),
       css: sanitizeEbookHtmlForCanvas(page.css),
-    })).map((page) => ({
-      ...page,
-      manifest: repairManifestFromHtml(page),
-    })),
+    })).map(decorateEbookPageForEditing),
   });
 }
 

@@ -4,15 +4,19 @@ import type { ChangeEvent, ReactNode } from "react";
 import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from "lucide-react";
 import type { CelionEditableElement } from "@/lib/ebook-document";
 import { CelionSegmentedControl } from "@/components/ui/celion-controls";
-import type { InspectorStyleValues } from "./editor-types";
+import type { InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
 
 type Props = {
   element: CelionEditableElement | null;
+  layoutTargetLabel: string;
+  layoutValues: InspectorLayoutValues | null;
   textValue: string;
   styleValues: InspectorStyleValues;
   onTextChange: (value: string) => void;
   onApplyText: () => void;
   onStyleChange: (prop: string, value: string) => void;
+  onLayoutChange: (prop: keyof InspectorLayoutValues, value: number) => void;
+  onResetLayout: () => void;
 };
 
 const alignOptions = [
@@ -171,11 +175,15 @@ function AlignControl({
 
 export function InspectorControls({
   element,
+  layoutTargetLabel,
+  layoutValues,
   textValue,
   styleValues,
   onTextChange,
   onApplyText,
   onStyleChange,
+  onLayoutChange,
+  onResetLayout,
 }: Props) {
   if (!element) {
     return (
@@ -200,12 +208,73 @@ export function InspectorControls({
 
     onStyleChange(prop, formatValue(clampValue(value, min, max)));
   };
+  const applyLayoutNumber = (
+    event: ChangeEvent<HTMLInputElement>,
+    prop: keyof InspectorLayoutValues,
+    min?: number,
+    max?: number,
+  ) => {
+    if (event.currentTarget.value === "") return;
+
+    const value = event.currentTarget.valueAsNumber;
+    if (!Number.isFinite(value)) return;
+
+    onLayoutChange(prop, clampValue(value, min, max));
+  };
 
   return (
     <div className="inspector-controls">
       <p className="inspector-element-label">
         {element.label}
       </p>
+      <p className="inspector-layout-target">
+        {layoutTargetLabel ? `Layout: ${layoutTargetLabel}` : "Text only"}
+      </p>
+
+      {layoutTargetLabel && (
+        <InspectorSection title="Layout">
+          <div className="inspector-layout-grid">
+            <NumberControl
+              label="X"
+              min="-2000"
+              max="2000"
+              placeholder="0"
+              value={layoutValues?.x}
+              onChange={(event) => applyLayoutNumber(event, "x", -2000, 2000)}
+            />
+            <NumberControl
+              label="Y"
+              min="-2000"
+              max="2000"
+              placeholder="0"
+              value={layoutValues?.y}
+              onChange={(event) => applyLayoutNumber(event, "y", -2000, 2000)}
+            />
+            <NumberControl
+              label="W"
+              min="24"
+              max="2000"
+              placeholder="auto"
+              value={layoutValues?.width}
+              onChange={(event) => applyLayoutNumber(event, "width", 24, 2000)}
+            />
+            <NumberControl
+              label="H"
+              min="24"
+              max="2000"
+              placeholder="auto"
+              value={layoutValues?.height}
+              onChange={(event) => applyLayoutNumber(event, "height", 24, 2000)}
+            />
+          </div>
+          <button
+            onClick={onResetLayout}
+            className="inspector-reset-button"
+          >
+            Reset layout
+          </button>
+        </InspectorSection>
+      )}
 
       {editableProps.has("text") && (
         <InspectorSection title="Content">

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileEbookDocumentToHtml, type CelionEbookDocument, validateEbookDocument } from "./ebook-document";
+import { compileEbookDocumentToHtml, insertEbookDocumentPage, sanitizeEbookDocument, type CelionEbookDocument, validateEbookDocument } from "./ebook-document";
 import { validateCelionSlideHtml } from "./ebook-html";
 
 const validDocument: CelionEbookDocument = {
@@ -63,6 +63,27 @@ test("validateEbookDocument accepts scoped page HTML, CSS, and manifest", () => 
   assert.deepEqual(result.errors, []);
 });
 
+test("insertEbookDocumentPage reindexes pages and keeps page ids unique", () => {
+  const inserted = insertEbookDocumentPage({
+    document: validDocument,
+    insertIndex: 0,
+    page: {
+      ...validDocument.pages[0],
+      id: "cover",
+      title: "Inserted page",
+    },
+  });
+  const validation = validateEbookDocument(inserted);
+
+  assert.equal(inserted.pages.length, 2);
+  assert.equal(inserted.pages[0].index, 0);
+  assert.equal(inserted.pages[1].index, 1);
+  assert.equal(inserted.pages[0].id, "cover-2");
+  assert.equal(inserted.pages[0].html.includes('data-celion-page="cover-2"'), true);
+  assert.equal(inserted.pages[0].css.includes('[data-celion-page="cover-2"]'), true);
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+});
+
 test("compileEbookDocumentToHtml produces valid Celion slide HTML", () => {
   const html = compileEbookDocumentToHtml(validDocument);
   const result = validateCelionSlideHtml(html, {
@@ -72,6 +93,84 @@ test("compileEbookDocumentToHtml produces valid Celion slide HTML", () => {
   });
 
   assert.equal(result.ok, true, result.errors.join("\n"));
+});
+
+test("sanitizeEbookDocument decorates clean HTML with stable editor ids and manifest entries", () => {
+  const document = sanitizeEbookDocument({
+    ...validDocument,
+    pages: [
+      {
+        id: "clean",
+        index: 0,
+        title: "Clean page",
+        role: "insight",
+        version: 1,
+        html: `<section class="clean-page">
+  <h1>Clean heading</h1>
+  <p>Clean body copy</p>
+  <img src="/placeholder.png" alt="Placeholder" />
+</section>`,
+        css: `[data-celion-page="clean"] {
+  width: 559px;
+  height: 794px;
+  overflow: hidden;
+}
+[data-celion-page="clean"] h1 {
+  font-size: 40px;
+}`,
+        manifest: { editableElements: [] },
+      },
+    ],
+  });
+  const page = document.pages[0]!;
+  const validation = validateEbookDocument(document);
+
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+  assert.match(page.html, /data-celion-page="clean"/);
+  assert.match(page.html, /data-celion-id="clean-text-001"/);
+  assert.match(page.html, /data-celion-id="clean-text-002"/);
+  assert.match(page.html, /data-celion-id="clean-image-001"/);
+  assert.deepEqual(
+    page.manifest.editableElements.map((element) => [element.id, element.type]),
+    [
+      ["clean-text-001", "text"],
+      ["clean-text-002", "text"],
+      ["clean-image-001", "image"],
+    ],
+  );
+});
+
+test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate ids", () => {
+  const document = sanitizeEbookDocument({
+    ...validDocument,
+    pages: [
+      {
+        id: "dupe",
+        index: 0,
+        title: "Duplicate ids",
+        role: "insight",
+        version: 1,
+        html: `<section data-celion-page="dupe" class="celion-page">
+  <h1 data-celion-id="hero-title">Existing title</h1>
+  <p data-celion-id="hero-title">Duplicate body</p>
+</section>`,
+        css: `[data-celion-page="dupe"] {
+  width: 559px;
+  height: 794px;
+  overflow: hidden;
+}`,
+        manifest: { editableElements: [] },
+      },
+    ],
+  });
+  const page = document.pages[0]!;
+  const ids = page.manifest.editableElements.map((element) => element.id);
+  const validation = validateEbookDocument(document);
+
+  assert.equal(validation.ok, true, validation.errors.join("\n"));
+  assert.ok(ids.includes("hero-title"));
+  assert.ok(ids.includes("dupe-text-001"));
+  assert.equal(new Set(ids).size, ids.length);
 });
 
 test("validateEbookDocument rejects unscoped CSS selectors", () => {
