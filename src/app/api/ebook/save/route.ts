@@ -128,6 +128,14 @@ export function prepareEbookDocumentForSave(document: unknown): PrepareSaveDocum
     };
   }
 
+  const rawValidation = validateEbookDocument(document);
+  if (!rawValidation.ok) {
+    return {
+      ok: false,
+      message: rawValidation.errors[0] ?? "Invalid ebook document",
+    };
+  }
+
   const normalizedDocument = sanitizeEbookDocument(document);
   const sanitizedValidation = validateEbookDocument(normalizedDocument);
   if (!sanitizedValidation.ok) {
