@@ -7,7 +7,7 @@ type DashboardEmptyStateProps = {
   title: string;
   description: string;
   maxWidth?: string;
-  action: ReactNode;
+  action?: ReactNode;
 };
 
 export function DashboardEmptyState({
@@ -31,7 +31,7 @@ export function DashboardEmptyState({
       <p className="dashboard-empty-description">
         {description}
       </p>
-      {action}
+      {action ?? null}
     </div>
   );
 }

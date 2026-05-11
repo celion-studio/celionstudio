@@ -49,7 +49,9 @@ API routes:
 - `GET /api/projects`
 - `POST /api/projects`
 - `GET /api/projects/[projectId]`
-- `DELETE /api/projects/[projectId]`
+- `DELETE /api/projects/[projectId]` - move a project to trash
+- `DELETE /api/projects/[projectId]?permanent=true` - permanently delete a trashed project
+- `PATCH /api/projects/[projectId]` - restore a trashed project with `{ "action": "restore" }`
 - `GET /api/projects/[projectId]/generation-logs`
 - `POST /api/ebook/plan`
 - `POST /api/ebook/generate`
@@ -152,7 +154,7 @@ Current application tables:
 
 Current project data model:
 
-- `projects` owns project identity, user ownership, title, status, and timestamps.
+- `projects` owns project identity, user ownership, title, status, timestamps, and `deleted_at` for the dashboard trash flow.
 - `project_profiles` stores author, target audience, purpose, tone, design mode, ebook style, accent color, page count, `ebook_document`, and compiled `ebook_html`.
 - `source_items` stores uploaded/pasted source text and excerpts.
 - `ebook_generation_logs` stores generation stage, model ids, plan summary, validation, generation trace, errors, HTML length, and slide count.
@@ -167,6 +169,8 @@ Current project status values:
 - `ready`
 - `revising`
 - `exported`
+
+Trash is not represented as a `ProjectStatus`; trashed projects keep their workflow status and are hidden from active lists with `deleted_at IS NOT NULL`.
 
 ## 8. Editor
 

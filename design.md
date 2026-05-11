@@ -2,27 +2,38 @@
 
 ## Overview
 
-Celion is an AI-powered publishing workspace that turns source material into polished ebooks. The product feels like quiet publishing software: muted, precise, editorial, and operational.
+Celion is an AI-powered creation studio for digital creators turning source material into sellable digital products. The product feels like a minimal studio: neutral, precise, output-led, and commercially sharp.
 
-**North Star**: Muted Minimalist Swiss Editorial SaaS ‚Äî restrained, useful, exact.
+**North Star**: Output-led Minimal Studio ??neutral chrome, vivid output.
+
+## Core Principles
+
+1. **Output first.** Generated covers, previews, images, pages, and exported products are the hero. UI chrome frames the work; it does not compete with it.
+2. **Neutral first, slightly warm only when useful.** Use white, near-white, gray, black, and low-saturation neutrals. Avoid beige lifestyle warmth.
+3. **Creator tool, not admin dashboard.** Controls should feel sharp, intentional, and production-grade.
+4. **Soft-square geometry.** Controls, panels, inputs, and cards stay between 8px and 12px radius. Avoid pill-shaped UI except avatars, dots, and truly circular media.
+5. **Color belongs to output.** Saturated color appears in generated artifacts, covers, thumbnails, images, and previews ??not in navigation, buttons, or routine app chrome.
+6. **Type carries hierarchy.** Use typography and spacing before color, shadows, or decoration.
+7. **Hairline separation.** Prefer borders, subtle dividers, and 1px optical lift over heavy shadows.
 
 ## Product Personality
 
-Celion reads as quiet (not empty), editorial (not decorative), precise (not sterile), premium (not luxury), useful (not promotional), and structured (not card-heavy).
+Celion reads as minimal (not empty), creator-grade (not admin), precise (not sterile), premium (not luxury), useful (not promotional), and output-led (not chrome-led).
 
-Good references: editorial design tools, manuscript review environments, Swiss grid systems, quiet productivity software, print-specimen layouts.
+Good references: ElevenLabs-like restraint, premium AI creation tools, modern creator studios, editorial landing pages, sharp workbench interfaces, neutral galleries that let the work carry color.
 
-Avoid: generic AI landing pages, purple/blue gradient SaaS, Notion-like beige dashboards, colorful status badges, oversized rounded cards, decorative blobs, glassmorphism, bokeh.
+Avoid: generic AI landing pages, purple/blue gradient SaaS, Notion-like beige dashboards, colorful status badges, oversized rounded cards, full-pill button systems, decorative blobs, glassmorphism, bokeh.
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router), React 19
 - **Styling**: Tailwind CSS 3, PostCSS, CSS custom properties
+- **Motion**: Framer Motion for React-driven UI animation. Use CSS keyframes only for legacy styles or isolated decorative loops that do not need component state.
 - **Language**: TypeScript 5
 - **State**: Zustand
 - **Icons**: Lucide React
 - **AI**: Google Gemini (Flash-Lite for planning, Pro for generation)
-- **Fonts**: Geist (body), Inter (display) via `next/font/google`
+- **Fonts**: Geist Sans for body and display via `next/font/google`
 - **Exports**: html2canvas + jsPDF (client-side PDF/PNG/JPG)
 - **Storage**: Cloudflare R2
 - **Auth**: Neon Auth
@@ -51,52 +62,53 @@ Tailwind maps these to utility classes: `bg-bg`, `text-text`, `text-muted`, `bg-
 
 ### Rules
 
-- Prefer cool neutral gray over beige, cream, sand, or brown.
+- Prefer neutral grayscale with slight warmth only where it keeps the UI from feeling cold. Never let the product read as beige, cozy, rustic, or lifestyle.
 - Use black/ink as the primary action color.
 - Use borders and hairlines before shadows.
-- Use color sparingly and only when it adds meaning.
-- Do not introduce blue, green, orange, or purple status pills unless a high-risk warning truly needs attention.
+- Use color sparingly in app chrome. Let creator output, generated covers, previews, thumbnails, and images provide the main color moments.
+- Do not introduce blue, green, orange, or purple status labels unless a high-risk warning truly needs attention.
 - Avoid semantic bright badges for normal workflow states.
 
 ### Component-Level Tokens
 
 Defined in `src/components/ui/celion-style.ts`:
 
-- `CELION_COLOR.appBg`: `#f3f2ef` (editor background)
+- `CELION_COLOR.appBg`: `#fafafa` (app background)
 - `CELION_COLOR.textStrong`: `#18181b` (primary button background)
 - `CELION_COLOR.panel`: `#ffffff`
-- `CELION_COLOR.panelSoft`: `#f8f7f4`
+- `CELION_COLOR.panelSoft`: `#f6f7f8`
 - `CELION_COLOR.muted`: `#71717A`
 - `CELION_COLOR.mutedSoft`: `#A1A1AA`
-- `CELION_COLOR.line`: `rgba(28,25,23,0.08)`
-- `CELION_COLOR.lineSoft`: `#ECEAE5`
+- `CELION_COLOR.line`: `rgba(24,24,27,0.08)`
+- `CELION_COLOR.lineSoft`: `#E7E9EC`
 
 ## Typography
 
 Fonts are loaded in `src/app/layout.tsx`:
 
 ```ts
-// Geist ‚Äî body text (300, 400, 500, 600)
-// Inter ‚Äî display/heading text (200, 300, 400, 500, 600)
+// Geist - body and display text (300, 400, 500, 600)
 ```
 
 | Role | Font | Variable |
 |------|------|----------|
 | Body | Geist | `--font-body` |
-| Display | Inter | `--font-display` |
-| Mono | ‚Äî | `--font-mono` (reserved) |
+| Display | Geist | `--font-display` |
+| Mono | ??| `--font-mono` (reserved) |
 
 Tailwind utility classes: `font-body`, `font-display`, `font-mono`.
 
 ### Rules
 
 - Prefer weights 400, 500, and 600. Avoid bold-heavy hierarchy.
-- Use small, exact labels for operational UI (12‚Äì13px).
-- Use larger editorial type only for genuinely editorial/brand-led surfaces (landing page, hero).
+- Use small, exact labels for operational UI (12??3px).
+- Use larger editorial type only for brand-led creator surfaces (landing page, hero, pricing). Keep the app itself operational.
 - Keep letter-spacing at `0` for body text.
 - Uppercase micro-labels may use modest tracking: `0.06em` to `0.14em`.
 - Do not use oversized marketing typography inside dashboards, panels, cards, or inspector surfaces.
 - Global `font-feature-settings: "ss01", "cv11"` on body for refined rendering.
+- Do not add decorative eyebrow labels, section kickers, or overline labels above marketing or landing section headings. This includes labels like "Outputs", "Pricing", "Included", "Questions", "How it works", and similar micro-headings used only as decoration.
+- If a section needs orientation, make the actual heading or supporting copy clearer instead of adding a small label above it.
 
 ## Spacing & Layout
 
@@ -105,20 +117,20 @@ Tailwind utility classes: `font-body`, `font-display`, `font-mono`.
 - **Grid**: Use alignment and negative space instead of decoration.
 - **Dividers**: 1px hairline dividers, gradient-faded hairline available via `.hairline` class.
 - **Cards**: Use only for repeated items, modals, or clearly framed tools. Do not nest cards inside cards.
-- **Lists and documents** should be the main visual object.
+- **Outputs, lists, and documents** should be the main visual object.
 - Align panels, headers, and tables on clear vertical axes.
 
 ### Editor Layout (core product surface)
 
 ```
-‚îå‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îê
-‚îÇ Top Bar (56px)                                   ‚îÇ
-‚îÇ  ‚ÜêBack | Title | Save state | View/Edit | Export ‚îÇ
-‚îú‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚î¨‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚î¨‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚î§
-‚îÇ Page ‚îÇ     Preview (640px wide)     ‚îÇ Inspector  ‚îÇ
-‚îÇ Rail ‚îÇ     iframe-rendered pages    ‚îÇ (Edit only)‚îÇ
-‚îÇ      ‚îÇ                              ‚îÇ            ‚îÇ
-‚îî‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚î¥‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚î¥‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îò
+?å‚??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä??
+??Top Bar (56px)                                   ??
+?? ?êBack | Title | Save state | View/Edit | Export ??
+?ú‚??Ä?Ä?Ä?Ä?Ä?¨‚??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?¨‚??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä??
+??Page ??    Preview (640px wide)     ??Inspector  ??
+??Rail ??    iframe-rendered pages    ??(Edit only)??
+??     ??                             ??           ??
+?î‚??Ä?Ä?Ä?Ä?Ä?¥‚??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?¥‚??Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä?Ä??
 ```
 
 - Page rail: compact vertical page thumbnails/numbers
@@ -130,19 +142,19 @@ Tailwind utility classes: `font-body`, `font-display`, `font-mono`.
 
 | Context | Value |
 |---------|-------|
-| Controls, buttons, fields, badges, pricing cards | `4px` |
-| Segmented controls, inputs (wizard) | `6px` |
+| Compact controls, tool buttons, dense fields | `6px` |
+| Buttons, segmented controls, inputs (wizard), badges | `6px` |
 | App shells, preview frames, panels | `6px` |
-| Larger containers needing softer boundary | `8px` |
+| Cards, pricing cards, output/demo containers | `8px`??10px` |
 | Round elements (avatars) | `50%` |
 
-Avoid radius above `8px` unless there is a specific product reason.
+Avoid radius above `10px` unless there is a specific product reason. Avoid full-pill buttons; Celion should feel like a creator tool, not a consumer SaaS clone.
 
 ## Borders & Shadows
 
 - **Default**: `1px` neutral borders (`#e3e5e8` or `rgba(28,25,23,0.08)`).
 - **Shadows**: Rare and subtle. The only defined shadow is `float`: `0 4px 24px rgba(31, 31, 31, 0.08)`.
-- **Pricing cards**: `box-shadow: 0 10px 24px rgba(17, 17, 15, 0.1)`.
+- **Pricing cards**: subtle optical lift only; avoid dramatic depth.
 - Avoid floating, pillowy SaaS cards with heavy shadows.
 - Editor panels use borders only, no box-shadows.
 
@@ -173,25 +185,25 @@ Defined in `src/components/ui/celion-controls.tsx`:
 
 ## Wizard (Onboarding)
 
-The wizard is a brief-building flow for ebook creation. Defined in `src/styles/globals.css` under `.wizard-*` classes:
+The wizard is a brief-building flow for ebook creation. Defined in `src/styles/wizard.css` under `.wizard-*` classes:
 
-- **Inputs**: 1px `#d9dde2` border, 6px radius, white background, 13.5px font, hover darkens border, focus shows ink border + subtle ring.
+- **Inputs**: 1px `#d9dde2` border, 8px radius, white background, 13.5px font, hover darkens border, focus shows ink border + subtle ring.
 - **Purpose selector**: Custom `<details>`-based dropdown. Selected state: `#17191d` background, white text. Dropdown menu: white card with shadow.
 - **Tone cards**: White cards with border, active state: `#17191d` background, white text.
 - **Labels**: 12.5px, weight 500, color `--color-ink-soft`.
-- **Step transitions**: `.step-in` class ‚Äî 0.32s opacity + translateY animation.
+- **Step transitions**: `.step-in` class ??0.32s opacity + translateY animation.
 
 Keep the first step light, group inputs by meaningful briefing decisions, avoid artificial one-field steps, avoid redundant inline validation when buttons already block progression.
 
 ## Dashboard
 
-The dashboard should feel like a manuscript desk, not an analytics product.
+The dashboard should feel like a creator studio inventory, not an analytics product.
 
 - Project list is the hero element.
 - Keep stats minimal.
 - Rows should be quiet, scannable, and table-like.
-- Metadata: dates, titles, audience, status.
-- Empty states: calm and useful, not promotional.
+- Metadata: dates, titles, audience, format, status.
+- Empty states: useful and motivating, not loud or promotional.
 - Loading: centered muted text, 72px vertical padding.
 - Error states: warm neutral alert (`#FFF5F2` background, `#9b4c19` text).
 
@@ -201,7 +213,7 @@ The editor is the core product surface. Key characteristics:
 
 - **Modes**: `View` (default, inspector hidden, preview dominant) and `Edit` (inspector visible, elements selectable).
 - **Preview**: iframe-rendered, 640px wide, pages stacked with 28px gaps.
-- **Page model**: `CelionEbookDocument` ‚Äî page-level JSON with scoped HTML/CSS per page, manifest-driven element selection.
+- **Page model**: `CelionEbookDocument` ??page-level JSON with scoped HTML/CSS per page, manifest-driven element selection.
 - **Selection**: Click-to-select in iframe, outlined with `2px solid #18181b`, 2px offset.
 - **Inspector**: Text content, font size, weight, alignment, color, background, opacity, border, margin, padding controls.
 - **Top bar**: Back navigation, project title, save indicator (saving/saved dots + "saved" label), View/Edit toggle, Export dropdown.
@@ -211,27 +223,27 @@ Design rules: keep the center preview dominant, keep the right panel as an inspe
 
 ## Landing Page
 
-Editorial but restrained. Defined in `src/styles/editorial.css`:
+Minimal studio, output-led, and creator-facing. Defined in `src/styles/marketing.css` and `src/styles/landing.css`:
 
 - **Hero**: Center-aligned, Geist headings up to 76px, tight line-height (1.05), minimal letter-spacing (-0.05em).
 - **Hero CTA cluster**: Primary (dark button with shadow) + Secondary (light button).
-- **Navigation**: Sticky dark bar (`#151412` background, 4px radius), 120px gap between brand and actions.
+- **Navigation**: Sticky dark bar (`#151412` background, 8px radius), 120px gap between brand and actions.
 - **Carousel**: 5 ebook cover cards in a radial arrangement with rotation transforms and book-spine pseudo-elements.
 - **Process section**: Alternating left/right layout with numbered background (huge faded numerals).
 - **Preview band**: Layered paper effect with rotated pseudo-elements.
 - **Footer**: Dark `#151412` background, 4-column grid, muted text.
 
-Rules: lead with Celion as a publishing OS, show real document/page objects (not abstract AI graphics), prefer static editorial compositions, avoid gradient backgrounds and decorative blobs.
+Rules: lead with Celion as a creator studio, show real output objects (covers, pages, previews, thumbnails) rather than abstract AI graphics, use neutral chrome so imagery can carry color, avoid gradient backgrounds and decorative blobs.
 
 ## Pricing Page
 
-Defined in `src/styles/editorial.css` under `.pricing-*`:
+Defined in `src/styles/pricing.css` under `.pricing-*`:
 
 - **Background**: Subtle gradient from `#f6f7f8` through `#f1f2f1`.
 - **Hero**: Center-aligned, 76px Geist heading.
 - **Proof line**: Horizontal bar with feature labels separated by borders.
 - **Plan cards**: 4-column grid, 10px gap, min-height 548px, semi-transparent white background. Featured card: dark `#151412` background.
-- **Plan labels**: Uppercase, 10px font, bordered pill.
+- **Plan labels**: Uppercase, 10px font, bordered soft-square label.
 - **Pricing**: 43px Geist number, cadence in muted text.
 - **Feature lists**: Muted text with green check icons.
 - **CTAs**: Ink border, hover fills background, featured card has white button.
@@ -240,7 +252,7 @@ Defined in `src/styles/editorial.css` under `.pricing-*`:
 
 ## Status UI
 
-Workflow status should be quiet. Use neutral backgrounds, neutral text, thin borders, and optional monochrome dots.
+Workflow status should be precise. Use neutral backgrounds, neutral text, thin borders, and optional monochrome or low-saturation dots.
 
 Reference pattern:
 ```
@@ -249,11 +261,15 @@ bg-surface-subtle px-2 py-0.5 text-[11.5px] font-medium text-muted
 ```
 with a 5px accent-colored dot.
 
-Never use: green "Ready", blue "Generating", yellow "Revising", red/orange routine alerts, colorful badge systems.
+Never use: green "Ready", blue "Generating", yellow "Revising", red/orange routine alerts, colorful badge systems. Save saturated color for output previews and generated artifacts.
 
 ## Motion
 
-Motion should be quiet and functional.
+Motion should be crisp and functional.
+
+New React UI animation should use **Framer Motion**. Prefer `motion.*`, `AnimatePresence`, and shared variants for modal entrances, view transitions, disclosure panels, and interactive state changes. Do not add new component-state animations with ad hoc CSS keyframes when Framer Motion can express the behavior cleanly.
+
+CSS transitions are still appropriate for simple hover/focus color changes. Existing CSS keyframes can remain until the surrounding UI is touched.
 
 | Animation | Duration | Easing | Usage |
 |-----------|----------|--------|-------|
@@ -266,9 +282,9 @@ Motion should be quiet and functional.
 ### Rules
 
 - Prefer short fades and small vertical transitions.
-- Use subtle hover responses (150‚Äì200ms transitions).
-- Avoid springy/bouncy interactions, dramatic reveal choreography, constant carousel movement in operational UI.
-- Respect `prefers-reduced-motion: reduce` ‚Äî disable all animations.
+- Use subtle hover responses (150??00ms transitions).
+- Avoid springy/bouncy interactions, dramatic reveal choreography, or motion that competes with creator output. Constant carousel movement belongs only on marketing surfaces, never operational UI.
+- Respect `prefers-reduced-motion: reduce` ??disable all animations.
 
 ## Selection Bubble Menu
 
@@ -297,21 +313,22 @@ Use **Lucide React** (`lucide-react`) for all icons. Prefer icons for tool actio
 ## Implementation Rules
 
 1. Check `src/styles/globals.css` for existing tokens before adding new styles.
-2. Reuse the neutral palette unless there is a clear reason not to.
+2. Reuse the neutral palette unless the color is part of user output or a clear semantic warning.
 3. Prefer local consistency over inventing a new visual pattern.
-4. Remove beige, colorful badges, excessive radius, unnecessary shadows when touching nearby UI.
+4. Remove beige lifestyle warmth, colorful badges, full-pill controls, excessive radius, and unnecessary shadows when touching nearby UI.
 5. For editor changes, inspect page 2+ behavior, not just the first page.
-6. When uncertain, choose the quieter option.
+6. When uncertain, choose neutral chrome and let the output carry energy.
 
 ## Quick Checklist
 
 Before finishing any UI change, verify:
 
-- Does this still look like publishing software?
+- Does this still look like an output-led minimal studio?
 - Did I add color where structure would have worked?
 - Did I create another card when a divider or row would be better?
 - Are badges neutral?
-- Are controls compact and precise?
+- Are controls compact, precise, and between 8px and 12px radius?
 - Is the typography calm, with limited weight hierarchy?
 - Does this screen match the editor and dashboard language?
-- Would this still feel right after the user creates 50 ebooks?
+- Does the UI frame the creator's output instead of competing with it?
+- Would this still feel right after the user creates 50 digital products?

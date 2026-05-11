@@ -131,7 +131,7 @@ export function MarketingHeader({
                 </div>
               </>
             ) : (
-              <Link href={AUTH_ROUTE} className="btn btn-light" style={{ textDecorationLine: 'none' }}>
+              <Link href={AUTH_ROUTE} prefetch={false} className="btn btn-light" style={{ textDecorationLine: 'none' }}>
                 Sign in
               </Link>
             )}

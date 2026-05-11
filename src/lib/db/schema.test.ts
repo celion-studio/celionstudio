@@ -176,6 +176,40 @@ test("applyAppSchema creates project-era tables and indexes", async () => {
   );
   assert.ok(
     statements.some((statement) =>
+      statement.includes("ADD COLUMN IF NOT EXISTS deleted_at timestamp"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX IF NOT EXISTS projects_user_id_deleted_at_updated_at_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE TABLE IF NOT EXISTS billing_customers") &&
+      statement.includes("customer_state jsonb") &&
+      statement.includes("active_plan text NOT NULL DEFAULT 'starter'"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE TABLE IF NOT EXISTS billing_events") &&
+      statement.includes("event_id text PRIMARY KEY") &&
+      statement.includes("payload jsonb NOT NULL"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX IF NOT EXISTS billing_customers_polar_customer_id_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
+      statement.includes("CREATE INDEX IF NOT EXISTS billing_events_event_type_created_at_idx"),
+    ),
+  );
+  assert.ok(
+    statements.some((statement) =>
       statement.includes("DROP TABLE IF EXISTS app_migrations"),
     ),
   );
@@ -206,7 +240,7 @@ test("applyAppSchema grants app table privileges when an app role is provided", 
   );
   assert.ok(
     statements.includes(
-      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, ebook_generation_logs TO "app""user"',
+      'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, ebook_generation_logs, billing_customers, billing_events TO "app""user"',
     ),
   );
   assert.ok(

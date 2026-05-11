@@ -582,6 +582,13 @@ export function EditorShell({
     setSetupOpen(false);
   }, [latestDocumentRef, selection]);
 
+  const handleStartBlankProject = useCallback(() => {
+    selection.clearSelection();
+    editorModeRef.current = "view";
+    setEditorMode("view");
+    setSetupOpen(false);
+  }, [selection]);
+
   const editorShellStyle = {
     "--editor-edge-gap": `${EDITOR_EDGE_GAP}px`,
     "--editor-content-min-height": `calc(100vh - ${EDITOR_TOP_RAIL_HEIGHT + EDITOR_EDGE_GAP}px)`,
@@ -613,6 +620,7 @@ export function EditorShell({
               projectId={projectId}
               variant="editor"
               onGenerated={handleWizardGenerated}
+              onStartBlank={handleStartBlankProject}
             />
           </div>
         ) : (

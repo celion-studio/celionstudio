@@ -108,6 +108,7 @@ export function CelionButtonLink({
 
 export type CelionSegmentedOption<T extends string> = {
   ariaLabel?: string;
+  disabled?: boolean;
   label: ReactNode;
   title?: string;
   value: T;
@@ -150,8 +151,13 @@ export function CelionSegmentedControl<T extends string>({
             type="button"
             aria-label={option.ariaLabel}
             aria-pressed={active}
+            disabled={option.disabled}
             title={option.title}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              if (!option.disabled) {
+                onChange(option.value);
+              }
+            }}
             className="celion-segmented-option"
             data-active={active}
             data-index={index}

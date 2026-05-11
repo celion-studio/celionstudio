@@ -1,30 +1,34 @@
-﻿"use client";
+"use client";
 
-import type { Route } from "next";
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { BookOpen, FileText } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FileText, Trash2 } from "lucide-react";
+import { BillingDialog } from "@/components/dashboard/BillingDialog";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
+import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { ProjectList } from "@/components/dashboard/ProjectList";
+import { SettingsPanel } from "@/components/dashboard/SettingsPanel";
 import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 import { useCreateProjectNavigation } from "@/components/dashboard/use-create-project-navigation";
+import { useDashboardBilling } from "@/components/dashboard/use-dashboard-billing";
+import { useDashboardProjects } from "@/components/dashboard/use-dashboard-projects";
 import { authClient } from "@/lib/auth-client";
 import { buildAuthHref, getSafeAuthNext } from "@/lib/auth-redirect";
-import { CelionButton, CelionButtonLink } from "@/components/ui/celion-controls";
+import { CelionButton } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
-import type { ProjectRecord } from "@/types/project";
+import type { ProjectSummary } from "@/lib/projects";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
+  initialProjects: ProjectSummary[];
+  initialProjectsError?: string;
   activeItem?: SidebarItemKey;
+  initialBillingOpen?: boolean;
 };
 
 const workspaceCopy = {
-  breadcrumbCurrent: "All projects",
-  heading: "Your projects",
-  description: "All your projects and works in progress.",
   primaryActionLabel: "New project",
   blankTitle: "Untitled project",
   emptyTitle: "No projects yet",
@@ -33,12 +37,43 @@ const workspaceCopy = {
   loadingLabel: "Loading projects...",
 } as const;
 
+const viewCopy: Record<SidebarItemKey, {
+  breadcrumbCurrent: string;
+  heading: string;
+  description: string;
+}> = {
+  home: {
+    breadcrumbCurrent: "Home",
+    heading: "Home",
+    description: "Start a new ebook or reopen recent work.",
+  },
+  projects: {
+    breadcrumbCurrent: "All projects",
+    heading: "Your projects",
+    description: "All your projects and works in progress.",
+  },
+  trash: {
+    breadcrumbCurrent: "Trash",
+    heading: "Trash",
+    description: "Restore projects or delete them permanently.",
+  },
+  settings: {
+    breadcrumbCurrent: "Settings",
+    heading: "Settings",
+    description: "Manage the basics for your Celion workspace.",
+  },
+};
+
 export function DashboardShell({
   isSignedIn,
   initialUserName,
   initialUserEmail,
-  activeItem = "workspace",
+  initialProjects,
+  initialProjectsError = "",
+  activeItem = "projects",
+  initialBillingOpen = false,
 }: DashboardShellProps) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const {
     createAndOpenProject,
@@ -48,26 +83,38 @@ export function DashboardShell({
   } = useCreateProjectNavigation();
   const hasVerifier = searchParams.has("neon_auth_session_verifier");
   const authNext = getSafeAuthNext(searchParams.get("next"));
-  const [resolvedSignedIn, setResolvedSignedIn] = useState(isSignedIn);
-
-  const [projects, setProjects] = useState<ProjectRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [deletingProjectId, setDeletingProjectId] = useState("");
-  const visibleError = error || createProjectError;
-  const showLoading = loading;
+  const [billingOpen, setBillingOpen] = useState(initialBillingOpen);
+  const billing = useDashboardBilling({ open: billingOpen, signedIn: isSignedIn });
+  const dashboardProjects = useDashboardProjects({
+    blankTitle: workspaceCopy.blankTitle,
+    initialError: initialProjectsError,
+    initialProjects,
+    loadingFromVerifier: hasVerifier,
+    resetKey: activeItem,
+  });
+  const visibleError = dashboardProjects.error || createProjectError;
+  const showLoading = dashboardProjects.loading;
   const copy = workspaceCopy;
+  const currentView = viewCopy[activeItem];
+  const isHomeView = activeItem === "home";
+  const isProjectsView = activeItem === "projects";
+  const isTrashView = activeItem === "trash";
+  const stopProjectLoading = dashboardProjects.stopLoading;
   const handleVerifierError = useCallback(() => {
-    setResolvedSignedIn(false);
-    setLoading(false);
-  }, []);
+    stopProjectLoading();
+    window.location.replace(buildAuthHref("sign-in", authNext));
+  }, [authNext, stopProjectLoading]);
 
-  async function fetchProjects() {
-    return fetch("/api/projects", {
-      method: "GET",
-      cache: "no-store",
-    });
-  }
+  const closeBilling = useCallback(() => {
+    setBillingOpen(false);
+    if (searchParams.get("view") === "billing") {
+      router.replace("/dashboard");
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    setBillingOpen(initialBillingOpen);
+  }, [initialBillingOpen]);
 
   useEffect(() => {
     if (!hasVerifier) {
@@ -102,94 +149,8 @@ export function DashboardShell({
     };
   }, [authNext, handleVerifierError, hasVerifier]);
 
-  useEffect(() => {
-    if (hasVerifier) {
-      return;
-    }
-
-    let active = true;
-
-    async function loadProjects() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await fetchProjects();
-
-        if (response.status === 401) {
-          if (active) {
-            setResolvedSignedIn(false);
-            setProjects([]);
-          }
-          return;
-        }
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as
-            | { message?: string }
-            | null;
-          throw new Error(payload?.message ?? "Could not load your workspace.");
-        }
-
-        const payload = (await response.json()) as { projects: ProjectRecord[] };
-
-        if (active) {
-          setResolvedSignedIn(true);
-          setProjects(payload.projects);
-        }
-      } catch (caught) {
-        if (active) {
-          setError(
-            caught instanceof Error
-              ? caught.message
-              : "Could not load your workspace.",
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadProjects();
-
-    return () => {
-      active = false;
-    };
-  }, [hasVerifier]);
-
-  async function deleteProject(project: ProjectRecord) {
-    const label = project.title || copy.blankTitle;
-    if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
-
-    const previousProjects = projects;
-    setDeletingProjectId(project.id);
-    setError("");
-    setProjects((current) => current.filter((item) => item.id !== project.id));
-
-    try {
-      const response = await fetch(`/api/projects/${project.id}`, {
-        method: "DELETE",
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { message?: string }
-          | null;
-        throw new Error(payload?.message ?? "Could not delete this project.");
-      }
-    } catch (caught) {
-      setProjects(previousProjects);
-      setError(caught instanceof Error ? caught.message : "Could not delete this project.");
-    } finally {
-      setDeletingProjectId("");
-    }
-  }
-
   async function handleCreateProject() {
-    setError("");
+    dashboardProjects.clearError();
     setCreateProjectError("");
     await createAndOpenProject();
   }
@@ -197,33 +158,37 @@ export function DashboardShell({
   return (
     <WorkspaceLayout
       activeItem={activeItem}
-      isSignedIn={resolvedSignedIn}
+      billingOpen={billingOpen}
+      isSignedIn={isSignedIn}
       initialUserName={initialUserName}
       initialUserEmail={initialUserEmail}
-      breadcrumbCurrent={copy.breadcrumbCurrent}
+      breadcrumbCurrent={currentView.breadcrumbCurrent}
+      onBillingClick={() => setBillingOpen(true)}
     >
-      <div className="dashboard-head">
-        <div>
-          <h1 className="dashboard-title">
-            {copy.heading}
-          </h1>
-          <p className="dashboard-description">
-            {copy.description}
-          </p>
+      {!isHomeView ? (
+        <div className="dashboard-head">
+          <div>
+            <h1 className="dashboard-title">
+              {currentView.heading}
+            </h1>
+            <p className="dashboard-description">
+              {currentView.description}
+            </p>
+          </div>
+          {isSignedIn && isProjectsView ? (
+            <CelionButton
+              onClick={handleCreateProject}
+              disabled={creatingProject}
+              variant="primary"
+              className="dashboard-primary-button"
+            >
+              {creatingProject ? "Creating..." : copy.primaryActionLabel}
+            </CelionButton>
+          ) : null}
         </div>
-        {resolvedSignedIn ? (
-          <CelionButton
-            onClick={handleCreateProject}
-            disabled={creatingProject}
-            variant="primary"
-            className="dashboard-primary-button"
-          >
-            {creatingProject ? "Creating..." : copy.primaryActionLabel}
-          </CelionButton>
-        ) : null}
-      </div>
+      ) : null}
 
-      {visibleError ? (
+      {visibleError && !isHomeView ? (
         <div className="dashboard-error">
           <p>{visibleError}</p>
         </div>
@@ -237,32 +202,40 @@ export function DashboardShell({
         </div>
       ) : null}
 
-      {!showLoading && resolvedSignedIn ? (
-        <ProjectList
-          projects={projects}
-          deletingProjectId={deletingProjectId}
-          onDeleteProject={deleteProject}
-        />
+      {!showLoading && isSignedIn ? (
+        <>
+          {isHomeView ? (
+            <DashboardHome
+              creatingProject={creatingProject}
+              error={visibleError}
+              projects={dashboardProjects.projects}
+              userName={initialUserName}
+              onCreateProject={handleCreateProject}
+            />
+          ) : null}
+          {isProjectsView ? (
+            <ProjectList
+              projects={dashboardProjects.projects}
+              processingProjectId={dashboardProjects.processingProjectId}
+              onDeleteProject={dashboardProjects.deleteProject}
+            />
+          ) : null}
+          {isTrashView ? (
+            <ProjectList
+              mode="trash"
+              projects={dashboardProjects.projects}
+              processingProjectId={dashboardProjects.processingProjectId}
+              onPermanentDeleteProject={dashboardProjects.permanentlyDeleteProject}
+              onRestoreProject={dashboardProjects.restoreProject}
+            />
+          ) : null}
+          {activeItem === "settings" ? (
+            <SettingsPanel userName={initialUserName} userEmail={initialUserEmail} />
+          ) : null}
+        </>
       ) : null}
 
-      {!showLoading && !resolvedSignedIn ? (
-        <DashboardEmptyState
-          icon={BookOpen}
-          title="Sign in to continue"
-          description="Your workspace is account-backed. Sign in to access your projects."
-          action={
-            <CelionButtonLink
-              href={buildAuthHref("sign-in", "/dashboard") as Route}
-              variant="primary"
-              className="dashboard-primary-button"
-            >
-              Return to sign in
-            </CelionButtonLink>
-          }
-        />
-      ) : null}
-
-      {!showLoading && resolvedSignedIn && projects.length === 0 ? (
+      {!showLoading && isSignedIn && isProjectsView && dashboardProjects.projects.length === 0 ? (
         <DashboardEmptyState
           icon={FileText}
           title={copy.emptyTitle}
@@ -281,6 +254,28 @@ export function DashboardShell({
           }
         />
       ) : null}
+
+      {!showLoading && isSignedIn && isTrashView && dashboardProjects.projects.length === 0 ? (
+        <DashboardEmptyState
+          icon={Trash2}
+          title="Trash is empty"
+          description="Projects you move to trash will appear here before permanent deletion."
+          maxWidth="320px"
+        />
+      ) : null}
+
+      <BillingDialog
+        billingCycle={billing.billingCycle}
+        billingError={billing.billingError}
+        billingState={billing.billingState}
+        checkoutPendingPlan={billing.checkoutPendingPlan}
+        open={billingOpen}
+        portalPending={billing.portalPending}
+        onBillingCycleChange={billing.setBillingCycle}
+        onCheckout={billing.startCheckout}
+        onClose={closeBilling}
+        onOpenPortal={billing.openPortal}
+      />
     </WorkspaceLayout>
   );
 }

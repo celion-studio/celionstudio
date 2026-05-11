@@ -46,6 +46,7 @@ export type ProjectRecord = {
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
   sources: ProjectSource[];
   profile: ProjectProfile;
 };

@@ -109,8 +109,11 @@ export async function recordEbookGenerationLog(input: EbookGenerationLogInput) {
   }
 }
 
-export async function listEbookGenerationLogsForProject(userId: string, projectId: string) {
-  const sql = getSql();
+export async function listEbookGenerationLogsForProject(
+  userId: string,
+  projectId: string,
+  sql: ReturnType<typeof getSql> = getSql(),
+) {
   const rows = (await sql`
     SELECT id, status, stage,
       plan_model AS "planModel",
@@ -135,6 +138,7 @@ export async function listEbookGenerationLogsForProject(userId: string, projectI
         SELECT 1 FROM projects
         WHERE id::text = ${projectId}
           AND user_id = ${userId}
+          AND deleted_at IS NULL
       )
     ORDER BY created_at DESC
     LIMIT 20

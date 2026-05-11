@@ -34,7 +34,7 @@ async function grantAppPrivileges(sql: SqlClientWithQuery, appRole: string) {
   await executeStatement(sql, `GRANT USAGE ON SCHEMA public TO ${role}`);
   await executeStatement(
     sql,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, ebook_generation_logs TO ${role}`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE projects, project_profiles, source_items, ebook_generation_logs, billing_customers, billing_events TO ${role}`,
   );
   await executeStatement(
     sql,
@@ -73,6 +73,35 @@ export async function applyAppSchema(
   await sql`
     ALTER TABLE projects
     DROP COLUMN IF EXISTS project_type
+  `;
+
+  await sql`
+    ALTER TABLE projects
+    ADD COLUMN IF NOT EXISTS deleted_at timestamp
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS billing_customers (
+      user_id text PRIMARY KEY,
+      polar_customer_id text,
+      email text,
+      name text,
+      customer_state jsonb,
+      active_plan text NOT NULL DEFAULT 'starter',
+      active_product_id text,
+      active_subscription_id text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      updated_at timestamp NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS billing_events (
+      event_id text PRIMARY KEY,
+      event_type text NOT NULL,
+      payload jsonb NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )
   `;
 
   await executeStatement(sql, "DROP TABLE IF EXISTS app_migrations");
@@ -322,6 +351,21 @@ export async function applyAppSchema(
   await sql`
     CREATE INDEX IF NOT EXISTS projects_user_id_updated_at_idx
     ON projects (user_id, updated_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS projects_user_id_deleted_at_updated_at_idx
+    ON projects (user_id, deleted_at, updated_at DESC)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS billing_customers_polar_customer_id_idx
+    ON billing_customers (polar_customer_id)
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS billing_events_event_type_created_at_idx
+    ON billing_events (event_type, created_at DESC)
   `;
 
   await sql`

@@ -3,21 +3,20 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  LogOut,
-  Plus,
-  type LucideIcon,
-} from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
+import { FiCreditCard, FiFileText, FiHome, FiSettings, FiTrash2 } from "react-icons/fi";
 import { authClient } from "@/lib/auth-client";
 
-export type SidebarItemKey = "workspace";
+export type SidebarItemKey = "home" | "projects" | "trash" | "settings";
+type SidebarIconName = SidebarItemKey | "billing";
 
 type WorkspaceSidebarProps = {
   activeItem: SidebarItemKey;
+  billingOpen?: boolean;
   isSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
+  onBillingClick?: () => void;
   primaryAction?: {
     href: Route;
     label: string;
@@ -28,21 +27,46 @@ type WorkspaceSidebarProps = {
 const NAV_ITEMS: Array<{
   key: SidebarItemKey;
   label: string;
-  icon: LucideIcon;
+  icon: SidebarIconName;
   href: Route;
 }> = [
-  { key: "workspace", label: "Projects", icon: LayoutDashboard, href: "/dashboard" },
+  { key: "home", label: "Home", icon: "home", href: "/dashboard?view=home" as Route },
+  { key: "projects", label: "All projects", icon: "projects", href: "/dashboard?view=projects" as Route },
+  { key: "trash", label: "Trash", icon: "trash", href: "/dashboard?view=trash" as Route },
+  { key: "settings", label: "Settings", icon: "settings", href: "/dashboard?view=settings" as Route },
 ];
 
 export const WORKSPACE_SIDEBAR_WIDTH = 280;
 export const WORKSPACE_TOP_RAIL_HEIGHT = 56;
 export const WORKSPACE_EDGE_GAP = 16;
 
+function WorkspaceSidebarGlyph({ name }: { name: SidebarIconName }) {
+  const icons = {
+    billing: FiCreditCard,
+    home: FiHome,
+    projects: FiFileText,
+    settings: FiSettings,
+    trash: FiTrash2,
+  };
+  const Icon = icons[name];
+
+  return (
+    <Icon
+      aria-hidden="true"
+      className="workspace-sidebar-glyph"
+      size={15}
+      strokeWidth={1.8}
+    />
+  );
+}
+
 export function WorkspaceSidebar({
   activeItem,
+  billingOpen = false,
   isSignedIn,
   initialUserName,
   initialUserEmail,
+  onBillingClick,
   primaryAction = null,
 }: WorkspaceSidebarProps) {
   const router = useRouter();
@@ -83,7 +107,7 @@ export function WorkspaceSidebar({
 
       <nav className="workspace-sidebar-nav">
         {NAV_ITEMS.map((item) => {
-          const active = item.key === activeItem;
+          const active = !billingOpen && item.key === activeItem;
 
           return (
             <Link
@@ -92,12 +116,21 @@ export function WorkspaceSidebar({
               className="workspace-sidebar-link"
               data-active={active ? "true" : "false"}
             >
-              <item.icon size={15} strokeWidth={1.8} />
+              <WorkspaceSidebarGlyph name={item.icon} />
               {item.label}
             </Link>
           );
         })}
 
+        <button
+          type="button"
+          className="workspace-sidebar-link workspace-sidebar-button"
+          data-active={billingOpen ? "true" : "false"}
+          onClick={onBillingClick}
+        >
+          <WorkspaceSidebarGlyph name="billing" />
+          Billing
+        </button>
       </nav>
 
       {primaryAction ? (

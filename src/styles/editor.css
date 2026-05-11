@@ -1,0 +1,565 @@
+﻿.editor-topbar {
+  align-items: center;
+  background: transparent;
+  box-sizing: border-box;
+  display: grid;
+  flex-shrink: 0;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  height: var(--editor-top-rail-height);
+  padding: 0 var(--editor-edge-gap);
+}
+
+.editor-topbar-left,
+.editor-topbar-right {
+  align-items: center;
+  display: flex;
+  min-width: 0;
+}
+
+.editor-topbar-left {
+  gap: 10px;
+}
+
+.editor-topbar-right {
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.editor-back-link {
+  align-items: center;
+  color: var(--celion-muted);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 13px;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.editor-breadcrumb-separator {
+  color: var(--celion-warm-line);
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.editor-project-title {
+  color: var(--celion-text-strong);
+  font-size: 13.5px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-status {
+  color: var(--celion-muted-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.editor-status-error {
+  color: var(--celion-warning);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-export-anchor {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.editor-export-menu {
+  background: var(--celion-panel);
+  border: 1px solid var(--celion-line-soft);
+  border-radius: var(--celion-radius-control);
+  box-shadow: var(--celion-shadow-none);
+  min-width: 140px;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+}
+
+.editor-export-option {
+  background: none;
+  border: none;
+  color: var(--celion-text-strong);
+  cursor: pointer;
+  display: block;
+  font-family: var(--celion-font-display);
+  font-size: 13px;
+  padding: 10px 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.editor-export-option:hover {
+  background: var(--celion-panel-soft);
+}
+
+.editor-page-list {
+  background: transparent;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 14px 4px 14px 0;
+  width: 220px;
+}
+
+.editor-page-list-count {
+  color: var(--celion-muted-soft);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.11em;
+  margin-bottom: 10px;
+  padding-left: 6px;
+  text-transform: uppercase;
+}
+
+.editor-page-list-item {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--celion-radius-control);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  margin-bottom: 3px;
+  padding: 8px 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.editor-page-list-item[data-active="true"] {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--celion-line);
+}
+
+.editor-page-index {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.56);
+  border-radius: var(--celion-radius-control);
+  color: var(--celion-muted);
+  display: inline-flex;
+  font-family: var(--celion-font-display);
+  font-size: 11px;
+  font-weight: 650;
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  width: 28px;
+}
+
+.editor-page-list-item[data-active="true"] .editor-page-index {
+  background: var(--celion-text-strong);
+  color: var(--celion-white);
+}
+
+.editor-page-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.editor-page-title,
+.editor-page-role {
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-page-title {
+  color: var(--celion-text-secondary);
+  font-size: 12px;
+  font-weight: 560;
+}
+
+.editor-page-role {
+  color: var(--celion-muted-soft);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.editor-preview-pane {
+  background: var(--celion-panel-soft);
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  overflow: auto;
+  padding: 40px 24px;
+}
+
+.editor-preview-page {
+  width: var(--editor-preview-width);
+}
+
+.editor-preview-frame {
+  border: none;
+  display: block;
+  height: var(--editor-iframe-height);
+  overflow: hidden;
+  width: var(--editor-preview-width);
+}
+
+.editor-preview-empty {
+  align-items: center;
+  color: var(--celion-muted-soft);
+  display: flex;
+  font-size: 14px;
+  height: 400px;
+  justify-content: center;
+}
+
+.editor-inspector-panel {
+  background: var(--celion-panel);
+  border: 1px solid var(--celion-line);
+  border-radius: var(--celion-radius-shell);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  min-height: var(--editor-inspector-min-height);
+  overflow-y: auto;
+  padding: 16px;
+  width: 286px;
+}
+
+.editor-inspector-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.editor-inspector-title {
+  color: var(--celion-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.editor-inspector-role {
+  color: var(--celion-muted-soft);
+  font-size: 11px;
+}
+
+.editor-shell {
+  background: var(--celion-app-bg);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--celion-font-display);
+  height: 100vh;
+  overflow: hidden;
+}
+
+.editor-shell-body {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  overflow: hidden;
+  padding: 0 var(--editor-edge-gap) var(--editor-edge-gap);
+}
+
+.editor-setup-panel,
+.editor-preview-shell {
+  background: var(--celion-panel);
+  border: 1px solid var(--celion-line);
+  border-radius: var(--celion-radius-shell);
+  flex: 1;
+  min-height: var(--editor-content-min-height);
+}
+
+.editor-setup-panel {
+  box-sizing: border-box;
+  overflow: auto;
+  padding: 44px 28px 56px;
+}
+
+.editor-preview-shell {
+  box-shadow: var(--celion-shadow-none);
+  display: flex;
+  overflow: hidden;
+}
+
+.inspector-controls {
+  display: flex;
+  flex-direction: column;
+}
+
+.inspector-empty {
+  color: var(--celion-muted-soft);
+  font-size: 12.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.inspector-element-label {
+  color: var(--celion-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 2px;
+}
+
+.inspector-section {
+  border-top: 1px solid #eeeeef;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px 0;
+}
+
+.inspector-section-title {
+  color: #8d9098;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.inspector-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inspector-control-row {
+  align-items: center;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  min-height: 30px;
+}
+
+.inspector-control-label {
+  color: var(--celion-muted);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.inspector-input {
+  background: var(--celion-panel);
+  border: 1px solid #dedee3;
+  border-radius: var(--celion-radius-control);
+  box-sizing: border-box;
+  color: var(--celion-text-strong);
+  font-family: var(--celion-font-display);
+  font-size: 12px;
+  height: 30px;
+  outline: none;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.inspector-input:focus {
+  border-color: var(--celion-muted-soft);
+}
+
+.inspector-color-input {
+  cursor: pointer;
+  padding: 3px 6px;
+}
+
+.inspector-textarea {
+  height: 112px;
+  line-height: 1.45;
+  padding: 8px 9px;
+  resize: vertical;
+}
+
+.inspector-apply-button {
+  background: var(--celion-text-strong);
+  border: none;
+  border-radius: var(--celion-radius-control);
+  color: var(--celion-white);
+  cursor: pointer;
+  font-family: var(--celion-font-display);
+  font-size: 12px;
+  font-weight: 500;
+  height: 30px;
+  padding: 0 12px;
+}
+
+.inspector-apply-button:hover:not(:disabled) {
+  background: #2f3034;
+}
+
+.inspector-apply-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+
+/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
+       SELECTION BUBBLE MENU
+       ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??*/
+
+.celion-selection-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 6px;
+  background: #1a1916;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.14);
+}
+
+.celion-selection-menu .celion-toolbar-btn {
+  width: 30px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  flex-shrink: 0;
+}
+
+.celion-selection-menu .celion-toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.celion-selection-menu .celion-toolbar-btn[data-active="true"] {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.celion-selection-menu .celion-toolbar-btn[data-label="Revise with AI"]:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.celion-selection-menu .celion-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 3px;
+}
+
+.celion-selection-menu-ai {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??
+       AI REVISION CARD
+       ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??*/
+
+.celion-ai-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: min(340px, calc(100vw - 32px));
+  padding: 0;
+  background: #ffffff;
+  border: 1px solid rgba(17, 17, 15, 0.12);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 10px 24px rgba(17, 17, 15, 0.1);
+  animation: celion-ai-card-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes celion-ai-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.celion-ai-card-input {
+  width: 100%;
+  height: 38px;
+  font-family: "Geist", sans-serif;
+  font-size: 14px;
+  line-height: 38px;
+  padding: 0 44px 0 15px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #11110f;
+  outline: none;
+}
+
+.celion-ai-card-input::placeholder {
+  color: #858b93;
+}
+
+.celion-ai-card-input:focus {
+  box-shadow: none;
+}
+
+.celion-ai-card-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.celion-ai-card:focus-within {
+  border-color: rgba(17, 17, 15, 0.26);
+  box-shadow: 0 0 0 3px rgba(17, 17, 15, 0.06), 0 10px 24px rgba(17, 17, 15, 0.1);
+}
+
+.celion-ai-card-error {
+  margin: 0;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #a62e2e;
+  background: rgba(166, 46, 46, 0.07);
+  border-radius: var(--radius-xs);
+  border-left: 2px solid #a62e2e;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+}
+
+.celion-ai-card-send {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: #11110f;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+}
+
+.celion-ai-card-send:hover:not(:disabled) {
+  background: #000000;
+  transform: translateY(-1px);
+}
+
+.celion-ai-card-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+

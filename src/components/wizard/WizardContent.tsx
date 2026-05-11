@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Zap } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileUp, ListChecks, Plus, Zap } from "lucide-react";
 import { z } from "zod";
 import { useProjectWizardStore } from "@/store/useProjectWizardStore";
 import type { WizardPurpose, WizardStep } from "@/store/useProjectWizardStore";
@@ -57,7 +57,44 @@ type WizardContentProps = {
   projectId?: string;
   variant?: "page" | "editor";
   onGenerated?: (project: ProjectRecord) => void;
+  onStartBlank?: () => void;
 };
+
+type StartMode = "questionnaire" | "files" | "blank";
+
+const START_OPTIONS: Array<{
+  mode: StartMode;
+  title: string;
+  description: string;
+  tag?: string;
+  icon: "questionnaire" | "files" | "blank";
+}> = [
+  {
+    mode: "questionnaire",
+    title: "Start with questionnaire",
+    description: "Answer a few prompts so Celion can shape the brief before drafting.",
+    tag: "Recommended",
+    icon: "questionnaire",
+  },
+  {
+    mode: "files",
+    title: "Extract content from files",
+    description: "Upload notes, transcripts, or docs first and build from the source.",
+    icon: "files",
+  },
+  {
+    mode: "blank",
+    title: "Start a blank project",
+    description: "Open an empty workspace and decide the structure manually.",
+    icon: "blank",
+  },
+];
+
+function StartOptionIcon({ name }: { name: "questionnaire" | "files" | "blank" }) {
+  if (name === "questionnaire") return <ListChecks size={22} strokeWidth={1.65} />;
+  if (name === "files") return <FileUp size={22} strokeWidth={1.65} />;
+  return <Plus size={22} strokeWidth={1.65} />;
+}
 
 export function getStepIssue(step: WizardStep, state: ReturnType<typeof useProjectWizardStore.getState>): string | null {
   if (step === 1) {
@@ -91,6 +128,7 @@ export function WizardContent({
   projectId,
   variant = "page",
   onGenerated,
+  onStartBlank,
 }: WizardContentProps = {}) {
   const router = useRouter();
   const resetOnUnmountRef = useRef(false);
@@ -106,6 +144,7 @@ export function WizardContent({
 
   const [submitting, setSubmitting] = useState(false);
   const [editingPlan, setEditingPlan] = useState(false);
+  const [startMode, setStartMode] = useState<StartMode | null>(null);
 
   useEffect(() => {
     return () => {
@@ -244,6 +283,56 @@ export function WizardContent({
         : "Continue";
 
   const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
+
+  const handleStartModeSelect = (mode: StartMode) => {
+    setStartMode(mode);
+    setError("");
+    if (mode === "files") {
+      setStep(3);
+      return;
+    }
+    if (mode === "blank") {
+      onStartBlank?.();
+    }
+  };
+
+  if (!startMode && variant === "editor") {
+    return (
+      <div className="wizard-start-shell">
+        <section className="wizard-start-copy">
+          <h1>How would you like to start?</h1>
+        </section>
+
+        <div className="wizard-start-grid" aria-label="Choose how to start">
+          {START_OPTIONS.map((option) => (
+            <button
+              key={option.mode}
+              type="button"
+              className="wizard-start-card"
+              onClick={() => handleStartModeSelect(option.mode)}
+            >
+              <span className="wizard-start-preview" aria-hidden="true">
+                <span className="wizard-start-icon">
+                  <StartOptionIcon name={option.icon} />
+                </span>
+                {option.tag ? (
+                  <span className="wizard-start-tag">
+                    {option.tag}
+                  </span>
+                ) : null}
+              </span>
+              <span className="wizard-start-title">
+                {option.title}
+              </span>
+              <span className="wizard-start-description">
+                {option.description}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="wizard-content-shell">

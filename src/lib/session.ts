@@ -26,12 +26,17 @@ function normalizeSession(result: AuthSessionResult | null | undefined) {
   return result?.data?.user?.id ? result.data : null;
 }
 
+function sessionErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message.slice(0, 200) : "unknown error";
+}
+
 async function fetchCurrentSession(): Promise<ServerSession | null> {
   if (!auth) return null;
 
   try {
     return normalizeSession((await auth.getSession()) as AuthSessionResult);
-  } catch {
+  } catch (error) {
+    console.warn(`[auth] session_fetch_failed ${JSON.stringify({ message: sessionErrorMessage(error) })}`);
     return null;
   }
 }

@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
-import { Geist, Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import "@/styles/globals.css";
-import "@/styles/editorial.css";
+import "@/styles/ui.css";
+import "@/styles/workspace.css";
+import "@/styles/editor.css";
+import "@/styles/dashboard.css";
+import "@/styles/auth.css";
+import "@/styles/wizard.css";
+import "@/styles/marketing.css";
+import "@/styles/landing.css";
+import "@/styles/pricing.css";
 
 const geist = Geist({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
   variable: "--font-body",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["200", "300", "400", "500", "600"],
-  variable: "--font-display",
   display: "swap",
 });
 
@@ -27,7 +28,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" data-scroll-behavior="smooth" className={`${geist.variable} ${inter.variable}`}>
+    <html lang="en" data-scroll-behavior="smooth" className={geist.variable}>
       <body className="bg-bg text-text antialiased">{children}</body>
     </html>
   );

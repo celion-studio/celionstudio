@@ -1,0 +1,331 @@
+﻿.editorial-landing-page {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Geist", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+.font-geist {
+  font-family: "Geist", sans-serif;
+}
+
+.container {
+  width: min(calc(100% - 48px), var(--container));
+  margin: 0 auto;
+}
+
+.font-geist {
+  font-family: "Geist", sans-serif;
+}
+
+.section-kicker {
+  font-family: "Geist", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  font-family: "Geist", sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-dark {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.btn-dark:hover {
+  background: #000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+
+.btn-light {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.btn-light:hover {
+  background: var(--line-soft);
+}
+
+/* NAV REVERT TO DARK BUT LESS ROUND */
+.nav {
+  position: sticky;
+  top: 16px;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding: 0 20px;
+}
+
+.nav-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 120px;
+  padding: 8px 8px 8px 20px;
+  background: #151412;
+  border-radius: var(--radius-sm);
+  /* Reduced rounding here */
+  color: #f6f7f8;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "Geist", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nav-link {
+  font-family: "Geist", sans-serif;
+  font-size: 13px;
+  color: rgba(246, 247, 248, 0.72);
+  transition: color 0.2s ease;
+}
+
+.nav-link:hover {
+  color: #f6f7f8;
+}
+
+.nav-actions .btn-light {
+  background: var(--bg);
+  color: #151412;
+  border: none;
+  border-radius: var(--radius-xs);
+  min-height: 34px;
+  padding: 0 16px;
+}
+
+.nav-actions .btn-light:hover {
+  background: #fff;
+}
+
+
+.site-footer {
+  margin-top: 0;
+  border-top: 0;
+  background: #151412;
+  color: #f6f7f8;
+  padding: 60px 0 46px;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 40px;
+}
+
+.footer-brand p {
+  margin: 16px 0 0;
+  max-width: 280px;
+  color: rgba(247, 244, 238, 0.7);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.footer-col h4 {
+  margin: 0;
+  font-family: "Geist", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(247, 244, 238, 0.56);
+}
+
+.footer-col a {
+  display: block;
+  margin-top: 16px;
+  color: rgba(247, 244, 238, 0.78);
+  font-size: 14px;
+}
+
+.footer-col a:hover {
+  color: #f6f7f8;
+}
+
+.footer-bottom {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(247, 244, 238, 0.18);
+  display: flex;
+  justify-content: space-between;
+  color: rgba(247, 244, 238, 0.58);
+  font-size: 13px;
+}
+
+/* GRAIN AND EDITORIAL UPGRADES */
+.grain-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+.fade-up {
+  opacity: 1;
+  transform: none;
+}
+
+.fade-up.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+
+.nav-avatar {
+  display: flex;
+  height: 32px;
+  width: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs);
+  background: #33302c;
+  color: #ffffff;
+  font-family: "Geist", sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.nav-profile {
+  position: relative;
+}
+
+.nav-profile-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 1px;
+  border: 1px solid rgba(246, 247, 248, 0.1);
+  border-radius: var(--radius-xs);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(246, 247, 248, 0.78);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.nav-profile-button:hover,
+.nav-profile-button[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(246, 247, 248, 0.18);
+  color: #ffffff;
+}
+
+.nav-profile-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: min(260px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid rgba(21, 20, 18, 0.08);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  color: #151412;
+  box-shadow:
+    0 24px 60px rgba(21, 20, 18, 0.16),
+    0 4px 14px rgba(21, 20, 18, 0.08);
+  z-index: 80;
+}
+
+.nav-profile-summary {
+  display: grid;
+  gap: 3px;
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.nav-profile-summary-label {
+  color: #8a867e;
+  font-family: "Geist", sans-serif;
+  font-size: 11px;
+}
+
+.nav-profile-summary strong,
+.nav-profile-summary span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-profile-summary strong {
+  color: #151412;
+  font-family: "Geist", sans-serif;
+  font-size: 13px;
+  font-weight: 560;
+  letter-spacing: 0;
+}
+
+.nav-profile-summary span:last-child {
+  color: #71717a;
+  font-family: "Geist", sans-serif;
+  font-size: 12px;
+}
+
+.nav-profile-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: #292724;
+  cursor: pointer;
+  font-family: "Geist", sans-serif;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.nav-profile-item:hover {
+  background: #f4f5f6;
+}
+
+.nav-profile-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.nav-profile-signout {
+  color: #8f3d18;
+}

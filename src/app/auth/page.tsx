@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Sign in | Celion",
-  description: "Create your Celion workspace and start shaping ideas into editable ebooks.",
+  description: "Sign in to your Celion workspace and continue shaping editable ebooks.",
 };
 
 type AuthRouteProps = {
@@ -24,7 +24,7 @@ export default async function AuthRoute({ searchParams }: AuthRouteProps) {
   const session = await getPageSession();
   if (session?.user) redirect(nextPath as Route);
 
-  const initialMode = params?.mode === "sign-in" ? "sign-in" : "sign-up";
+  const initialMode = params?.mode === "sign-up" ? "sign-up" : "sign-in";
 
-  return <AuthPage initialMode={initialMode} initialNext={nextPath} />;
+  return <AuthPage key={`${initialMode}:${nextPath}`} initialMode={initialMode} initialNext={nextPath} />;
 }

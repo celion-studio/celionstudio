@@ -14,6 +14,8 @@ import type {
   ProjectStatus,
 } from "@/types/project";
 
+type ProjectSqlClient = ReturnType<typeof getSql>;
+
 type ProjectCreateProfileInput = Omit<ProjectProfile, "ebookDocument"> & {
   ebookDocument?: CelionEbookDocument | null;
 };
@@ -32,7 +34,13 @@ type ProjectRow = {
   status: ProjectStatus;
   createdAt: Date | string;
   updatedAt: Date | string;
+  deletedAt?: Date | string | null;
 };
+
+export type ProjectSummary = Pick<
+  ProjectRecord,
+  "id" | "title" | "status" | "createdAt" | "updatedAt" | "deletedAt"
+>;
 
 type ProfileRow = {
   projectId: string;
@@ -60,6 +68,10 @@ type SourceRow = {
 
 function toIsoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function toOptionalIsoString(value: Date | string | null | undefined) {
+  return value ? toIsoString(value) : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,6 +116,54 @@ export function profileFromRow(row: ProfileRow): ProjectProfile {
   };
 }
 
+export async function listProjectSummariesForUser(
+  userId: string,
+  sql: ProjectSqlClient = getSql(),
+): Promise<ProjectSummary[]> {
+  const projectRows = (await sql`
+    SELECT id::text AS id, title, status,
+      created_at AS "createdAt", updated_at AS "updatedAt",
+      deleted_at AS "deletedAt"
+    FROM projects
+    WHERE user_id = ${userId}
+      AND deleted_at IS NULL
+    ORDER BY updated_at DESC
+  `) as ProjectRow[];
+
+  return projectRows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
+    deletedAt: toOptionalIsoString(row.deletedAt),
+  }));
+}
+
+export async function listDeletedProjectSummariesForUser(
+  userId: string,
+  sql: ProjectSqlClient = getSql(),
+): Promise<ProjectSummary[]> {
+  const projectRows = (await sql`
+    SELECT id::text AS id, title, status,
+      created_at AS "createdAt", updated_at AS "updatedAt",
+      deleted_at AS "deletedAt"
+    FROM projects
+    WHERE user_id = ${userId}
+      AND deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC, updated_at DESC
+  `) as ProjectRow[];
+
+  return projectRows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
+    deletedAt: toOptionalIsoString(row.deletedAt),
+  }));
+}
+
 export async function listProjectRecordsForUser(
   userId: string,
 ) {
@@ -113,6 +173,7 @@ export async function listProjectRecordsForUser(
       created_at AS "createdAt", updated_at AS "updatedAt"
     FROM projects
     WHERE user_id = ${userId}
+      AND deleted_at IS NULL
     ORDER BY updated_at DESC
   `) as ProjectRow[];
 
@@ -170,7 +231,11 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
   const [projectRow] = (await sql`
     SELECT id::text AS id, title, status,
       created_at AS "createdAt", updated_at AS "updatedAt"
-    FROM projects WHERE id::text = ${projectId} AND user_id = ${userId} LIMIT 1
+    FROM projects
+    WHERE id::text = ${projectId}
+      AND user_id = ${userId}
+      AND deleted_at IS NULL
+    LIMIT 1
   `) as ProjectRow[];
   if (!projectRow) return null;
 
@@ -287,6 +352,7 @@ export async function updateProjectEbookHtml(
           SELECT 1 FROM projects
           WHERE id::text = ${projectId}
             AND user_id = ${userId}
+            AND deleted_at IS NULL
         )
       RETURNING project_id::text AS id
     `,
@@ -295,6 +361,7 @@ export async function updateProjectEbookHtml(
       SET status = 'ready', updated_at = ${updatedAt}
       WHERE id::text = ${projectId}
         AND user_id = ${userId}
+        AND deleted_at IS NULL
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -326,6 +393,7 @@ export async function updateProjectEbookDocument(
           SELECT 1 FROM projects
           WHERE id::text = ${projectId}
             AND user_id = ${userId}
+            AND deleted_at IS NULL
         )
       RETURNING project_id::text AS id
     `,
@@ -334,6 +402,7 @@ export async function updateProjectEbookDocument(
       SET status = 'ready', updated_at = ${updatedAt}
       WHERE id::text = ${projectId}
         AND user_id = ${userId}
+        AND deleted_at IS NULL
       RETURNING id::text AS id
     `,
   ]) as [{ id: string }[], { id: string }[]];
@@ -375,6 +444,7 @@ export async function updateProjectWithGeneratedEbook(
           updated_at = ${updatedAt}
       WHERE id::text = ${projectId}
         AND user_id = ${userId}
+        AND deleted_at IS NULL
       RETURNING id::text AS id
     `,
     sql`
@@ -395,6 +465,7 @@ export async function updateProjectWithGeneratedEbook(
           SELECT 1 FROM projects
           WHERE id::text = ${projectId}
             AND user_id = ${userId}
+            AND deleted_at IS NULL
         )
       RETURNING project_id::text AS id
     `,
@@ -410,14 +481,57 @@ export async function updateProjectWithGeneratedEbook(
   return getProjectRecordForUser(userId, projectId);
 }
 
-export async function deleteProjectForUser(userId: string, projectId: string) {
-  const sql = getSql();
+export async function deleteProjectForUser(
+  userId: string,
+  projectId: string,
+  sql: ProjectSqlClient = getSql(),
+) {
   const deletedRows = (await sql`
     DELETE FROM projects
-    WHERE id::text = ${projectId} AND user_id = ${userId}
+    WHERE id::text = ${projectId}
+      AND user_id = ${userId}
+      AND deleted_at IS NOT NULL
     RETURNING id::text AS id
   `) as { id: string }[];
 
   return deletedRows.length > 0;
+}
+
+export async function trashProjectForUser(
+  userId: string,
+  projectId: string,
+  sql: ProjectSqlClient = getSql(),
+) {
+  const deletedAt = new Date();
+  const rows = (await sql`
+    UPDATE projects
+    SET deleted_at = ${deletedAt},
+        updated_at = ${deletedAt}
+    WHERE id::text = ${projectId}
+      AND user_id = ${userId}
+      AND deleted_at IS NULL
+    RETURNING id::text AS id
+  `) as { id: string }[];
+
+  return rows.length > 0;
+}
+
+export async function restoreProjectForUser(
+  userId: string,
+  projectId: string,
+  sql: ProjectSqlClient = getSql(),
+) {
+  const updatedAt = new Date();
+  const rows = (await sql`
+    UPDATE projects
+    SET deleted_at = NULL,
+        updated_at = ${updatedAt}
+    WHERE id::text = ${projectId}
+      AND user_id = ${userId}
+      AND deleted_at IS NOT NULL
+    RETURNING id::text AS id
+  `) as { id: string }[];
+
+  return rows.length > 0;
 }
 
