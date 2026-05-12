@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   EbookGenerationError,
-  generateEbookPage,
   generateEbookHtml,
   generateEbookHtmlFromPlan,
   generateEbookHtmlWithDiagnostics,
@@ -485,53 +484,6 @@ test("generateEbookHtml decorates clean Gemini HTML without manifest entries", a
     assert.match(page.html, /data-celion-page="page-1"/);
     assert.match(page.html, /data-celion-id="page-1-text-001"/);
     assert.ok(page.manifest.editableElements.some((element) => element.id === "page-1-text-001"));
-  } finally {
-    restoreWarn();
-    globalThis.fetch = originalFetch;
-    if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
-    else process.env.GEMINI_API_KEY = originalApiKey;
-  }
-});
-
-test("generateEbookPage decorates clean single-page Gemini HTML", async () => {
-  const originalApiKey = process.env.GEMINI_API_KEY;
-  const originalFetch = globalThis.fetch;
-  const restoreWarn = muteConsoleWarn();
-  process.env.GEMINI_API_KEY = "test-key";
-  const cleanPage = {
-    ...cleanEbookDocument("Added clean page", 1).pages[0]!,
-    id: "ignored",
-    index: 1,
-    css: `[data-celion-page="page-new"] {
-  width: 559px;
-  height: 794px;
-  overflow: hidden;
-  padding: 56px;
-}
-[data-celion-page="page-new"] h1 {
-  font-size: 42px;
-}`,
-  };
-  setQueuedGemini([
-    geminiJsonResponse({ page: cleanPage }),
-  ]);
-
-  try {
-    const result = await generateEbookPage({
-      document: validEbookDocument("Existing page", 2),
-      insertIndex: 1,
-      pageId: "page-new",
-    });
-    const validation = validateEbookDocument({
-      ...validEbookDocument("Shell", 1),
-      pages: [result.page],
-    });
-
-    assert.equal(validation.ok, true, validation.errors.join("\n"));
-    assert.equal(result.page.id, "page-new");
-    assert.match(result.page.html, /data-celion-page="page-new"/);
-    assert.match(result.page.html, /data-celion-id="page-new-text-001"/);
-    assert.ok(result.page.manifest.editableElements.some((element) => element.id === "page-new-text-001"));
   } finally {
     restoreWarn();
     globalThis.fetch = originalFetch;

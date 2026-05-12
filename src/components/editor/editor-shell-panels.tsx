@@ -161,32 +161,14 @@ type PageListProps = {
   slideCount: number;
   currentSlide: number;
   pageSummaries: PageSummary[];
-  addingPage: boolean;
-  addPageError: string;
-  addPageInstruction: string;
-  addPagePanelOpen: boolean;
-  canAddPage: boolean;
   onSelectPage: (index: number) => void;
-  onAddPageInstructionChange: (value: string) => void;
-  onCancelAddPage: () => void;
-  onSubmitAddPage: () => void;
-  onToggleAddPagePanel: () => void;
 };
 
 function EditorPageListComponent({
   slideCount,
   currentSlide,
   pageSummaries,
-  addingPage,
-  addPageError,
-  addPageInstruction,
-  addPagePanelOpen,
-  canAddPage,
   onSelectPage,
-  onAddPageInstructionChange,
-  onCancelAddPage,
-  onSubmitAddPage,
-  onToggleAddPagePanel,
 }: PageListProps) {
   return (
     <div className="editor-page-list">
@@ -194,78 +176,7 @@ function EditorPageListComponent({
         <p className="editor-page-list-count">
           {slideCount} pages
         </p>
-        <motion.button
-          aria-label="Add page after current page"
-          className="editor-page-add-button"
-          disabled={!canAddPage || addingPage}
-          onClick={onToggleAddPagePanel}
-          title="Add page after current page"
-          type="button"
-          whileTap={{ scale: 0.97 }}
-        >
-          +
-        </motion.button>
       </div>
-      <AnimatePresence initial={false}>
-        {addPagePanelOpen && (
-          <motion.form
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className="editor-page-add-panel"
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSubmitAddPage();
-            }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <div className="editor-page-add-panel-head">
-              <span className="editor-page-add-kicker">
-                After {currentSlide + 1}
-              </span>
-              <button
-                className="editor-page-add-close"
-                disabled={addingPage}
-                onClick={onCancelAddPage}
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-            <textarea
-              className="editor-page-add-input"
-              disabled={addingPage}
-              maxLength={2000}
-              onChange={(event) => onAddPageInstructionChange(event.target.value)}
-              placeholder="Add a comparison page, a checklist, or the next useful step."
-              rows={4}
-              value={addPageInstruction}
-            />
-            <div className="editor-page-add-actions">
-              <button
-                className="editor-page-add-secondary"
-                disabled={addingPage}
-                onClick={() => onAddPageInstructionChange("")}
-                type="button"
-              >
-                Clear
-              </button>
-              <button
-                className="editor-page-add-primary"
-                disabled={!canAddPage || addingPage}
-                type="submit"
-              >
-                {addingPage ? "Adding..." : "Generate"}
-              </button>
-            </div>
-          </motion.form>
-        )}
-      </AnimatePresence>
-      {addPageError && (
-        <p className="editor-page-list-error">
-          {addPageError}
-        </p>
-      )}
       {Array.from({ length: slideCount }).map((_, index) => (
         <motion.button
           key={index}

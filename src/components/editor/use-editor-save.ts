@@ -8,6 +8,7 @@ type SavePayload = { html: string } | { document: CelionEbookDocument };
 export function useEditorSave(projectId: string, initialDocument: CelionEbookDocument | null) {
   const latestDocumentRef = useRef<CelionEbookDocument | null>(initialDocument);
   const documentSaveInFlightRef = useRef(false);
+  const documentSaveDrainRef = useRef<Promise<void> | null>(null);
   const pendingDocumentSaveRef = useRef<CelionEbookDocument | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -54,20 +55,27 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
 
     if (documentSaveInFlightRef.current) {
       pendingDocumentSaveRef.current = newDocument;
+      await documentSaveDrainRef.current;
       return;
     }
 
     documentSaveInFlightRef.current = true;
     let documentToSave: CelionEbookDocument | null = newDocument;
 
-    try {
+    const drain = (async () => {
       while (documentToSave) {
         pendingDocumentSaveRef.current = null;
         await saveDocumentInternal(documentToSave);
         documentToSave = pendingDocumentSaveRef.current;
       }
+    })();
+    documentSaveDrainRef.current = drain;
+
+    try {
+      await drain;
     } finally {
       documentSaveInFlightRef.current = false;
+      documentSaveDrainRef.current = null;
     }
   };
 

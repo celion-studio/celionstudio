@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import type { ProjectRecord, ProjectStatus } from "@/types/project";
 import { WizardContent } from "@/components/wizard/WizardContent";
-import { EBOOK_PAGE_SIZE_PX, EBOOK_PDF_A5_SIZE_PT } from "@/lib/ebook-format";
+import { EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
 import { countCelionSlides } from "@/lib/ebook-html";
 import {
   compileEbookDocumentToHtml,
@@ -46,18 +46,16 @@ import {
   EditorPageList,
   EditorPreviewPane,
   EditorTopBar,
-  type ExportFormat,
 } from "./editor-shell-panels";
 import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
-import { clearEditorSelectionFromDocument, stripEditorMetadataFromHtml } from "./export-cleanup";
+import { clearEditorSelectionFromDocument } from "./export-cleanup";
+import { useEditorExport } from "./use-editor-export";
 import { useEditorSave } from "./use-editor-save";
 import { useEditorSelection } from "./use-editor-selection";
 
 const PREVIEW_WIDTH = 640;
 const PAGE_HEIGHT: number = EBOOK_PAGE_SIZE_PX.height;
 const PAGE_GAP = 28;
-const PDF_A5_WIDTH_PT = EBOOK_PDF_A5_SIZE_PT.width;
-const PDF_A5_HEIGHT_PT = EBOOK_PDF_A5_SIZE_PT.height;
 const EDITOR_TOP_RAIL_HEIGHT = 56;
 const EDITOR_EDGE_GAP = 16;
 const LAYOUT_PROPS = new Set(["transform", "width", "height"]);
@@ -73,30 +71,6 @@ type Props = {
 type UndoSnapshot =
   | { type: "document"; document: CelionEbookDocument }
   | { type: "html"; html: string };
-
-function sanitizeExportFilename(value: string) {
-  return (value.trim() || "celion-ebook")
-    .replace(/[\\/:*?"<>|]+/g, "-")
-    .replace(/\s+/g, " ")
-    .slice(0, 120);
-}
-
-function downloadTextFile(filename: string, contents: string, type: string) {
-  const blob = new Blob([contents], { type });
-  downloadBlob(filename, blob);
-}
-
-function downloadBlob(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-}
 
 function cssPropertyName(prop: string) {
   return prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
@@ -220,6 +194,18 @@ export function EditorShell({
   const [slideCount, setSlideCount] = useState(0);
   const [iframeHeight, setIframeHeight] = useState(PAGE_HEIGHT);
   const [pageSummaries, setPageSummaries] = useState<PageSummary[]>([]);
+  const {
+    exportOpen,
+    exporting,
+    exportError,
+    setExportOpen,
+    exportAs,
+  } = useEditorExport({
+    displayTitle,
+    html,
+    iframeRef,
+    latestDocumentRef,
+  });
   const selection = useEditorSelection();
   const { selectElement } = selection;
   const selectedLayoutTargetRef = useRef<LayoutTarget | null>(null);
@@ -227,13 +213,6 @@ export function EditorShell({
   const [layoutTargetLabel, setLayoutTargetLabel] = useState("");
   const [layoutValues, setLayoutValuesState] = useState<InspectorLayoutValues | null>(null);
   const [canUndo, setCanUndo] = useState(false);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState("");
-  const [addingPage, setAddingPage] = useState(false);
-  const [addPageError, setAddPageError] = useState("");
-  const [addPageInstruction, setAddPageInstruction] = useState("");
-  const [addPagePanelOpen, setAddPagePanelOpen] = useState(false);
 
   const setLayoutValues = useCallback((values: InspectorLayoutValues | null) => {
     layoutValuesRef.current = values;
@@ -304,33 +283,33 @@ export function EditorShell({
 
   useEffect(() => cleanupIframeEffects, [cleanupIframeEffects]);
 
-  const applyLiveStyleToElement = useCallback((element: CelionEditableElement, prop: string, value: string) => {
+  const applyLiveStyleToElement = useCallback((pageId: string, element: CelionEditableElement, prop: string, value: string) => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return;
 
-    const node = getLayoutTargetElement(doc, element);
+    const node = getLayoutTargetElement(doc, element, pageId);
     if (!node) return;
 
     node.style.setProperty(cssPropertyName(prop), value);
     refreshLayoutChromeRef.current?.();
   }, []);
 
-  const applyLiveLayoutTransformToElement = useCallback((element: CelionEditableElement, transform: string) => {
+  const applyLiveLayoutTransformToElement = useCallback((pageId: string, element: CelionEditableElement, transform: string) => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return;
 
-    const node = getLayoutTargetElement(doc, element);
+    const node = getLayoutTargetElement(doc, element, pageId);
     if (!node) return;
 
     node.style.transform = transform;
     refreshLayoutChromeRef.current?.();
   }, []);
 
-  const applyLiveLayoutBoxToElement = useCallback((element: CelionEditableElement, width: string, height: string) => {
+  const applyLiveLayoutBoxToElement = useCallback((pageId: string, element: CelionEditableElement, width: string, height: string) => {
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return;
 
-    const node = getLayoutTargetElement(doc, element);
+    const node = getLayoutTargetElement(doc, element, pageId);
     if (!node) return;
 
     node.style.width = width;
@@ -342,7 +321,7 @@ export function EditorShell({
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return;
 
-    const node = getLayoutTargetElement(doc, element);
+    const node = getLayoutTargetElement(doc, element, pageId);
     if (!node) return;
 
     removeLiveLayoutCss(doc, pageId, element);
@@ -368,7 +347,7 @@ export function EditorShell({
         ? getRuntimeTextElements(page)[selection.selectedRuntimeText.textIndex] ?? null
         : null;
     } else if (selection.selectedElement) {
-      target = getLayoutTargetElement(doc, selection.selectedElement);
+      target = getLayoutTargetElement(doc, selection.selectedElement, selection.selectedPageId);
     }
 
     if (!target) return false;
@@ -400,7 +379,7 @@ export function EditorShell({
     pushUndoSnapshot(currentDocument);
     latestDocumentRef.current = layoutEdit.value;
     setEbookDocument(layoutEdit.value);
-    applyLiveLayoutTransformToElement(element, transform);
+    applyLiveLayoutTransformToElement(pageId, element, transform);
     void queueDocumentSave(layoutEdit.value);
   }, [applyLiveLayoutTransformToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
 
@@ -428,7 +407,7 @@ export function EditorShell({
     pushUndoSnapshot(currentDocument);
     latestDocumentRef.current = layoutEdit.value;
     setEbookDocument(layoutEdit.value);
-    applyLiveLayoutBoxToElement(element, width, height);
+    applyLiveLayoutBoxToElement(pageId, element, width, height);
     void queueDocumentSave(layoutEdit.value);
   }, [applyLiveLayoutBoxToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
 
@@ -506,7 +485,7 @@ export function EditorShell({
       const currentTarget = selectedLayoutTargetRef.current;
       if (!currentTarget) return;
 
-      const selectedNode = getLayoutTargetElement(doc, currentTarget.element);
+      const selectedNode = getLayoutTargetElement(doc, currentTarget.element, currentTarget.pageId);
       const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
       if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentTarget.pageId) {
         setLayoutValues(readLayoutValues(selectedNode));
@@ -622,7 +601,7 @@ export function EditorShell({
           if (!text) return;
 
           selectPreviewElement(runtimeTextEl);
-          const layoutTargetEl = manifestElement ? getLayoutTargetElement(doc, manifestElement) : null;
+          const layoutTargetEl = manifestElement ? getLayoutTargetElement(doc, manifestElement, pageId) : null;
           if (manifestElement && layoutTargetEl) {
             setLayoutTarget({ pageId, element: manifestElement });
             setLayoutValues(readLayoutValues(layoutTargetEl));
@@ -652,7 +631,7 @@ export function EditorShell({
 
         if (!manifestElement) return;
 
-        const celionEl = getLayoutTargetElement(doc, manifestElement);
+        const celionEl = getLayoutTargetElement(doc, manifestElement, pageId);
         if (!celionEl) return;
 
         const text = celionEl.textContent?.trim() ?? "";
@@ -737,7 +716,7 @@ export function EditorShell({
 
     const currentLayoutTarget = selectedLayoutTargetRef.current;
     if (editorModeRef.current === "edit" && currentLayoutTarget) {
-      const selectedNode = getLayoutTargetElement(doc, currentLayoutTarget.element);
+      const selectedNode = getLayoutTargetElement(doc, currentLayoutTarget.element, currentLayoutTarget.pageId);
       const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
       if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentLayoutTarget.pageId) {
         selectPreviewElement(selectedNode);
@@ -898,7 +877,7 @@ export function EditorShell({
     latestDocumentRef.current = styleEdit.value;
     setEbookDocument(styleEdit.value);
     if (selection.selectedElement) {
-      applyLiveStyleToElement(selection.selectedElement, prop, value);
+      applyLiveStyleToElement(selection.selectedPageId, selection.selectedElement, prop, value);
     }
     selection.setStyleValue(prop, value);
     void queueDocumentSave(styleEdit.value);
@@ -977,140 +956,6 @@ export function EditorShell({
     void queueDocumentSave(restoredDocument);
   }, [latestDocumentRef, queueDocumentSave, saveHtml, selection, setLayoutTarget]);
 
-  const addPageAfterCurrent = useCallback(async (instruction: string) => {
-    const currentDocument = latestDocumentRef.current ?? ebookDocument;
-    if (!currentDocument || addingPage) return;
-
-    const insertIndex = Math.min(currentSlide + 1, currentDocument.pages.length);
-    setAddingPage(true);
-    setAddPageError("");
-    setSaveError("");
-
-    try {
-      const response = await fetch("/api/ebook/page", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId,
-          insertIndex,
-          instruction: instruction.trim() || undefined,
-        }),
-      });
-      const payload = await response.json().catch(() => ({})) as {
-        message?: string;
-        pageIndex?: number;
-        project?: ProjectRecord;
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.message || "Could not add a page.");
-      }
-
-      const nextDocument = payload.project?.profile.ebookDocument
-        ? normalizeEbookDocument(payload.project.profile.ebookDocument)
-        : null;
-      if (!payload.project || !nextDocument) {
-        throw new Error("The generated page was saved, but the updated document was not returned.");
-      }
-
-      pushUndoSnapshot(currentDocument);
-      latestDocumentRef.current = nextDocument;
-      setDisplayTitle(payload.project.title);
-      setEbookDocument(nextDocument);
-      setHtml(compileEbookDocumentToHtml(nextDocument));
-      setCurrentSlide(Math.min(payload.pageIndex ?? insertIndex, nextDocument.pages.length - 1));
-      setLayoutTarget(null);
-      setAddPageInstruction("");
-      setAddPagePanelOpen(false);
-      selection.clearSelection();
-    } catch (error) {
-      setAddPageError(error instanceof Error ? error.message : "Could not add a page.");
-    } finally {
-      setAddingPage(false);
-    }
-  }, [addingPage, currentSlide, ebookDocument, latestDocumentRef, projectId, pushUndoSnapshot, selection, setLayoutTarget, setSaveError]);
-
-  const submitAddPage = useCallback(() => {
-    void addPageAfterCurrent(addPageInstruction);
-  }, [addPageAfterCurrent, addPageInstruction]);
-
-  const cancelAddPage = useCallback(() => {
-    if (addingPage) return;
-    setAddPagePanelOpen(false);
-    setAddPageError("");
-  }, [addingPage]);
-
-  const exportAs = async (format: ExportFormat) => {
-    setExportOpen(false);
-    setExporting(true);
-    setExportError("");
-    try {
-      const filename = sanitizeExportFilename(displayTitle);
-
-      if (format === "html") {
-        const exportHtml = latestDocumentRef.current
-          ? compileEbookDocumentToHtml(latestDocumentRef.current)
-          : html;
-        if (!exportHtml.trim()) {
-          throw new Error("No HTML content was found to export.");
-        }
-        downloadTextFile(`${filename}.html`, stripEditorMetadataFromHtml(exportHtml), "text/html;charset=utf-8");
-        return;
-      }
-
-      const iframe = iframeRef.current;
-      const doc = iframe?.contentDocument;
-      if (!doc) {
-        throw new Error("Preview is not ready. Try again after it finishes loading.");
-      }
-
-      const pages = Array.from(doc.querySelectorAll<HTMLElement>(".slide"));
-      if (pages.length === 0) {
-        throw new Error("No pages were found to export.");
-      }
-
-      const restoreSelection = clearEditorSelectionFromDocument(doc);
-      const frameStyle = doc.getElementById("celion-preview-frame-style");
-      const originalFrameStyle = frameStyle?.textContent ?? "";
-      if (frameStyle) frameStyle.textContent = "";
-      try {
-        const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-          import("html2canvas"),
-          import("jspdf"),
-        ]);
-
-        if (format === "pdf") {
-          const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a5" });
-          for (let i = 0; i < pages.length; i++) {
-            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
-            if (i > 0) pdf.addPage("a5", "portrait");
-            pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
-          }
-          pdf.save(`${filename}.pdf`);
-        } else {
-          for (let i = 0; i < pages.length; i++) {
-            const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
-            const blob = await new Promise<Blob>((resolve, reject) => {
-              canvas.toBlob(
-                (result) => result ? resolve(result) : reject(new Error("Could not prepare image export.")),
-                format === "jpg" ? "image/jpeg" : "image/png",
-                0.95,
-              );
-            });
-            downloadBlob(`${filename}-page-${i + 1}.${format}`, blob);
-          }
-        }
-      } finally {
-        if (frameStyle) frameStyle.textContent = originalFrameStyle;
-        restoreSelection();
-      }
-    } catch (error) {
-      setExportError(error instanceof Error ? error.message : "Could not export ebook.");
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const handlePageSelect = useCallback((index: number) => {
     scrollToPage(index);
   }, [scrollToPage]);
@@ -1152,9 +997,6 @@ export function EditorShell({
     editorModeRef.current = "view";
     setEditorMode("view");
     setSetupOpen(false);
-    setAddPageError("");
-    setAddPageInstruction("");
-    setAddPagePanelOpen(false);
   }, [latestDocumentRef, selection, setLayoutTarget]);
 
   const handleStartBlankProject = useCallback(() => {
@@ -1207,19 +1049,7 @@ export function EditorShell({
               slideCount={slideCount}
               currentSlide={currentSlide}
               pageSummaries={pageSummaries}
-              addingPage={addingPage}
-              addPageError={addPageError}
-              addPageInstruction={addPageInstruction}
-              addPagePanelOpen={addPagePanelOpen}
-              canAddPage={Boolean(ebookDocument)}
               onSelectPage={handlePageSelect}
-              onAddPageInstructionChange={setAddPageInstruction}
-              onCancelAddPage={cancelAddPage}
-              onSubmitAddPage={submitAddPage}
-              onToggleAddPagePanel={() => {
-                setAddPageError("");
-                setAddPagePanelOpen((open) => !open);
-              }}
             />
 
             <motion.div

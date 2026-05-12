@@ -90,7 +90,6 @@ export function clearEditorSelectionFromDocument(doc: Document) {
 
 export function stripEditorMetadataFromHtml(html: string) {
   return html
-    .replace(/\sdata-celion-id\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/\sdata-role\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/\sdata-editable\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/\sdata-selected\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")

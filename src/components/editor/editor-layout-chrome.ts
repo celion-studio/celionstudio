@@ -24,11 +24,18 @@ function formatPixelSize(value: number) {
   return `${Math.max(MIN_RESIZE_SIZE, Math.round(value))}px`;
 }
 
-export function getLayoutTargetElement(doc: Document, element: CelionEditableElement) {
+function attributeSelector(name: string, value: string) {
+  return `[${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"]`;
+}
+
+export function getLayoutTargetElement(doc: Document, element: CelionEditableElement, pageId?: string) {
   if (!element.selector.startsWith("[data-celion-id=")) return null;
 
   try {
-    return doc.querySelector<HTMLElement>(element.selector);
+    const scope = pageId
+      ? doc.querySelector<HTMLElement>(attributeSelector("data-celion-page", pageId))
+      : doc;
+    return scope?.querySelector<HTMLElement>(element.selector) ?? null;
   } catch {
     return null;
   }
@@ -126,7 +133,7 @@ export function createPreviewLayoutChrome(
       return;
     }
 
-    const selectedNode = getLayoutTargetElement(doc, target.element);
+    const selectedNode = getLayoutTargetElement(doc, target.element, target.pageId);
     const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
     if (selectedNode && pageEl?.getAttribute("data-celion-page") === target.pageId) {
       showFor(selectedNode);
@@ -139,7 +146,7 @@ export function createPreviewLayoutChrome(
     const layoutTarget = options.getCurrentTarget();
     if (!layoutTarget) return;
 
-    const selectedNode = getLayoutTargetElement(doc, layoutTarget.element);
+    const selectedNode = getLayoutTargetElement(doc, layoutTarget.element, layoutTarget.pageId);
     const eventTarget = e.target as Node | null;
     if (!selectedNode || !eventTarget) return;
 

@@ -114,13 +114,12 @@ function NumberControl({
   return (
     <ControlRow label={label}>
       <input
-        key={value ?? ""}
         type="number"
         min={min}
         max={max}
         step={step}
         placeholder={placeholder}
-        defaultValue={value ?? ""}
+        value={value ?? ""}
         onChange={onChange}
         className="inspector-input"
       />

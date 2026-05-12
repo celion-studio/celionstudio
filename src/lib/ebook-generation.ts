@@ -15,7 +15,6 @@ import {
   sanitizeEbookDocument,
   validateEbookDocument,
   type CelionEbookDocument,
-  type CelionEbookPage,
 } from "@/lib/ebook-document";
 import {
   MAX_EBOOK_PLAN_SLIDES,
@@ -140,11 +139,6 @@ You receive an approved editorial plan.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
 Your job is to turn the plan into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
 Return JSON only: { "document": { "version": 1, "size": { "width": ${EBOOK_PAGE_SIZE_PX.width}, "height": ${EBOOK_PAGE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "pages": [] } }`;
-
-const PAGE_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designer.
-
-You receive an existing Celion ebook document context and must add exactly one new page that fits the surrounding publication.
-Return JSON only: { "page": { "id": "page id", "index": 0, "title": "page title", "role": "page role", "html": "", "css": "", "version": 1 } }`;
 
 function tonePromptFor(tone?: string) {
   return TONE_PROMPTS[tone ?? ""] ?? tone ?? "use the best tone for the source and reader";
@@ -293,139 +287,6 @@ Technical contract:
 - Do not use color(), color-mix(), oklch(), lab(), or lch().
 - No placeholders, lorem ipsum, markdown fences, scripts, external assets, or generic filler.
 - Keep all text readable inside the fixed A5 page.`;
-}
-
-function isGenerationRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function truncateForPrompt(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value;
-  return `${value.slice(0, maxLength)}\n...[truncated]`;
-}
-
-function htmlTextForPrompt(html: string) {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function pageContextForPrompt(page: CelionEbookPage | undefined) {
-  if (!page) return null;
-
-  return {
-    title: page.title,
-    role: page.role,
-    text: truncateForPrompt(htmlTextForPrompt(page.html), 800),
-    html: truncateForPrompt(page.html, 2400),
-    css: truncateForPrompt(page.css, 2400),
-  };
-}
-
-function pageOutlineForPrompt(document: CelionEbookDocument) {
-  return document.pages.map((page, index) => ({
-    index,
-    title: page.title,
-    role: page.role,
-    text: truncateForPrompt(htmlTextForPrompt(page.html), 280),
-  }));
-}
-
-export type EbookPageGenerationArgs = {
-  document: CelionEbookDocument;
-  insertIndex: number;
-  pageId: string;
-  instruction?: string;
-};
-
-export type EbookPageGenerationResult = {
-  page: CelionEbookPage;
-  model: string;
-  promptLength: number;
-};
-
-function buildPagePrompt({
-  document,
-  insertIndex,
-  pageId,
-  instruction,
-}: EbookPageGenerationArgs) {
-  const normalizedDocument = normalizeEbookDocument(document);
-  const clampedIndex = Math.max(0, Math.min(insertIndex, normalizedDocument.pages.length));
-  const previousPage = normalizedDocument.pages[clampedIndex - 1];
-  const nextPage = normalizedDocument.pages[clampedIndex];
-
-  return `Add one page to this existing A5 ebook.
-
-Request:
-- Insert index: ${clampedIndex}
-- New page id: ${pageId}
-- User instruction: ${instruction?.trim() || "Continue the ebook naturally with the next useful page."}
-
-Document context:
-${JSON.stringify({
-  title: normalizedDocument.title,
-  size: normalizedDocument.size,
-  themeCss: truncateForPrompt(normalizedDocument.themeCss, 1200),
-  pageOutline: pageOutlineForPrompt(normalizedDocument),
-  previousPage: pageContextForPrompt(previousPage),
-  nextPage: pageContextForPrompt(nextPage),
-}, null, 2)}
-
-Design direction:
-- Match the existing visual language, typography, spacing, and editorial rhythm.
-- Use the previous and next page as local context; do not rewrite existing pages.
-- Make the new page useful, specific, and publication-ready, not a generic filler page.
-- If the user instruction is empty, create the page that best continues the surrounding flow.
-- Use only the existing document context. Do not invent unsupported facts.
-
-Technical contract:
-- Output only JSON with one "page" field.
-- Generate exactly one page.
-- The page id must be "${pageId}" and index must be ${clampedIndex}.
-- Page html has root <section data-celion-page="${pageId}" class="celion-page">.
-- Use clean semantic HTML with meaningful class names.
-- Keep editable text, images, card titles, block titles, labels, captions, badges, and list headings as separate DOM nodes.
-- Do not put important editable content in pseudo-elements.
-- Do not add Celion editor metadata manually; Celion will normalize editable elements after generation.
-- Never put style="" attributes in HTML. Put every visual rule in the page css field.
-- Every page CSS selector starts with [data-celion-page="${pageId}"].
-- Do not use script, iframe, object, embed, form, input, textarea, button, video, audio, canvas, external JS, external CSS, url(), @import, @keyframes, animations, or transitions.
-- Do not use global selectors like html, body, *, h1, p, div, span, section, or unscoped class selectors.
-- No editable manifest is required from the model.
-- Use page CSS to make [data-celion-page="${pageId}"] exactly ${EBOOK_PAGE_SIZE_CSS_PX} and overflow: hidden.
-- Keep all text readable inside the fixed A5 page.`;
-}
-
-function generatedPageCandidate(raw: unknown) {
-  if (!isGenerationRecord(raw)) return null;
-  const page = raw.page;
-  if (isGenerationRecord(page)) return page;
-  const document = raw.document;
-  if (!isGenerationRecord(document) || !Array.isArray(document.pages)) return null;
-  return isGenerationRecord(document.pages[0]) ? document.pages[0] : null;
-}
-
-function forceGeneratedPageId(rawPage: Record<string, unknown>, pageId: string, index: number) {
-  const normalizedPage = normalizeEbookDocument({ pages: [rawPage] }).pages[0];
-  const html = normalizedPage.html.replace(
-    /data-celion-page=(["'])[^"']+\1/g,
-    `data-celion-page="${pageId}"`,
-  );
-  const css = normalizedPage.css.replace(
-    /\[data-celion-page=(["'])[^"']+\1\]/g,
-    `[data-celion-page="${pageId}"]`,
-  );
-
-  return {
-    ...normalizedPage,
-    id: pageId,
-    index,
-    html,
-    css,
-  };
 }
 
 function stringValue(value: unknown, fallback = "") {
@@ -633,82 +494,6 @@ export async function generateEbookPlan(args: EbookGenerationArgs) {
       { status, stage: "plan" },
     );
   }
-}
-
-export async function generateEbookPage(
-  args: EbookPageGenerationArgs,
-): Promise<EbookPageGenerationResult> {
-  const prompt = buildPagePrompt(args);
-
-  let raw: unknown;
-  try {
-    raw = await generateJsonWithGemini({
-      system: PAGE_SYSTEM,
-      user: prompt,
-      model: EBOOK_GEMINI_MODEL,
-      temperature: 0.85,
-    });
-  } catch (error) {
-    const details = errorDetails(error);
-    const status = error instanceof GeminiProviderError ? error.status : undefined;
-    warnEbookGenerationFailure("gemini_call_failed", {
-      stage: "html",
-      ...details,
-    });
-    return failGeneration(
-      "gemini_call_failed",
-      status === 429
-        ? "Gemini rate limit was reached while adding the page. Please wait a bit and try again."
-        : "AI page generation failed before Gemini returned a usable page.",
-      { status, stage: "html" },
-    );
-  }
-
-  const candidate = generatedPageCandidate(raw);
-  if (!candidate) {
-    warnEbookGenerationFailure("missing_html", {
-      stage: "html",
-      documentType: typeof raw,
-    });
-    return failGeneration("missing_html", "Gemini did not return an ebook page.", {
-      stage: "html",
-    });
-  }
-
-  const clampedIndex = Math.max(0, Math.min(args.insertIndex, args.document.pages.length));
-  const forcedPage = forceGeneratedPageId(candidate, args.pageId, clampedIndex);
-  const pageDocument = sanitizeEbookDocument({
-    ...normalizeEbookDocument(args.document),
-    pages: [forcedPage],
-  });
-  const validation = validateEbookDocument(pageDocument);
-
-  if (!validation.ok) {
-    warnEbookGenerationFailure("invalid_html", {
-      stage: "html",
-      documentValidationErrors: validation.errors,
-      pageCount: pageDocument.pages.length,
-    });
-    return failGeneration(
-      "invalid_html",
-      `Gemini returned a page, but it did not pass Celion document validation: ${validation.errors[0] ?? "Unknown document validation error."}`,
-      {
-        stage: "html",
-        validation: {
-          ok: false,
-          errors: validation.errors,
-          pageCount: pageDocument.pages.length,
-        },
-        pageCount: pageDocument.pages.length,
-      },
-    );
-  }
-
-  return {
-    page: pageDocument.pages[0],
-    model: EBOOK_GEMINI_MODEL,
-    promptLength: prompt.length,
-  };
 }
 
 async function generateCompleteEbookDocument(
