@@ -402,65 +402,13 @@
 }
 
 .dashboard-home-project-preview {
-  align-items: center;
-  background: #f5f6f7;
-  border: 1px solid #e7e9eb;
-  border-radius: 10px;
-  display: flex;
   height: 116px;
-  justify-content: center;
-  overflow: hidden;
   padding: 16px;
-  transition: border-color 0.15s ease, transform 0.15s ease;
 }
 
 .dashboard-home-project:hover .dashboard-home-project-preview {
   border-color: rgba(17, 17, 15, 0.18);
   transform: translateY(-1px);
-}
-
-.dashboard-home-project-page {
-  background: #ffffff;
-  border: 1px solid rgba(17, 17, 15, 0.08);
-  border-radius: 7px;
-  box-shadow: 0 1px 2px rgba(17, 17, 15, 0.025);
-  box-sizing: border-box;
-}
-
-.dashboard-home-project-page {
-  display: grid;
-  gap: 6px;
-  height: 78px;
-  padding: 12px 11px;
-  width: 112px;
-}
-
-.dashboard-home-project-page svg {
-  color: var(--celion-muted);
-  margin-bottom: 1px;
-}
-
-.dashboard-home-project-page span,
-.dashboard-home-project-page i {
-  background: #d9dde2;
-  border-radius: 2px;
-  display: block;
-  height: 5px;
-}
-
-.dashboard-home-project-page span:nth-child(2) {
-  width: 78%;
-}
-
-.dashboard-home-project-page span:nth-child(3) {
-  width: 52%;
-}
-
-.dashboard-home-project-page i {
-  align-self: end;
-  background: #eef0f2;
-  border-radius: 6px;
-  height: 18px;
 }
 
 .dashboard-home-project strong,
@@ -587,66 +535,22 @@
 }
 
 .project-card-preview {
-  align-items: center;
   background:
     linear-gradient(180deg, #fbfbfb 0%, #f2f4f6 100%);
+  border: 0;
   border-bottom: 1px solid #e5e8eb;
+  border-radius: 0;
   box-sizing: border-box;
-  display: flex;
-  gap: 12px;
   height: 88px;
-  overflow: hidden;
   padding: 15px 16px;
-  position: relative;
+  justify-content: flex-start;
 }
 
-.project-card-file-icon,
-.project-card-page {
-  background: #ffffff;
-  border: 1px solid rgba(17, 17, 15, 0.075);
-  border-radius: 8px;
+.project-card-preview .celion-document-preview-icon,
+.project-card-preview .celion-document-preview-page {
   box-shadow:
     0 1px 2px rgba(17, 17, 15, 0.028),
     0 8px 16px rgba(17, 17, 15, 0.018);
-  box-sizing: border-box;
-  position: relative;
-}
-
-.project-card-file-icon {
-  align-items: center;
-  color: #5f6873;
-  display: flex;
-  flex: 0 0 48px;
-  height: 48px;
-  justify-content: center;
-}
-
-.project-card-page {
-  display: grid;
-  flex: 1;
-  gap: 7px;
-  min-width: 0;
-  padding: 13px 14px;
-}
-
-.project-card-page-line,
-.project-card-page-block {
-  background: #d8dde2;
-  border-radius: 999px;
-  display: block;
-  height: 5px;
-}
-
-.project-card-page-line.short {
-  width: 62%;
-}
-
-.project-card-page-block {
-  align-self: end;
-  background: #eef0f2;
-  border: 1px solid rgba(17, 17, 15, 0.05);
-  border-radius: 6px;
-  height: 18px;
 }
 
 .project-title {
@@ -774,12 +678,12 @@
   width: 92px;
 }
 
-.project-card[data-view="list"] .project-card-file-icon {
+.project-card[data-view="list"] .celion-document-preview-icon {
   flex-basis: 34px;
   height: 34px;
 }
 
-.project-card[data-view="list"] .project-card-page {
+.project-card[data-view="list"] .celion-document-preview-page {
   display: none;
 }
 
@@ -1346,39 +1250,171 @@
 
 
 @media (max-width: 760px) {
+  .dashboard-head {
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .dashboard-head>div,
+  .dashboard-primary-button {
+    width: 100%;
+  }
+
+  .dashboard-title {
+    font-size: 20px;
+  }
+
+  .dashboard-description {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .dashboard-empty {
+    padding: 44px 18px;
+  }
 
   .dashboard-home {
-
-    gap: 56px;
-
+    gap: 42px;
     min-height: auto;
+    padding: 18px 0 10px;
+  }
 
-    padding-top: 28px;
+  .dashboard-home-intake {
+    gap: 18px;
+    max-width: 100%;
+    text-align: left;
+  }
 
+  .dashboard-home-copy {
+    margin-bottom: 4px;
+    max-width: 100%;
+    width: 100%;
   }
 
   .dashboard-home-copy h1 {
-
     font-size: 28px;
+    line-height: 1.12;
+    white-space: normal;
+  }
 
+  .dashboard-home-composer {
+    border-radius: 10px;
+    margin-top: 2px;
+    width: 100%;
+  }
+
+  .dashboard-home-composer-top {
+    padding: 9px 12px;
   }
 
   .dashboard-home-composer textarea {
-
     min-height: 112px;
-
+    padding: 14px 13px 8px;
   }
 
-  .dashboard-home-recent-grid {
+  .dashboard-home-composer-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 0 10px 10px;
+  }
 
+  .dashboard-home-source-hint,
+  .dashboard-home-start-button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .dashboard-home-quick-starts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 16px;
+    width: 100%;
+  }
+
+  .dashboard-home-quick-starts button {
+    justify-content: flex-start;
+    min-height: 40px;
+  }
+
+  .dashboard-home-recent {
+    margin-top: 0;
+    width: 100%;
+  }
+
+  .dashboard-home-recent-grid,
+  .project-grid {
     grid-template-columns: 1fr;
+  }
 
+  .dashboard-home-project-preview {
+    height: 102px;
+  }
+
+  .project-grid {
+    gap: 12px;
+  }
+
+  .project-card[data-view="grid"] {
+    min-height: 0;
+  }
+
+  .project-card[data-view="grid"] .project-delete-button {
+    opacity: 1;
+    transform: none;
+  }
+
+  .project-card[data-view="grid"][data-mode="trash"] .project-trash-actions {
+    flex-wrap: wrap;
   }
 
   .dashboard-modal-layer {
-
-    padding: 18px;
-
+    align-items: stretch;
+    padding: 12px;
   }
 
+  .dashboard-pricing-dialog {
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .dashboard-pricing-dialog-head {
+    padding: 4px 42px 4px 0;
+    text-align: left;
+  }
+
+  .dashboard-pricing-dialog-head h2 {
+    font-size: 20px;
+  }
+
+  .dashboard-billing-cycle {
+    justify-content: flex-start;
+  }
+
+  .dashboard-billing-manage {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dashboard-billing-manage button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-home-copy h1 {
+    font-size: 25px;
+  }
+
+  .dashboard-home-quick-starts {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-home-section-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .project-card-preview {
+    height: 78px;
+  }
 }

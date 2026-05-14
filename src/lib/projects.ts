@@ -371,7 +371,7 @@ export async function updateProjectEbookHtml(
   return { updatedAt: updatedAt.toISOString() };
 }
 
-export async function updateProjectEbookDocument(
+async function writeProjectEbookDocument(
   userId: string,
   projectId: string,
   ebookDocument: CelionEbookDocument,
@@ -408,6 +408,27 @@ export async function updateProjectEbookDocument(
   ]) as [{ id: string }[], { id: string }[]];
 
   if (profileRows.length === 0 || projectRows.length === 0) return null;
+
+  return { updatedAt: updatedAt.toISOString() };
+}
+
+export async function updateProjectEbookDocumentForSave(
+  userId: string,
+  projectId: string,
+  ebookDocument: CelionEbookDocument,
+  ebookHtml: string,
+) {
+  return writeProjectEbookDocument(userId, projectId, ebookDocument, ebookHtml);
+}
+
+export async function updateProjectEbookDocument(
+  userId: string,
+  projectId: string,
+  ebookDocument: CelionEbookDocument,
+  ebookHtml: string,
+) {
+  const result = await writeProjectEbookDocument(userId, projectId, ebookDocument, ebookHtml);
+  if (!result) return null;
 
   return getProjectRecordForUser(userId, projectId);
 }

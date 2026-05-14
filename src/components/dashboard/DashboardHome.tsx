@@ -12,6 +12,7 @@ import {
   FiMenu,
   FiTarget,
 } from "react-icons/fi";
+import { CelionDocumentPreview } from "@/components/ui/CelionDocumentPreview";
 import type { ProjectSummary } from "@/lib/projects";
 
 type DashboardHomeProps = {
@@ -81,15 +82,11 @@ function DashboardHomeGlyph({
 
 function RecentProjectPreview() {
   return (
-    <div className="dashboard-home-project-preview" aria-hidden="true">
-      <div className="dashboard-home-project-page">
-        <FiFileText size={15} strokeWidth={1.7} />
-        <span />
-        <span />
-        <span />
-        <i />
-      </div>
-    </div>
+    <CelionDocumentPreview
+      className="dashboard-home-project-preview"
+      density="compact"
+      showLeadingIcon={false}
+    />
   );
 }
 

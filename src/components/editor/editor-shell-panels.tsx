@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, type CSSProperties, type RefObject } from "react";
-import { ArrowLeft, ChevronDown, Download, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Download, ImagePlus, Undo2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import type { CelionEditableElement } from "@/lib/ebook-document";
@@ -14,18 +14,19 @@ export type ExportFormat = "pdf" | "png" | "jpg" | "html";
 
 type TopBarProps = {
   projectTitle: string;
-  saving: boolean;
   saveError: string;
   exportError: string;
   exporting: boolean;
   exportOpen: boolean;
   canExport?: boolean;
+  canAddImage?: boolean;
   showModeToggle?: boolean;
   editorMode: EditorMode;
   canUndo: boolean;
   edgeGap: number;
   topRailHeight: number;
   onModeChange: (mode: EditorMode) => void;
+  onAddImage: () => void;
   onUndo: () => void;
   onToggleExport: () => void;
   onExport: (format: ExportFormat) => void;
@@ -33,18 +34,19 @@ type TopBarProps = {
 
 export function EditorTopBar({
   projectTitle,
-  saving,
   saveError,
   exportError,
   exporting,
   exportOpen,
   canExport = true,
+  canAddImage = true,
   showModeToggle = true,
   editorMode,
   canUndo,
   edgeGap,
   topRailHeight,
   onModeChange,
+  onAddImage,
   onUndo,
   onToggleExport,
   onExport,
@@ -77,10 +79,20 @@ export function EditorTopBar({
           {showModeToggle && editorMode === "edit" && (
             <motion.div
               animate={{ opacity: 1, x: 0, scale: 1 }}
+              className="editor-edit-actions"
               exit={{ opacity: 0, x: 6, scale: 0.98 }}
               initial={{ opacity: 0, x: 6, scale: 0.98 }}
               transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             >
+              <CelionButton
+                onClick={onAddImage}
+                disabled={!canAddImage}
+                size="sm"
+                variant="ghost"
+              >
+                <ImagePlus size={13} />
+                Image
+              </CelionButton>
               <CelionButton
                 onClick={onUndo}
                 disabled={!canUndo}
@@ -93,7 +105,6 @@ export function EditorTopBar({
             </motion.div>
           )}
         </AnimatePresence>
-        {saving && <span className="editor-status">Saving...</span>}
         {saveError && <span className="editor-status editor-status-error">{saveError}</span>}
         {exportError && <span className="editor-status editor-status-error">{exportError}</span>}
 
@@ -290,14 +301,15 @@ export function EditorInspectorPanel({
 }: InspectorPanelProps) {
   return (
     <motion.div
-      animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+      animate={{ opacity: 1, x: 0, scale: 1, filter: "blur(0px)" }}
       className="editor-inspector-panel"
-      exit={{ opacity: 0, x: 16, filter: "blur(2px)" }}
-      initial={{ opacity: 0, x: 18, filter: "blur(2px)" }}
+      exit={{ opacity: 0, x: 28, scale: 0.985, filter: "blur(3px)" }}
+      initial={{ opacity: 0, x: 28, scale: 0.985, filter: "blur(3px)" }}
+      layout
       style={{
         "--editor-inspector-min-height": `calc(100vh - ${topRailHeight + edgeGap}px)`,
       } as CSSProperties}
-      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className="editor-inspector-head">
         <h3 className="editor-inspector-title">

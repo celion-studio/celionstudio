@@ -17,6 +17,7 @@ type WorkspaceSidebarProps = {
   initialUserName: string | null;
   initialUserEmail: string | null;
   onBillingClick?: () => void;
+  onNavigate?: () => void;
   primaryAction?: {
     href: Route;
     label: string;
@@ -67,6 +68,7 @@ export function WorkspaceSidebar({
   initialUserName,
   initialUserEmail,
   onBillingClick,
+  onNavigate,
   primaryAction = null,
 }: WorkspaceSidebarProps) {
   const router = useRouter();
@@ -84,6 +86,7 @@ export function WorkspaceSidebar({
         <Link
           href="/"
           className="workspace-brand-link"
+          onClick={onNavigate}
         >
           <div className="workspace-brand-mark">
             <svg
@@ -115,6 +118,7 @@ export function WorkspaceSidebar({
               href={item.href}
               className="workspace-sidebar-link"
               data-active={active ? "true" : "false"}
+              onClick={onNavigate}
             >
               <WorkspaceSidebarGlyph name={item.icon} />
               {item.label}
@@ -126,7 +130,10 @@ export function WorkspaceSidebar({
           type="button"
           className="workspace-sidebar-link workspace-sidebar-button"
           data-active={billingOpen ? "true" : "false"}
-          onClick={onBillingClick}
+          onClick={() => {
+            onBillingClick?.();
+            onNavigate?.();
+          }}
         >
           <WorkspaceSidebarGlyph name="billing" />
           Billing
@@ -139,9 +146,11 @@ export function WorkspaceSidebar({
             onClick={() => {
               if (primaryAction.onClick) {
                 primaryAction.onClick();
+                onNavigate?.();
                 return;
               }
               router.push(primaryAction.href);
+              onNavigate?.();
             }}
             disabled={!isSignedIn}
             className="workspace-primary-action"

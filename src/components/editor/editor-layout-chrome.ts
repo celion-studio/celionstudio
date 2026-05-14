@@ -6,9 +6,38 @@ export type LayoutTarget = {
 };
 
 const DRAG_START_THRESHOLD = 3;
-const MOVE_HANDLE_SIZE = 18;
-const RESIZE_HANDLE_SIZE = 12;
+const MOVE_HANDLE_SIZE = 24;
+const RESIZE_DOT_SIZE = 11;
+const SELECTION_LINE_WIDTH = 2;
 const MIN_RESIZE_SIZE = 24;
+const CHROME_Z_INDEX = "2147483647";
+const CHROME_RESIZE_Z_INDEX = "2147483646";
+const CHROME_BOX_Z_INDEX = "2147483645";
+const CHROME_SURFACE = "#ffffff";
+const CHROME_ACCENT = "#ff5a1f";
+const CHROME_ACCENT_DEEP = "#e94612";
+const CHROME_VERSION = "layout-controls-v4";
+
+type ResizeAxis = -1 | 0 | 1;
+
+type ResizeHandleConfig = {
+  id: string;
+  title: string;
+  cursor: string;
+  x: ResizeAxis;
+  y: ResizeAxis;
+};
+
+const RESIZE_HANDLES: ResizeHandleConfig[] = [
+  { id: "nw", title: "Resize top left", cursor: "nwse-resize", x: -1, y: -1 },
+  { id: "n", title: "Resize top", cursor: "ns-resize", x: 0, y: -1 },
+  { id: "ne", title: "Resize top right", cursor: "nesw-resize", x: 1, y: -1 },
+  { id: "e", title: "Resize right", cursor: "ew-resize", x: 1, y: 0 },
+  { id: "se", title: "Resize bottom right", cursor: "nwse-resize", x: 1, y: 1 },
+  { id: "s", title: "Resize bottom", cursor: "ns-resize", x: 0, y: 1 },
+  { id: "sw", title: "Resize bottom left", cursor: "nesw-resize", x: -1, y: 1 },
+  { id: "w", title: "Resize left", cursor: "ew-resize", x: -1, y: 0 },
+];
 
 function formatDragTransform(baseTransform: string, deltaX: number, deltaY: number) {
   const x = Math.round(deltaX);
@@ -45,86 +74,172 @@ export function createPreviewLayoutChrome(
   doc: Document,
   options: {
     getCurrentTarget: () => LayoutTarget | null;
-    onMove: (target: LayoutTarget, transform: string) => void;
-    onResize: (target: LayoutTarget, width: string, height: string) => void;
+    onTransform: (target: LayoutTarget, transform: string) => void;
+    onResize: (target: LayoutTarget, width: string, height: string, transform?: string) => void;
   },
 ) {
+  const selectionBoxId = "celion-selection-box";
   const moveHandleId = "celion-move-handle";
-  const resizeHandleId = "celion-resize-handle";
+  const resizeHandlePrefix = "celion-resize-handle";
+
+  const getSelectionBox = () => {
+    let box = doc.getElementById(selectionBoxId) as HTMLElement | null;
+    if (!box) {
+      box = doc.createElement("div");
+      box.id = selectionBoxId;
+      doc.body.appendChild(box);
+    }
+    if (box.getAttribute("data-celion-editor-version") !== CHROME_VERSION) {
+      box.setAttribute("data-celion-editor-chrome", "true");
+      box.setAttribute("data-celion-editor-action", "selection");
+      box.setAttribute("data-celion-editor-version", CHROME_VERSION);
+      box.setAttribute("aria-hidden", "true");
+      Object.assign(box.style, {
+        position: "absolute",
+        border: `${SELECTION_LINE_WIDTH}px solid ${CHROME_ACCENT}`,
+        borderRadius: "3px",
+        boxSizing: "border-box",
+        display: "none",
+        pointerEvents: "none",
+        zIndex: CHROME_BOX_Z_INDEX,
+      } satisfies Partial<CSSStyleDeclaration>);
+    }
+
+    return box;
+  };
 
   const getMoveHandle = () => {
     let handle = doc.getElementById(moveHandleId) as HTMLElement | null;
     if (!handle) {
       handle = doc.createElement("div");
       handle.id = moveHandleId;
+      doc.body.appendChild(handle);
+    }
+    if (handle.getAttribute("data-celion-editor-version") !== CHROME_VERSION) {
       handle.setAttribute("data-celion-editor-chrome", "true");
+      handle.setAttribute("data-celion-editor-action", "move");
+      handle.setAttribute("data-celion-editor-version", CHROME_VERSION);
       handle.setAttribute("aria-hidden", "true");
+      handle.title = "Move";
+      handle.innerHTML = `
+        <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+          <circle cx="3" cy="3" r="1" fill="currentColor" />
+          <circle cx="9" cy="3" r="1" fill="currentColor" />
+          <circle cx="3" cy="9" r="1" fill="currentColor" />
+          <circle cx="9" cy="9" r="1" fill="currentColor" />
+        </svg>`;
       Object.assign(handle.style, {
         position: "absolute",
         width: `${MOVE_HANDLE_SIZE}px`,
         height: `${MOVE_HANDLE_SIZE}px`,
-        border: "2px solid #ffffff",
-        background: "#18181b",
-        borderRadius: "999px",
-        boxShadow: "0 1px 4px rgba(0, 0, 0, 0.18)",
+        alignItems: "center",
+        justifyContent: "center",
+        border: `1px solid ${CHROME_ACCENT_DEEP}`,
+        background: CHROME_ACCENT,
+        borderRadius: "6px",
+        boxShadow: "0 4px 12px rgba(255, 90, 31, 0.22)",
         boxSizing: "border-box",
+        color: CHROME_SURFACE,
         cursor: "grab",
         display: "none",
-        zIndex: "2147483647",
+        touchAction: "none",
+        userSelect: "none",
+        zIndex: CHROME_Z_INDEX,
       } satisfies Partial<CSSStyleDeclaration>);
-      doc.body.appendChild(handle);
     }
 
     return handle;
   };
 
-  const getResizeHandle = () => {
-    let handle = doc.getElementById(resizeHandleId) as HTMLElement | null;
+  const getResizeHandle = (config: ResizeHandleConfig) => {
+    const handleId = `${resizeHandlePrefix}-${config.id}`;
+    let handle = doc.getElementById(handleId) as HTMLElement | null;
     if (!handle) {
       handle = doc.createElement("div");
-      handle.id = resizeHandleId;
+      handle.id = handleId;
+      doc.body.appendChild(handle);
+    }
+    if (handle.getAttribute("data-celion-editor-version") !== CHROME_VERSION) {
       handle.setAttribute("data-celion-editor-chrome", "true");
+      handle.setAttribute("data-celion-editor-action", "resize");
+      handle.setAttribute("data-celion-resize-axis-x", String(config.x));
+      handle.setAttribute("data-celion-resize-axis-y", String(config.y));
+      handle.setAttribute("data-celion-editor-version", CHROME_VERSION);
       handle.setAttribute("aria-hidden", "true");
+      handle.title = config.title;
+      handle.innerHTML = "";
       Object.assign(handle.style, {
         position: "absolute",
-        width: `${RESIZE_HANDLE_SIZE}px`,
-        height: `${RESIZE_HANDLE_SIZE}px`,
-        border: "2px solid #18181b",
-        background: "#ffffff",
+        width: `${RESIZE_DOT_SIZE}px`,
+        height: `${RESIZE_DOT_SIZE}px`,
+        border: `2px solid ${CHROME_ACCENT}`,
+        background: CHROME_SURFACE,
         borderRadius: "999px",
         boxSizing: "border-box",
-        cursor: "nwse-resize",
+        boxShadow: "0 0 0 2px rgba(255, 255, 255, 0.92), 0 2px 8px rgba(255, 90, 31, 0.18)",
+        cursor: config.cursor,
         display: "none",
-        zIndex: "2147483647",
+        touchAction: "none",
+        userSelect: "none",
+        zIndex: CHROME_RESIZE_Z_INDEX,
       } satisfies Partial<CSSStyleDeclaration>);
-      doc.body.appendChild(handle);
     }
 
     return handle;
   };
 
+  const getResizeHandles = () => RESIZE_HANDLES.map((config) => ({
+    config,
+    handle: getResizeHandle(config),
+  }));
+
   const hide = () => {
+    const selectionBox = doc.getElementById(selectionBoxId) as HTMLElement | null;
     const moveHandle = doc.getElementById(moveHandleId) as HTMLElement | null;
-    const resizeHandle = doc.getElementById(resizeHandleId) as HTMLElement | null;
+    const rotateHandle = doc.getElementById("celion-rotate-handle") as HTMLElement | null;
+    if (selectionBox) selectionBox.style.display = "none";
     if (moveHandle) moveHandle.style.display = "none";
-    if (resizeHandle) resizeHandle.style.display = "none";
+    RESIZE_HANDLES.forEach((config) => {
+      const resizeHandle = doc.getElementById(`${resizeHandlePrefix}-${config.id}`) as HTMLElement | null;
+      if (resizeHandle) resizeHandle.style.display = "none";
+    });
+    rotateHandle?.remove();
   };
 
   const showFor = (element: HTMLElement) => {
+    const selectionBox = getSelectionBox();
     const moveHandle = getMoveHandle();
-    const resizeHandle = getResizeHandle();
+    const resizeHandles = getResizeHandles();
+    doc.getElementById("celion-rotate-handle")?.remove();
     const rect = element.getBoundingClientRect();
     const view = doc.defaultView;
     const scrollX = view?.scrollX ?? 0;
     const scrollY = view?.scrollY ?? 0;
+    const edgeLeft = rect.left + scrollX;
+    const edgeTop = rect.top + scrollY;
+    const edgeRight = rect.right + scrollX;
+    const edgeBottom = rect.bottom + scrollY;
+    const edgeCenterX = edgeLeft + rect.width / 2;
+    const edgeCenterY = edgeTop + rect.height / 2;
 
-    moveHandle.style.left = `${rect.left + scrollX - MOVE_HANDLE_SIZE / 2}px`;
-    moveHandle.style.top = `${rect.top + scrollY - MOVE_HANDLE_SIZE / 2}px`;
-    moveHandle.style.display = "block";
+    selectionBox.style.left = `${edgeLeft - SELECTION_LINE_WIDTH / 2}px`;
+    selectionBox.style.top = `${edgeTop - SELECTION_LINE_WIDTH / 2}px`;
+    selectionBox.style.width = `${rect.width + SELECTION_LINE_WIDTH}px`;
+    selectionBox.style.height = `${rect.height + SELECTION_LINE_WIDTH}px`;
+    selectionBox.style.display = "block";
 
-    resizeHandle.style.left = `${rect.right + scrollX - RESIZE_HANDLE_SIZE / 2}px`;
-    resizeHandle.style.top = `${rect.bottom + scrollY - RESIZE_HANDLE_SIZE / 2}px`;
-    resizeHandle.style.display = "block";
+    moveHandle.style.left = `${edgeCenterX - MOVE_HANDLE_SIZE / 2}px`;
+    moveHandle.style.top = `${edgeCenterY - MOVE_HANDLE_SIZE / 2}px`;
+    moveHandle.style.display = "flex";
+
+    resizeHandles.forEach(({ config, handle }) => {
+      const left = config.x === -1 ? edgeLeft : config.x === 1 ? edgeRight : edgeCenterX;
+      const top = config.y === -1 ? edgeTop : config.y === 1 ? edgeBottom : edgeCenterY;
+
+      handle.style.left = `${left - RESIZE_DOT_SIZE / 2}px`;
+      handle.style.top = `${top - RESIZE_DOT_SIZE / 2}px`;
+      handle.style.display = "block";
+    });
   };
 
   const restore = (target: LayoutTarget | null) => {
@@ -153,28 +268,33 @@ export function createPreviewLayoutChrome(
     const pageEl = selectedNode.closest<HTMLElement>("[data-celion-page]");
     if (pageEl?.getAttribute("data-celion-page") !== layoutTarget.pageId) return;
 
-    const resizeHandle = doc.getElementById(resizeHandleId);
     const moveHandle = doc.getElementById(moveHandleId);
-    if (resizeHandle?.contains(eventTarget)) {
+    const resizeTarget = RESIZE_HANDLES
+      .map((config) => ({ config, handle: doc.getElementById(`${resizeHandlePrefix}-${config.id}`) }))
+      .find(({ handle }) => handle?.contains(eventTarget));
+    if (resizeTarget) {
       e.preventDefault();
       e.stopPropagation();
 
       const rect = selectedNode.getBoundingClientRect();
       const startX = e.clientX;
       const startY = e.clientY;
+      const baseTransform = doc.defaultView?.getComputedStyle(selectedNode).transform ?? selectedNode.style.transform;
+      const originalInlineTransform = selectedNode.style.transform;
       const originalInlineWidth = selectedNode.style.width;
       const originalInlineHeight = selectedNode.style.height;
       const originalWillChange = selectedNode.style.willChange;
       const originalCursor = selectedNode.style.cursor;
       let latestWidth = "";
       let latestHeight = "";
+      let latestTransform = "";
       let hasResized = false;
 
       const cleanupResize = () => {
         doc.removeEventListener("pointermove", handleResizeMove);
         doc.removeEventListener("pointerup", handleResizeUp);
         doc.removeEventListener("pointercancel", handleResizeCancel);
-        resizeHandle.releasePointerCapture?.(e.pointerId);
+        resizeTarget.handle?.releasePointerCapture?.(e.pointerId);
         selectedNode.style.willChange = originalWillChange;
         selectedNode.style.cursor = originalCursor;
       };
@@ -188,12 +308,22 @@ export function createPreviewLayoutChrome(
         hasResized = true;
         moveEvent.preventDefault();
         moveEvent.stopPropagation();
-        latestWidth = formatPixelSize(rect.width + deltaX);
-        latestHeight = formatPixelSize(rect.height + deltaY);
-        selectedNode.style.willChange = "width, height";
-        selectedNode.style.cursor = "nwse-resize";
+
+        const nextWidth = rect.width + (resizeTarget.config.x === -1 ? -deltaX : resizeTarget.config.x === 1 ? deltaX : 0);
+        const nextHeight = rect.height + (resizeTarget.config.y === -1 ? -deltaY : resizeTarget.config.y === 1 ? deltaY : 0);
+        const clampedWidth = Math.max(MIN_RESIZE_SIZE, nextWidth);
+        const clampedHeight = Math.max(MIN_RESIZE_SIZE, nextHeight);
+        const shiftX = resizeTarget.config.x === -1 ? rect.width - clampedWidth : 0;
+        const shiftY = resizeTarget.config.y === -1 ? rect.height - clampedHeight : 0;
+
+        latestWidth = formatPixelSize(clampedWidth);
+        latestHeight = formatPixelSize(clampedHeight);
+        latestTransform = shiftX || shiftY ? formatDragTransform(baseTransform, shiftX, shiftY) : "";
+        selectedNode.style.willChange = latestTransform ? "width, height, transform" : "width, height";
+        selectedNode.style.cursor = resizeTarget.config.cursor;
         selectedNode.style.width = latestWidth;
         selectedNode.style.height = latestHeight;
+        if (latestTransform) selectedNode.style.transform = latestTransform;
         showFor(selectedNode);
       };
 
@@ -203,17 +333,18 @@ export function createPreviewLayoutChrome(
 
         upEvent.preventDefault();
         upEvent.stopPropagation();
-        options.onResize(layoutTarget, latestWidth, latestHeight);
+        options.onResize(layoutTarget, latestWidth, latestHeight, latestTransform || undefined);
       };
 
       const handleResizeCancel = () => {
         cleanupResize();
+        selectedNode.style.transform = originalInlineTransform;
         selectedNode.style.width = originalInlineWidth;
         selectedNode.style.height = originalInlineHeight;
         showFor(selectedNode);
       };
 
-      resizeHandle.setPointerCapture?.(e.pointerId);
+      resizeTarget.handle?.setPointerCapture?.(e.pointerId);
       doc.addEventListener("pointermove", handleResizeMove);
       doc.addEventListener("pointerup", handleResizeUp);
       doc.addEventListener("pointercancel", handleResizeCancel);
@@ -221,7 +352,7 @@ export function createPreviewLayoutChrome(
     }
 
     const startedFromMoveHandle = Boolean(moveHandle?.contains(eventTarget));
-    if (!startedFromMoveHandle && !selectedNode.contains(eventTarget)) return;
+    if (!startedFromMoveHandle) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -269,7 +400,7 @@ export function createPreviewLayoutChrome(
 
       upEvent.preventDefault();
       upEvent.stopPropagation();
-      options.onMove(layoutTarget, latestTransform);
+      options.onTransform(layoutTarget, latestTransform);
     };
 
     const handlePointerCancel = () => {

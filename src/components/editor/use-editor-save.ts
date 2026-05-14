@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CelionEbookDocument } from "@/lib/ebook-document";
 
 type SavePayload = { html: string } | { document: CelionEbookDocument };
@@ -13,7 +13,7 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const postEbookSave = async (payload: SavePayload) => {
+  const postEbookSave = useCallback(async (payload: SavePayload) => {
     const response = await fetch(`/api/ebook/save`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -24,9 +24,9 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
       const data = await response.json().catch(() => ({ message: "" })) as { message?: string };
       throw new Error(data.message || "Could not save ebook changes.");
     }
-  };
+  }, [projectId]);
 
-  const saveHtml = async (newHtml: string) => {
+  const saveHtml = useCallback(async (newHtml: string) => {
     setSaving(true);
     setSaveError("");
     try {
@@ -36,9 +36,9 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
     } finally {
       setSaving(false);
     }
-  };
+  }, [postEbookSave]);
 
-  const saveDocumentInternal = async (newDocument: CelionEbookDocument) => {
+  const saveDocumentInternal = useCallback(async (newDocument: CelionEbookDocument) => {
     setSaving(true);
     setSaveError("");
     try {
@@ -48,9 +48,9 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
     } finally {
       setSaving(false);
     }
-  };
+  }, [postEbookSave]);
 
-  const queueDocumentSave = async (newDocument: CelionEbookDocument) => {
+  const queueDocumentSave = useCallback(async (newDocument: CelionEbookDocument) => {
     latestDocumentRef.current = newDocument;
 
     if (documentSaveInFlightRef.current) {
@@ -77,7 +77,7 @@ export function useEditorSave(projectId: string, initialDocument: CelionEbookDoc
       documentSaveInFlightRef.current = false;
       documentSaveDrainRef.current = null;
     }
-  };
+  }, [saveDocumentInternal]);
 
   return {
     latestDocumentRef,

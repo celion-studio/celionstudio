@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import type { CSSProperties } from "react";
+import type { ChangeEvent, CSSProperties } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import type { ProjectRecord, ProjectStatus } from "@/types/project";
 import { WizardContent } from "@/components/wizard/WizardContent";
@@ -17,7 +17,6 @@ import {
   buildPageSummariesFromDocument,
   buildPageSummariesFromElements,
   estimatePreviewIframeHeight,
-  getRuntimeTextElements,
   normalizeEditorHtml,
   pickSelectableElement,
   pickRuntimeTextElement,
@@ -30,26 +29,48 @@ import {
   appendScopedStyleToDocument,
   applyDocumentTextEdit,
   applyLegacyHtmlTextEdit,
+  insertImageIntoDocument,
   removeScopedLayoutFromDocument,
 } from "./editor-document-edits";
+import {
+  LAYOUT_PROPS,
+  cssPropertyName,
+  layoutMarker,
+  removeExistingScopedRules,
+} from "./editor-style-rules";
 import {
   measurePreviewFrameHeight,
   preparePreviewFrame,
 } from "./editor-preview-frame";
 import {
+  clampLayoutNumber,
+  formatLayoutNumber,
+  layoutNumber,
+} from "./editor-layout-values";
+import {
   createPreviewLayoutChrome,
   getLayoutTargetElement,
-  type LayoutTarget,
 } from "./editor-layout-chrome";
+import {
+  getCandidateCelionIds,
+  getDocumentPageContext,
+  getPointedElements,
+  getRuntimeTextBySelection,
+  readInspectorStyleValues,
+  readLayoutValues,
+  selectPreviewElement,
+} from "./editor-preview-selection";
 import {
   EditorInspectorPanel,
   EditorPageList,
   EditorPreviewPane,
   EditorTopBar,
 } from "./editor-shell-panels";
-import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
+import type { EditorMode, InspectorLayoutValues } from "./editor-types";
 import { clearEditorSelectionFromDocument } from "./export-cleanup";
 import { useEditorExport } from "./use-editor-export";
+import { useEditorLayoutSelection } from "./use-editor-layout-selection";
+import { useEditorUndo } from "./use-editor-undo";
 import { useEditorSave } from "./use-editor-save";
 import { useEditorSelection } from "./use-editor-selection";
 
@@ -58,7 +79,8 @@ const PAGE_HEIGHT: number = EBOOK_PAGE_SIZE_PX.height;
 const PAGE_GAP = 28;
 const EDITOR_TOP_RAIL_HEIGHT = 56;
 const EDITOR_EDGE_GAP = 16;
-const LAYOUT_PROPS = new Set(["transform", "width", "height"]);
+const MAX_EDITOR_IMAGE_BYTES = 650_000;
+const SUPPORTED_EDITOR_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type Props = {
   projectId: string;
@@ -68,91 +90,32 @@ type Props = {
   initialDocument: CelionEbookDocument | null;
 };
 
-type UndoSnapshot =
-  | { type: "document"; document: CelionEbookDocument }
-  | { type: "html"; html: string };
-
-function cssPropertyName(prop: string) {
-  return prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function formatLayoutNumber(value: number) {
-  const rounded = Math.round(value);
-  return Object.is(rounded, -0) ? "0" : String(rounded);
-}
-
-function clampLayoutNumber(value: number, min?: number, max?: number) {
-  let nextValue = value;
-  if (typeof min === "number") nextValue = Math.max(min, nextValue);
-  if (typeof max === "number") nextValue = Math.min(max, nextValue);
-  return nextValue;
-}
-
-function parseTranslate(transform: string | undefined) {
-  if (!transform || transform === "none") return { x: 0, y: 0 };
-
-  const matrix3dMatch = transform.match(/^matrix3d\(([^)]+)\)$/);
-  if (matrix3dMatch) {
-    const values = matrix3dMatch[1]!.split(",").map((part) => Number(part.trim()));
-    return {
-      x: Number.isFinite(values[12]) ? values[12]! : 0,
-      y: Number.isFinite(values[13]) ? values[13]! : 0,
-    };
-  }
-
-  const matrixMatch = transform.match(/^matrix\(([^)]+)\)$/);
-  if (matrixMatch) {
-    const values = matrixMatch[1]!.split(",").map((part) => Number(part.trim()));
-    return {
-      x: Number.isFinite(values[4]) ? values[4]! : 0,
-      y: Number.isFinite(values[5]) ? values[5]! : 0,
-    };
-  }
-
-  const translateMatch = transform.match(/translate(?:3d)?\(([^)]+)\)/);
-  if (!translateMatch) return { x: 0, y: 0 };
-
-  const [rawX = "0", rawY = "0"] = translateMatch[1]!.split(",");
-  return {
-    x: Number.parseFloat(rawX) || 0,
-    y: Number.parseFloat(rawY) || 0,
-  };
-}
-
-function layoutNumber(value: string | undefined, fallback: number, min?: number, max?: number) {
-  const parsed = Number(value);
-  return clampLayoutNumber(Number.isFinite(parsed) ? parsed : fallback, min, max);
-}
-
-function layoutMarker(pageId: string, elementId: string) {
-  const safePageId = pageId.replace(/\*\//g, "").trim();
-  const safeElementId = elementId.replace(/\*\//g, "").trim();
-  return {
-    start: `/* celion-layout:${safePageId}:${safeElementId} */`,
-    end: `/* /celion-layout:${safePageId}:${safeElementId} */`,
-  };
-}
-
 function removeLiveLayoutCss(doc: Document, pageId: string, element: CelionEditableElement) {
   const selector = `[data-celion-page="${pageId}"] ${element.selector}`;
   const markers = layoutMarker(pageId, element.id);
-  const markerPattern = new RegExp(`\\s*${escapeRegex(markers.start)}\\s*\\n?${escapeRegex(selector)}\\s*\\{[^{}]*\\}\\s*\\n?${escapeRegex(markers.end)}\\s*`, "g");
-  const legacyRulePattern = new RegExp(`(^|\\n)\\s*${escapeRegex(selector)}\\s*\\{([^{}]*)\\}\\s*(?=\\n|$)`, "g");
 
   doc.querySelectorAll<HTMLStyleElement>("style").forEach((style) => {
-    const withoutMarkers = (style.textContent ?? "").replace(markerPattern, "\n");
-    style.textContent = withoutMarkers.replace(legacyRulePattern, (match, prefix: string, rawDeclarations: string) => {
-      const props = rawDeclarations
-        .split(";")
-        .map((declaration) => declaration.split(":")[0]?.trim())
-        .filter(Boolean);
-      const isLayoutOnlyRule = props.length > 0 && props.every((prop) => LAYOUT_PROPS.has(prop));
-      return isLayoutOnlyRule ? prefix : match;
+    style.textContent = removeExistingScopedRules({
+      css: style.textContent ?? "",
+      selector,
+      markers,
+      shouldRemoveLegacyRule: (props) => props.length > 0 && props.every((prop) => LAYOUT_PROPS.has(prop)),
+    }).css;
+  });
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Could not read image file."));
+      }
     });
+    reader.addEventListener("error", () => reject(new Error("Could not read image file.")));
+    reader.readAsDataURL(file);
   });
 }
 
@@ -168,10 +131,10 @@ export function EditorShell({
   const initialSetupOpen = !initialHasContent && !["ready", "exported"].includes(projectStatus);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const iframeClickCleanupRef = useRef<(() => void) | null>(null);
   const handleIframeLoadRef = useRef<() => void>(() => undefined);
   const refreshLayoutChromeRef = useRef<(() => void) | null>(null);
-  const undoStackRef = useRef<UndoSnapshot[]>([]);
   const measureTimeoutRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
@@ -179,7 +142,6 @@ export function EditorShell({
   const editorModeRef = useRef<EditorMode>("view");
   const {
     latestDocumentRef,
-    saving,
     saveError,
     setSaveError,
     saveHtml,
@@ -208,42 +170,21 @@ export function EditorShell({
   });
   const selection = useEditorSelection();
   const { selectElement } = selection;
-  const selectedLayoutTargetRef = useRef<LayoutTarget | null>(null);
-  const layoutValuesRef = useRef<InspectorLayoutValues | null>(null);
-  const [layoutTargetLabel, setLayoutTargetLabel] = useState("");
-  const [layoutValues, setLayoutValuesState] = useState<InspectorLayoutValues | null>(null);
-  const [canUndo, setCanUndo] = useState(false);
-
-  const setLayoutValues = useCallback((values: InspectorLayoutValues | null) => {
-    layoutValuesRef.current = values;
-    setLayoutValuesState(values);
-  }, []);
-
-  const setLayoutTarget = useCallback((target: LayoutTarget | null) => {
-    selectedLayoutTargetRef.current = target;
-    setLayoutTargetLabel(target?.element.label ?? "");
-    if (!target) setLayoutValues(null);
-  }, [setLayoutValues]);
-
-  const pushUndoSnapshot = useCallback((document: CelionEbookDocument | null) => {
-    if (!document) return;
-
-    undoStackRef.current = [
-      ...undoStackRef.current.slice(-19),
-      { type: "document", document: structuredClone(document) as CelionEbookDocument },
-    ];
-    setCanUndo(true);
-  }, []);
-
-  const pushHtmlUndoSnapshot = useCallback((currentHtml: string) => {
-    if (!currentHtml.trim()) return;
-
-    undoStackRef.current = [
-      ...undoStackRef.current.slice(-19),
-      { type: "html", html: currentHtml },
-    ];
-    setCanUndo(true);
-  }, []);
+  const {
+    layoutTargetLabel,
+    layoutValues,
+    layoutValuesRef,
+    selectedLayoutTargetRef,
+    setLayoutTarget,
+    setLayoutValues,
+  } = useEditorLayoutSelection();
+  const {
+    canUndo,
+    clearUndoStack,
+    popUndoSnapshot,
+    pushDocumentSnapshot,
+    pushHtmlSnapshot,
+  } = useEditorUndo();
 
   const measurePreview = useCallback(() => {
     const height = measurePreviewFrameHeight(iframeRef.current, {
@@ -335,20 +276,11 @@ export function EditorShell({
     const doc = iframeRef.current?.contentDocument;
     if (!doc) return false;
 
-    let target: HTMLElement | null = null;
-    if (selection.selectedRuntimeText?.mode === "document") {
-      const page = doc.querySelector<HTMLElement>(`[data-celion-page="${selection.selectedRuntimeText.pageId}"]`);
-      target = page
-        ? getRuntimeTextElements(page)[selection.selectedRuntimeText.textIndex] ?? null
+    const target = selection.selectedRuntimeText
+      ? getRuntimeTextBySelection(doc, selection.selectedRuntimeText)
+      : selection.selectedElement
+        ? getLayoutTargetElement(doc, selection.selectedElement, selection.selectedPageId)
         : null;
-    } else if (selection.selectedRuntimeText?.mode === "legacy") {
-      const page = doc.querySelectorAll<HTMLElement>(".slide")[selection.selectedRuntimeText.pageIndex];
-      target = page
-        ? getRuntimeTextElements(page)[selection.selectedRuntimeText.textIndex] ?? null
-        : null;
-    } else if (selection.selectedElement) {
-      target = getLayoutTargetElement(doc, selection.selectedElement, selection.selectedPageId);
-    }
 
     if (!target) return false;
 
@@ -376,18 +308,19 @@ export function EditorShell({
       return;
     }
 
-    pushUndoSnapshot(currentDocument);
+    pushDocumentSnapshot(currentDocument);
     latestDocumentRef.current = layoutEdit.value;
     setEbookDocument(layoutEdit.value);
     applyLiveLayoutTransformToElement(pageId, element, transform);
     void queueDocumentSave(layoutEdit.value);
-  }, [applyLiveLayoutTransformToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
+  }, [applyLiveLayoutTransformToElement, latestDocumentRef, pushDocumentSnapshot, queueDocumentSave, setSaveError]);
 
   const applyLayoutBoxToElement = useCallback((
     pageId: string,
     element: CelionEditableElement,
     width: string,
     height: string,
+    transform?: string,
   ) => {
     const currentDocument = latestDocumentRef.current;
     const layoutEdit = appendScopedLayoutBoxToDocument({
@@ -396,6 +329,7 @@ export function EditorShell({
       selectedElement: element,
       width,
       height,
+      transform,
     });
     if (!layoutEdit.ok) {
       if (layoutEdit.reason === "target-missing") {
@@ -404,12 +338,15 @@ export function EditorShell({
       return;
     }
 
-    pushUndoSnapshot(currentDocument);
+    pushDocumentSnapshot(currentDocument);
     latestDocumentRef.current = layoutEdit.value;
     setEbookDocument(layoutEdit.value);
+    if (transform) {
+      applyLiveLayoutTransformToElement(pageId, element, transform);
+    }
     applyLiveLayoutBoxToElement(pageId, element, width, height);
     void queueDocumentSave(layoutEdit.value);
-  }, [applyLiveLayoutBoxToElement, latestDocumentRef, pushUndoSnapshot, queueDocumentSave, setSaveError]);
+  }, [applyLiveLayoutBoxToElement, applyLiveLayoutTransformToElement, latestDocumentRef, pushDocumentSnapshot, queueDocumentSave, setSaveError]);
 
   const handleIframeLoad = useCallback(() => {
     cleanupIframeEffects();
@@ -427,58 +364,13 @@ export function EditorShell({
       setPageSummaries(buildPageSummariesFromElements(pages));
     }
 
-    const selectPreviewElement = (textEl: Element) => {
-      doc.querySelectorAll("[data-selected]").forEach((el) => {
-        el.removeAttribute("data-selected");
-        (el as HTMLElement).style.outline = "";
-        (el as HTMLElement).style.outlineOffset = "";
-      });
-      textEl.setAttribute("data-selected", "true");
-      (textEl as HTMLElement).style.outline = "2px solid #18181b";
-      (textEl as HTMLElement).style.outlineOffset = "2px";
-    };
-
-    const readInspectorStyleValues = (element: HTMLElement): InspectorStyleValues => {
-      const styles = doc.defaultView?.getComputedStyle(element);
-      if (!styles) return {};
-
-      return {
-        fontSize: styles.fontSize,
-        fontWeight: styles.fontWeight,
-        lineHeight: styles.lineHeight,
-        letterSpacing: styles.letterSpacing,
-        textAlign: styles.textAlign,
-        color: styles.color,
-        backgroundColor: styles.backgroundColor,
-        opacity: styles.opacity,
-        borderColor: styles.borderColor,
-        borderWidth: styles.borderWidth,
-        borderRadius: styles.borderRadius,
-        margin: styles.margin,
-        padding: styles.padding,
-      };
-    };
-
-    const readLayoutValues = (element: HTMLElement): InspectorLayoutValues => {
-      const styles = doc.defaultView?.getComputedStyle(element);
-      const rect = element.getBoundingClientRect();
-      const translate = parseTranslate(styles?.transform ?? element.style.transform);
-
-      return {
-        x: formatLayoutNumber(translate.x),
-        y: formatLayoutNumber(translate.y),
-        width: formatLayoutNumber(rect.width),
-        height: formatLayoutNumber(rect.height),
-      };
-    };
-
     const layoutChrome = createPreviewLayoutChrome(doc, {
       getCurrentTarget: () => selectedLayoutTargetRef.current,
-      onMove: (target, transform) => {
+      onTransform: (target, transform) => {
         applyLayoutTransformToElement(target.pageId, target.element, transform);
       },
-      onResize: (target, width, height) => {
-        applyLayoutBoxToElement(target.pageId, target.element, width, height);
+      onResize: (target, width, height, transform) => {
+        applyLayoutBoxToElement(target.pageId, target.element, width, height, transform);
       },
     });
     refreshLayoutChromeRef.current = () => {
@@ -488,7 +380,7 @@ export function EditorShell({
       const selectedNode = getLayoutTargetElement(doc, currentTarget.element, currentTarget.pageId);
       const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
       if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentTarget.pageId) {
-        setLayoutValues(readLayoutValues(selectedNode));
+        setLayoutValues(readLayoutValues(doc, selectedNode));
         layoutChrome.showFor(selectedNode);
       }
     };
@@ -528,7 +420,7 @@ export function EditorShell({
         cursor: element.style.cursor,
       };
       element.setAttribute("data-celion-hovered", kind);
-      element.style.outline = kind === "layout" ? "1px dashed #6366f1" : "1px dashed #0ea5e9";
+      element.style.outline = kind === "layout" ? "1px dashed rgba(255, 90, 31, 0.72)" : "1px dashed rgba(255, 90, 31, 0.42)";
       element.style.outlineOffset = "2px";
       element.style.cursor = "pointer";
     };
@@ -545,9 +437,7 @@ export function EditorShell({
         return;
       }
 
-      const pointedElements = typeof doc.elementsFromPoint === "function"
-        ? doc.elementsFromPoint(e.clientX, e.clientY)
-        : [target];
+      const pointedElements = getPointedElements(doc, e, target);
       const layoutHoverTarget = pointedElements
         .map((element) => element.closest<HTMLElement>("[data-celion-id]"))
         .find((element): element is HTMLElement => Boolean(element));
@@ -571,23 +461,14 @@ export function EditorShell({
       clearHover();
 
       const target = e.target as HTMLElement;
-      const pointedElements = typeof doc.elementsFromPoint === "function"
-        ? doc.elementsFromPoint(e.clientX, e.clientY)
-        : [target];
+      const pointedElements = getPointedElements(doc, e, target);
 
       if (currentDocument) {
-        const pageEl = (pointedElements.find((element) => element.closest("[data-celion-page]")) ?? target)
-          .closest<HTMLElement>("[data-celion-page]");
-        const pageId = pageEl?.getAttribute("data-celion-page");
-        if (!pageId) return;
+        const pageContext = getDocumentPageContext(currentDocument, pointedElements, target);
+        if (!pageContext) return;
 
-        const pageIndex = currentDocument.pages.findIndex((page) => page.id === pageId);
-        const page = pageIndex >= 0 ? currentDocument.pages[pageIndex] : null;
-        if (!page) return;
-
-        const candidateIds = pointedElements
-          .map((element) => element.closest<HTMLElement>("[data-celion-id]")?.getAttribute("data-celion-id") ?? "")
-          .filter((id, index, ids) => id && ids.indexOf(id) === index);
+        const { page, pageId, pageIndex } = pageContext;
+        const candidateIds = getCandidateCelionIds(pointedElements);
         const manifestElement = pickSelectableElement(page, candidateIds);
         const runtimeTextEl = pickRuntimeTextElement(pointedElements, target);
         const runtimeTextIndex = runtimeTextIndexFromElement(runtimeTextEl);
@@ -600,11 +481,11 @@ export function EditorShell({
           const text = runtimeTextEl.textContent?.trim() ?? "";
           if (!text) return;
 
-          selectPreviewElement(runtimeTextEl);
+          selectPreviewElement(doc, runtimeTextEl);
           const layoutTargetEl = manifestElement ? getLayoutTargetElement(doc, manifestElement, pageId) : null;
           if (manifestElement && layoutTargetEl) {
             setLayoutTarget({ pageId, element: manifestElement });
-            setLayoutValues(readLayoutValues(layoutTargetEl));
+            setLayoutValues(readLayoutValues(doc, layoutTargetEl));
             layoutChrome.showFor(layoutTargetEl);
           } else {
             setLayoutTarget(null);
@@ -615,7 +496,7 @@ export function EditorShell({
             pageId,
             selector: "",
             runtimeText: { mode: "document", pageId, pageIndex, textIndex: runtimeTextIndex },
-            styleValues: readInspectorStyleValues(runtimeTextEl),
+            styleValues: readInspectorStyleValues(doc, runtimeTextEl),
             element: {
               id: `runtime-text-${pageId}-${runtimeTextIndex}`,
               role: "text",
@@ -636,9 +517,9 @@ export function EditorShell({
 
         const text = celionEl.textContent?.trim() ?? "";
 
-        selectPreviewElement(celionEl);
+        selectPreviewElement(doc, celionEl);
         setLayoutTarget({ pageId, element: manifestElement });
-        setLayoutValues(readLayoutValues(celionEl));
+        setLayoutValues(readLayoutValues(doc, celionEl));
         layoutChrome.showFor(celionEl);
         selectElement({
           text,
@@ -646,7 +527,7 @@ export function EditorShell({
           element: manifestElement,
           selector: "",
           runtimeText: null,
-          styleValues: readInspectorStyleValues(celionEl),
+          styleValues: readInspectorStyleValues(doc, celionEl),
         });
         setCurrentSlide((current) => current === pageIndex ? current : pageIndex);
         return;
@@ -659,7 +540,7 @@ export function EditorShell({
       const text = textEl.textContent?.trim() ?? "";
       if (!text) return;
 
-      selectPreviewElement(textEl);
+      selectPreviewElement(doc, textEl);
       setLayoutTarget(null);
       layoutChrome.hide();
 
@@ -683,7 +564,7 @@ export function EditorShell({
             pageIndex: Number(pageIdx),
             textIndex: runtimeTextIndex,
           },
-          styleValues: readInspectorStyleValues(textEl as HTMLElement),
+          styleValues: readInspectorStyleValues(doc, textEl as HTMLElement),
         });
       } else {
         selectElement({
@@ -692,7 +573,7 @@ export function EditorShell({
           element: null,
           selector: editableIndex >= 0 ? `${pageIdx}:${editableIndex}` : `[data-slide-index="${pageIdx}"] ${tag}`,
           runtimeText: null,
-          styleValues: readInspectorStyleValues(textEl as HTMLElement),
+          styleValues: readInspectorStyleValues(doc, textEl as HTMLElement),
         });
       }
     };
@@ -719,8 +600,8 @@ export function EditorShell({
       const selectedNode = getLayoutTargetElement(doc, currentLayoutTarget.element, currentLayoutTarget.pageId);
       const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
       if (selectedNode && pageEl?.getAttribute("data-celion-page") === currentLayoutTarget.pageId) {
-        selectPreviewElement(selectedNode);
-        setLayoutValues(readLayoutValues(selectedNode));
+        selectPreviewElement(doc, selectedNode);
+        setLayoutValues(readLayoutValues(doc, selectedNode));
         layoutChrome.showFor(selectedNode);
       } else {
         layoutChrome.hide();
@@ -821,7 +702,7 @@ export function EditorShell({
       editValue: nextText,
     });
     if (documentEdit.ok) {
-      pushUndoSnapshot(currentDocument);
+      pushDocumentSnapshot(currentDocument);
       latestDocumentRef.current = documentEdit.value;
       setEbookDocument(documentEdit.value);
       if (!applyLiveTextToSelection(nextText)) {
@@ -851,7 +732,7 @@ export function EditorShell({
     }
 
     const newHtml = legacyEdit.value;
-    pushHtmlUndoSnapshot(html);
+    pushHtmlSnapshot(html);
     setHtml(newHtml);
     selection.clearSelection();
     void saveHtml(newHtml);
@@ -873,7 +754,7 @@ export function EditorShell({
       return;
     }
 
-    pushUndoSnapshot(currentDocument);
+    pushDocumentSnapshot(currentDocument);
     latestDocumentRef.current = styleEdit.value;
     setEbookDocument(styleEdit.value);
     if (selection.selectedElement) {
@@ -882,6 +763,83 @@ export function EditorShell({
     selection.setStyleValue(prop, value);
     void queueDocumentSave(styleEdit.value);
   };
+
+  const triggerImageInput = useCallback(() => {
+    if (!latestDocumentRef.current && !ebookDocument) {
+      setSaveError("Image insertion is available after an ebook document is generated.");
+      return;
+    }
+
+    imageInputRef.current?.click();
+  }, [ebookDocument, latestDocumentRef, setSaveError]);
+
+  const handleImageInputChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+
+    if (!SUPPORTED_EDITOR_IMAGE_TYPES.has(file.type)) {
+      setSaveError("Use a JPG, PNG, or WebP image.");
+      return;
+    }
+
+    if (file.size > MAX_EDITOR_IMAGE_BYTES) {
+      setSaveError("Use an image under 650 KB for now.");
+      return;
+    }
+
+    const currentDocument = latestDocumentRef.current ?? ebookDocument;
+    if (!currentDocument) {
+      setSaveError("Image insertion is available after an ebook document is generated.");
+      return;
+    }
+
+    let src = "";
+    try {
+      src = await readFileAsDataUrl(file);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not read image file.");
+      return;
+    }
+
+    const imageEdit = insertImageIntoDocument({
+      document: currentDocument,
+      pageIndex: currentSlide,
+      src,
+      alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
+    });
+    if (!imageEdit.ok) {
+      setSaveError("Could not insert the image on this page.");
+      return;
+    }
+
+    const { document: nextDocument, pageId, element } = imageEdit.value;
+    pushDocumentSnapshot(currentDocument);
+    latestDocumentRef.current = nextDocument;
+    setEbookDocument(nextDocument);
+    setHtml(compileEbookDocumentToHtml(nextDocument));
+    setLayoutTarget({ pageId, element });
+    setLayoutValues(null);
+    selection.selectElement({
+      text: "",
+      pageId,
+      element,
+      selector: "",
+      runtimeText: null,
+      styleValues: {},
+    });
+    void queueDocumentSave(nextDocument);
+  }, [
+    currentSlide,
+    ebookDocument,
+    latestDocumentRef,
+    pushDocumentSnapshot,
+    queueDocumentSave,
+    selection,
+    setLayoutTarget,
+    setLayoutValues,
+    setSaveError,
+  ]);
 
   const applyLayoutValueToSelectedElement = useCallback((prop: keyof InspectorLayoutValues, value: number) => {
     const target = selectedLayoutTargetRef.current;
@@ -923,19 +881,16 @@ export function EditorShell({
     });
     if (!layoutEdit.ok) return;
 
-    pushUndoSnapshot(currentDocument);
+    pushDocumentSnapshot(currentDocument);
     latestDocumentRef.current = layoutEdit.value;
     setEbookDocument(layoutEdit.value);
     resetLiveLayoutForElement(target.pageId, target.element);
     void queueDocumentSave(layoutEdit.value);
-  }, [latestDocumentRef, pushUndoSnapshot, queueDocumentSave, resetLiveLayoutForElement]);
+  }, [latestDocumentRef, pushDocumentSnapshot, queueDocumentSave, resetLiveLayoutForElement]);
 
   const undoLastEdit = useCallback(() => {
-    const snapshot = undoStackRef.current.at(-1);
+    const snapshot = popUndoSnapshot();
     if (!snapshot) return;
-
-    undoStackRef.current = undoStackRef.current.slice(0, -1);
-    setCanUndo(undoStackRef.current.length > 0);
 
     if (snapshot.type === "html") {
       latestDocumentRef.current = null;
@@ -954,7 +909,20 @@ export function EditorShell({
     setLayoutTarget(null);
     selection.clearSelection();
     void queueDocumentSave(restoredDocument);
-  }, [latestDocumentRef, queueDocumentSave, saveHtml, selection, setLayoutTarget]);
+  }, [latestDocumentRef, popUndoSnapshot, queueDocumentSave, saveHtml, selection, setLayoutTarget]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (editorModeRef.current !== "edit") return;
+      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== "z") return;
+
+      event.preventDefault();
+      undoLastEdit();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undoLastEdit]);
 
   const handlePageSelect = useCallback((index: number) => {
     scrollToPage(index);
@@ -991,13 +959,12 @@ export function EditorShell({
     setHtml(nextHtml);
     setCurrentSlide(0);
     setLayoutTarget(null);
-    undoStackRef.current = [];
-    setCanUndo(false);
+    clearUndoStack();
     selection.clearSelection();
     editorModeRef.current = "view";
     setEditorMode("view");
     setSetupOpen(false);
-  }, [latestDocumentRef, selection, setLayoutTarget]);
+  }, [clearUndoStack, latestDocumentRef, selection, setLayoutTarget]);
 
   const handleStartBlankProject = useCallback(() => {
     selection.clearSelection();
@@ -1014,20 +981,28 @@ export function EditorShell({
   return (
     <MotionConfig reducedMotion="user">
       <div className="editor-shell" style={editorShellStyle}>
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        onChange={handleImageInputChange}
+        className="editor-image-input"
+      />
       <EditorTopBar
         projectTitle={displayTitle}
-        saving={saving}
         saveError={saveError}
         exportError={exportError}
         exporting={exporting}
         exportOpen={exportOpen}
         canExport={!setupOpen}
+        canAddImage={Boolean(ebookDocument)}
         showModeToggle={!setupOpen && Boolean(html)}
         editorMode={editorMode}
         canUndo={canUndo}
         edgeGap={EDITOR_EDGE_GAP}
         topRailHeight={EDITOR_TOP_RAIL_HEIGHT}
         onModeChange={handleModeChange}
+        onAddImage={triggerImageInput}
         onUndo={undoLastEdit}
         onToggleExport={() => setExportOpen((open) => !open)}
         onExport={exportAs}

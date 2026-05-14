@@ -1,7 +1,19 @@
 "use client";
 
 import type { ChangeEvent, ReactNode } from "react";
-import { AlignCenter, AlignJustify, AlignLeft, AlignRight } from "lucide-react";
+import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
+  Check,
+  Move,
+  Palette,
+  SlidersHorizontal,
+  Square,
+  Type,
+  type LucideIcon,
+} from "lucide-react";
 import type { CelionEditableElement } from "@/lib/ebook-document";
 import { CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
@@ -64,14 +76,24 @@ function alignFromStyleValue(value: string | undefined) {
 
 function InspectorSection({
   title,
+  icon: Icon,
+  action,
   children,
 }: {
   title: string;
+  icon: LucideIcon;
+  action?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="inspector-section">
-      <p className="inspector-section-title">{title}</p>
+      <div className="inspector-section-head">
+        <span className="inspector-section-title">
+          <Icon size={14} strokeWidth={1.8} />
+          {title}
+        </span>
+        {action}
+      </div>
       <div className="inspector-section-body">
         {children}
       </div>
@@ -127,6 +149,37 @@ function NumberControl({
   );
 }
 
+function LayoutNumberControl({
+  label,
+  min,
+  max,
+  placeholder,
+  value,
+  onChange,
+}: {
+  label: string;
+  min?: string;
+  max?: string;
+  placeholder: string;
+  value?: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <label className="inspector-layout-field">
+      <span>{label}</span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        placeholder={placeholder}
+        value={value ?? ""}
+        onChange={onChange}
+        className="inspector-input inspector-layout-input"
+      />
+    </label>
+  );
+}
+
 function ColorControl({
   label,
   value,
@@ -138,12 +191,15 @@ function ColorControl({
 }) {
   return (
     <ControlRow label={label}>
-      <input
-        type="color"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="inspector-input inspector-color-input"
-      />
+      <label className="inspector-color-field">
+        <input
+          type="color"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="inspector-color-input"
+        />
+        <span>{value}</span>
+      </label>
     </ControlRow>
   );
 }
@@ -223,17 +279,35 @@ export function InspectorControls({
 
   return (
     <div className="inspector-controls">
-      <p className="inspector-element-label">
-        {element.label}
-      </p>
-      <p className="inspector-layout-target">
-        {layoutTargetLabel ? `Layout: ${layoutTargetLabel}` : "Text only"}
-      </p>
+      <div className="inspector-element-card">
+        <span className="inspector-element-icon">
+          {layoutTargetLabel ? <Square size={15} strokeWidth={1.9} /> : <Type size={15} strokeWidth={1.9} />}
+        </span>
+        <span className="inspector-element-copy">
+          <span className="inspector-element-label">
+            {element.label}
+          </span>
+          <span className="inspector-layout-target">
+            {layoutTargetLabel ? layoutTargetLabel : "Text only"}
+          </span>
+        </span>
+      </div>
 
       {layoutTargetLabel && (
-        <InspectorSection title="Layout">
+        <InspectorSection
+          title="Layout"
+          icon={Move}
+          action={(
+            <button
+              onClick={onResetLayout}
+              className="inspector-section-action"
+            >
+              Reset
+            </button>
+          )}
+        >
           <div className="inspector-layout-grid">
-            <NumberControl
+            <LayoutNumberControl
               label="X"
               min="-2000"
               max="2000"
@@ -241,7 +315,7 @@ export function InspectorControls({
               value={layoutValues?.x}
               onChange={(event) => applyLayoutNumber(event, "x", -2000, 2000)}
             />
-            <NumberControl
+            <LayoutNumberControl
               label="Y"
               min="-2000"
               max="2000"
@@ -249,7 +323,7 @@ export function InspectorControls({
               value={layoutValues?.y}
               onChange={(event) => applyLayoutNumber(event, "y", -2000, 2000)}
             />
-            <NumberControl
+            <LayoutNumberControl
               label="W"
               min="24"
               max="2000"
@@ -257,7 +331,7 @@ export function InspectorControls({
               value={layoutValues?.width}
               onChange={(event) => applyLayoutNumber(event, "width", 24, 2000)}
             />
-            <NumberControl
+            <LayoutNumberControl
               label="H"
               min="24"
               max="2000"
@@ -266,17 +340,11 @@ export function InspectorControls({
               onChange={(event) => applyLayoutNumber(event, "height", 24, 2000)}
             />
           </div>
-          <button
-            onClick={onResetLayout}
-            className="inspector-reset-button"
-          >
-            Reset layout
-          </button>
         </InspectorSection>
       )}
 
       {editableProps.has("text") && (
-        <InspectorSection title="Content">
+        <InspectorSection title="Content" icon={Type}>
           <textarea
             value={textValue}
             onChange={(event) => onTextChange(event.target.value)}
@@ -288,13 +356,14 @@ export function InspectorControls({
             disabled={!textValue.trim()}
             className="inspector-apply-button"
           >
+            <Check size={14} strokeWidth={2} />
             Apply text
           </button>
         </InspectorSection>
       )}
 
       {(editableProps.has("fontSize") || editableProps.has("fontWeight") || editableProps.has("lineHeight") || editableProps.has("letterSpacing") || editableProps.has("textAlign") || editableProps.has("color")) && (
-        <InspectorSection title="Typography">
+        <InspectorSection title="Typography" icon={SlidersHorizontal}>
           {editableProps.has("fontSize") && (
             <NumberControl
               label="Size"
@@ -359,7 +428,7 @@ export function InspectorControls({
       )}
 
       {(editableProps.has("backgroundColor") || editableProps.has("opacity") || editableProps.has("borderColor") || editableProps.has("borderWidth") || editableProps.has("borderRadius")) && (
-        <InspectorSection title="Appearance">
+        <InspectorSection title="Appearance" icon={Palette}>
           {editableProps.has("backgroundColor") && (
             <ColorControl
               label="Fill"
@@ -413,7 +482,7 @@ export function InspectorControls({
       )}
 
       {(editableProps.has("margin") || editableProps.has("padding")) && (
-        <InspectorSection title="Spacing">
+        <InspectorSection title="Spacing" icon={Move}>
           {editableProps.has("margin") && (
             <NumberControl
               label="Margin"

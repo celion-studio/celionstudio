@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { FiArrowUpRight, FiFileText, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import { FiArrowUpRight, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import { CelionDocumentPreview } from "@/components/ui/CelionDocumentPreview";
 import { CelionButton, CelionIconButton } from "@/components/ui/celion-controls";
 import type { ProjectSummary } from "@/lib/projects";
 
@@ -40,17 +41,10 @@ function ProjectCardGlyph({ name }: { name: "open" | "restore" | "delete" }) {
 
 function ProjectCardPreview() {
   return (
-    <div className="project-card-preview" aria-hidden="true">
-      <div className="project-card-file-icon">
-        <FiFileText size={17} strokeWidth={1.7} />
-      </div>
-      <div className="project-card-page">
-        <span className="project-card-page-line" />
-        <span className="project-card-page-line" />
-        <span className="project-card-page-line short" />
-        <span className="project-card-page-block" />
-      </div>
-    </div>
+    <CelionDocumentPreview
+      className="project-card-preview"
+      showLeadingIcon
+    />
   );
 }
 

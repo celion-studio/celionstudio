@@ -1,5 +1,13 @@
 import type { CelionEditableElement, CelionEbookDocument } from "@/lib/ebook-document";
 import { getRuntimeTextElements, normalizeEditorHtml } from "./editor-preview";
+import {
+  LAYOUT_PROPS,
+  cssPropertyName,
+  formatDeclarations,
+  layoutMarker,
+  removeExistingScopedRules,
+  styleMarker,
+} from "./editor-style-rules";
 import type { RuntimeTextSelection } from "./editor-types";
 
 type EditResult<T> =
@@ -16,76 +24,62 @@ function parseHtmlDocument(html: string) {
   return new DOMParser().parseFromString(html, "text/html");
 }
 
-function cssPropertyName(prop: string) {
-  return prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-const LAYOUT_PROPS = new Set(["transform", "width", "height"]);
-
-function layoutMarker(pageId: string, elementId: string) {
-  const safePageId = pageId.replace(/\*\//g, "").trim();
-  const safeElementId = elementId.replace(/\*\//g, "").trim();
-  return {
-    start: `/* celion-layout:${safePageId}:${safeElementId} */`,
-    end: `/* /celion-layout:${safePageId}:${safeElementId} */`,
-  };
-}
-
-function parseDeclarations(value: string) {
-  const declarations = new Map<string, string>();
-  value.split(";").forEach((part) => {
-    const [rawProp, ...rawValueParts] = part.split(":");
-    const prop = rawProp?.trim();
-    const declarationValue = rawValueParts.join(":").trim();
-    if (!prop || !declarationValue) return;
-    declarations.set(prop, declarationValue);
-  });
-
-  return declarations;
-}
-
-function formatDeclarations(declarations: Map<string, string>) {
-  return Array.from(declarations)
-    .map(([prop, value]) => `${prop}: ${value};`)
-    .join(" ");
-}
-
 function removeExistingLayoutRules(css: string, selector: string, markers: { start: string; end: string }) {
-  const declarations = new Map<string, string>();
-  let nextCss = css;
-
-  const markerPattern = new RegExp(`\\s*${escapeRegex(markers.start)}\\s*\\n?${escapeRegex(selector)}\\s*\\{([^{}]*)\\}\\s*\\n?${escapeRegex(markers.end)}\\s*`, "g");
-  nextCss = nextCss.replace(markerPattern, (_match, rawDeclarations: string) => {
-    parseDeclarations(rawDeclarations).forEach((value, prop) => {
-      if (LAYOUT_PROPS.has(prop)) declarations.set(prop, value);
-    });
-    return "\n";
+  return removeExistingScopedRules({
+    css,
+    selector,
+    markers,
+    shouldCollectProp: (prop) => LAYOUT_PROPS.has(prop),
+    shouldRemoveLegacyRule: (props) => props.length > 0 && props.every((prop) => LAYOUT_PROPS.has(prop)),
   });
+}
 
-  const legacyRulePattern = new RegExp(`(^|\\n)\\s*${escapeRegex(selector)}\\s*\\{([^{}]*)\\}\\s*(?=\\n|$)`, "g");
-  nextCss = nextCss.replace(legacyRulePattern, (match, prefix: string, rawDeclarations: string) => {
-    const parsed = parseDeclarations(rawDeclarations);
-    const props = Array.from(parsed.keys());
-    const isLegacyLayoutRule = props.length > 0 && props.every((prop) => LAYOUT_PROPS.has(prop));
-    if (!isLegacyLayoutRule) return match;
+function escapeHtmlAttribute(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
-    parsed.forEach((value, prop) => declarations.set(prop, value));
-    return prefix;
-  });
+function imageIdBase(pageId: string) {
+  const normalizedPageId = pageId
+    .trim()
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    || "page";
+  return `${normalizedPageId}-image`;
+}
 
-  return {
-    css: nextCss
-      .split("\n")
-      .map((line) => line.trimEnd())
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim(),
-    declarations,
-  };
+function nextImageElementId(page: CelionEbookDocument["pages"][number]) {
+  const base = imageIdBase(page.id);
+  const usedIds = new Set([
+    ...page.manifest.editableElements.map((element) => element.id),
+    ...Array.from(page.html.matchAll(/\sdata-celion-id\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s>]+))/gi))
+      .map((match) => match[1] ?? match[2] ?? match[3] ?? ""),
+  ].filter(Boolean));
+  let index = 1;
+  let candidate = `${base}-${String(index).padStart(3, "0")}`;
+
+  while (usedIds.has(candidate)) {
+    index += 1;
+    candidate = `${base}-${String(index).padStart(3, "0")}`;
+  }
+
+  return candidate;
+}
+
+function insertBeforePageClose(html: string, fragment: string) {
+  const closingSection = /<\/section>\s*$/i;
+  if (closingSection.test(html)) {
+    return html.replace(closingSection, `${fragment}\n</section>`);
+  }
+
+  return `${html}\n${fragment}`;
+}
+
+function isSafeEditorImageSrc(value: string) {
+  return /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\s]+$/i.test(value.trim());
 }
 
 function appendScopedDeclarationsToDocument(input: {
@@ -110,11 +104,21 @@ function appendScopedDeclarationsToDocument(input: {
   const selector = `[data-celion-page="${page.id}"] ${input.selectedElement.selector}`;
   if (selector.includes("runtime-text:")) return { ok: false, reason: "not-applicable" };
 
-  const ruleDeclarations = declarations
-    .map(({ prop, value }) => `${cssPropertyName(prop)}: ${value};`)
-    .join(" ");
-  const rule = `${selector} { ${ruleDeclarations} }`;
-  page.css = page.css.trim() ? `${page.css.trim()}\n${rule}` : rule;
+  const markers = styleMarker(page.id, input.selectedElement.id);
+  const cleaned = removeExistingScopedRules({
+    css: page.css,
+    selector,
+    markers,
+    shouldCollectProp: (prop) => !LAYOUT_PROPS.has(prop),
+    shouldRemoveLegacyRule: (props) => props.length > 0 && props.every((prop) => !LAYOUT_PROPS.has(prop)),
+  });
+  const mergedDeclarations = cleaned.declarations;
+  declarations.forEach(({ prop, value }) => {
+    mergedDeclarations.set(cssPropertyName(prop), value);
+  });
+
+  const rule = `${markers.start}\n${selector} { ${formatDeclarations(mergedDeclarations)} }\n${markers.end}`;
+  page.css = cleaned.css ? `${cleaned.css}\n${rule}` : rule;
   page.version += 1;
 
   return { ok: true, value: nextDocument };
@@ -262,16 +266,71 @@ export function appendScopedLayoutBoxToDocument(input: {
   selectedElement: CelionEditableElement | null;
   width: string;
   height: string;
+  transform?: string;
 }): EditResult<CelionEbookDocument> {
   return replaceScopedLayoutDeclarationsInDocument({
     document: input.document,
     selectedPageId: input.selectedPageId,
     selectedElement: input.selectedElement,
     declarations: [
+      ...(input.transform?.trim() ? [{ prop: "transform", value: input.transform.trim() }] : []),
       { prop: "width", value: input.width },
       { prop: "height", value: input.height },
     ],
   });
+}
+
+export function insertImageIntoDocument(input: {
+  document: CelionEbookDocument | null;
+  pageIndex: number;
+  src: string;
+  alt: string;
+}): EditResult<{ document: CelionEbookDocument; pageId: string; element: CelionEditableElement }> {
+  if (!input.document || !Number.isFinite(input.pageIndex) || !isSafeEditorImageSrc(input.src)) {
+    return { ok: false, reason: "not-applicable" };
+  }
+
+  const pageIndex = Math.trunc(input.pageIndex);
+  const currentPage = input.document.pages[pageIndex];
+  if (!currentPage) return { ok: false, reason: "not-applicable" };
+
+  const nextDocument = structuredClone(input.document) as CelionEbookDocument;
+  const page = nextDocument.pages[pageIndex];
+  if (!page) return { ok: false, reason: "not-applicable" };
+
+  const id = nextImageElementId(page);
+  const element: CelionEditableElement = {
+    id,
+    role: "image",
+    type: "image",
+    selector: `[data-celion-id="${id}"]`,
+    label: "Image",
+    editableProps: ["opacity", "borderRadius", "margin"],
+  };
+  const safeSrc = escapeHtmlAttribute(input.src.trim());
+  const safeAlt = escapeHtmlAttribute(input.alt.trim() || "Inserted image");
+  const imageHtml = `<img class="celion-inserted-image" data-celion-id="${id}" data-role="image" data-editable="true" src="${safeSrc}" alt="${safeAlt}" />`;
+  const selector = `[data-celion-page="${page.id}"] ${element.selector}`;
+  const imageCss = `${selector} { position: absolute; left: 48px; top: 96px; width: 220px; height: 160px; object-fit: cover; display: block; border-radius: 10px; }`;
+
+  page.html = insertBeforePageClose(page.html, imageHtml);
+  page.css = page.css.trim() ? `${page.css.trim()}\n${imageCss}` : imageCss;
+  page.manifest = {
+    editableElements: [
+      ...page.manifest.editableElements,
+      element,
+    ],
+  };
+  page.version += 1;
+
+  return {
+    ok: true,
+    value: {
+      document: nextDocument,
+      pageId: page.id,
+      element,
+    },
+  };
 }
 
 export function removeScopedLayoutFromDocument(input: {

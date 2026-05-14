@@ -8,6 +8,7 @@ import {
   appendScopedStyleToDocument,
   applyDocumentTextEdit,
   applyLegacyHtmlTextEdit,
+  insertImageIntoDocument,
   removeScopedLayoutFromDocument,
 } from "./editor-document-edits";
 
@@ -246,6 +247,68 @@ test("applyLegacyHtmlTextEdit handles runtime text selectors", () => {
   assert.match(result.value, /Edited legacy runtime/);
 });
 
+test("insertImageIntoDocument adds an editable image to the selected page", () => {
+  const result = insertImageIntoDocument({
+    document: baseDocument,
+    pageIndex: 0,
+    src: "data:image/png;base64,abc123",
+    alt: "Example chart",
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  const insertedPage = result.value.document.pages[0]!;
+  assert.match(insertedPage.html, /<img/);
+  assert.match(insertedPage.html, /src="data:image\/png;base64,abc123"/);
+  assert.match(insertedPage.html, /alt="Example chart"/);
+  assert.match(insertedPage.html, /data-celion-id="cover-image-001"/);
+  assert.match(insertedPage.css, /\[data-celion-page="cover"\] \[data-celion-id="cover-image-001"\]/);
+  assert.equal(insertedPage.version, 2);
+  assert.equal(result.value.element.id, "cover-image-001");
+  assert.equal(result.value.element.type, "image");
+  assert.deepEqual(result.value.element.editableProps, ["opacity", "borderRadius", "margin"]);
+  assert.equal(insertedPage.manifest.editableElements.some((element) => element.id === "cover-image-001"), true);
+  assert.equal(result.value.document.pages[1]!.html, baseDocument.pages[1]!.html);
+});
+
+test("insertImageIntoDocument creates unique image ids per page", () => {
+  const first = insertImageIntoDocument({
+    document: baseDocument,
+    pageIndex: 0,
+    src: "data:image/png;base64,first",
+    alt: "First image",
+  });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+
+  const second = insertImageIntoDocument({
+    document: first.value.document,
+    pageIndex: 0,
+    src: "data:image/png;base64,second",
+    alt: "Second image",
+  });
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+
+  assert.equal(second.value.element.id, "cover-image-002");
+  assert.match(second.value.document.pages[0]!.html, /data-celion-id="cover-image-001"/);
+  assert.match(second.value.document.pages[0]!.html, /data-celion-id="cover-image-002"/);
+});
+
+test("insertImageIntoDocument rejects non-image sources", () => {
+  const result = insertImageIntoDocument({
+    document: baseDocument,
+    pageIndex: 0,
+    src: "javascript:alert(1)",
+    alt: "Unsafe image",
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "not-applicable");
+});
+
 test("appendScopedStyleToDocument keeps style changes scoped to the selected page", () => {
   const result = appendScopedStyleToDocument({
     document: baseDocument,
@@ -260,6 +323,32 @@ test("appendScopedStyleToDocument keeps style changes scoped to the selected pag
 
   assert.match(result.value.pages[0]!.css, /\[data-celion-page="cover"\] \[data-celion-id="cover-title"\] \{ font-size: 42px; \}/);
   assert.equal(result.value.pages[0]!.version, 2);
+});
+
+test("appendScopedStyleToDocument merges repeated style edits into one override block", () => {
+  const first = appendScopedStyleToDocument({
+    document: baseDocument,
+    selectedPageId: "cover",
+    selectedElement: textElement,
+    prop: "fontSize",
+    value: "42px",
+  });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+
+  const second = appendScopedStyleToDocument({
+    document: first.value,
+    selectedPageId: "cover",
+    selectedElement: textElement,
+    prop: "color",
+    value: "#111111",
+  });
+  assert.equal(second.ok, true);
+  if (!second.ok) return;
+
+  const css = second.value.pages[0]!.css;
+  assert.equal((css.match(/celion-style:cover:cover-title/g) ?? []).length, 2);
+  assert.match(css, /\{ font-size: 42px; color: #111111; \}/);
 });
 
 test("appendScopedLayoutTransformToDocument stores drag movement as a scoped transform", () => {
@@ -316,6 +405,23 @@ test("appendScopedLayoutBoxToDocument stores resize dimensions in one scoped rul
 
   assert.match(result.value.pages[0]!.css, /\/\* celion-layout:cover:cover-title \*\//);
   assert.match(result.value.pages[0]!.css, /\[data-celion-page="cover"\] \[data-celion-id="cover-title"\] \{ width: 320px; height: 96px; \}/);
+  assert.equal(result.value.pages[0]!.version, 2);
+});
+
+test("appendScopedLayoutBoxToDocument can store resize dimensions and movement as one undoable rule", () => {
+  const result = appendScopedLayoutBoxToDocument({
+    document: baseDocument,
+    selectedPageId: "cover",
+    selectedElement: textElement,
+    width: "320px",
+    height: "96px",
+    transform: "translate(-12px, 8px)",
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+
+  assert.match(result.value.pages[0]!.css, /\[data-celion-page="cover"\] \[data-celion-id="cover-title"\] \{ transform: translate\(-12px, 8px\); width: 320px; height: 96px; \}/);
   assert.equal(result.value.pages[0]!.version, 2);
 });
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRouteSession } from "@/lib/session";
 import { prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "@/lib/ebook-save";
-import { updateProjectEbookDocument, updateProjectEbookHtml } from "@/lib/projects";
+import { updateProjectEbookDocumentForSave, updateProjectEbookHtml } from "@/lib/projects";
 
 const schema = z.object({
   projectId: z.string().min(1),
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: prepared.message }, { status: 400 });
     }
 
-    const result = await updateProjectEbookDocument(
+    const result = await updateProjectEbookDocumentForSave(
       session.user.id,
       parsed.data.projectId,
       prepared.document,

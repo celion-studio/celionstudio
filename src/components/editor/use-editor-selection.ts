@@ -53,7 +53,7 @@ export function useEditorSelection() {
       } satisfies CelionEditableElement
     : null), [selectedElement, selectedSelector, selectedText]);
 
-  return {
+  return useMemo(() => ({
     selectedText,
     selectedSelector,
     selectedElement,
@@ -67,5 +67,18 @@ export function useEditorSelection() {
     commitTextValue,
     clearSelection,
     selectElement,
-  };
+  }), [
+    clearSelection,
+    commitTextValue,
+    editValue,
+    inspectorElement,
+    selectElement,
+    selectedElement,
+    selectedPageId,
+    selectedRuntimeText,
+    selectedSelector,
+    selectedText,
+    setStyleValue,
+    styleValues,
+  ]);
 }
