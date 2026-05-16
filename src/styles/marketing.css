@@ -127,6 +127,13 @@
   background: #fff;
 }
 
+.nav-auth-pending {
+  display: inline-flex;
+  width: 72px;
+  height: 34px;
+  border-radius: var(--radius-xs);
+}
+
 
 .site-footer {
   margin-top: 0;

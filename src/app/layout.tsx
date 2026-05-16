@@ -5,7 +5,6 @@ import "@/styles/ui.css";
 import "@/styles/workspace.css";
 import "@/styles/editor.css";
 import "@/styles/dashboard.css";
-import "@/styles/auth.css";
 import "@/styles/wizard.css";
 import "@/styles/marketing.css";
 import "@/styles/landing.css";

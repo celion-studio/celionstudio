@@ -3,9 +3,8 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { FiCreditCard, FiFileText, FiHome, FiSettings, FiTrash2 } from "react-icons/fi";
-import { authClient } from "@/lib/auth-client";
 
 export type SidebarItemKey = "home" | "projects" | "trash" | "settings";
 type SidebarIconName = SidebarItemKey | "billing";
@@ -116,6 +115,7 @@ export function WorkspaceSidebar({
             <Link
               key={item.key}
               href={item.href}
+              prefetch={false}
               className="workspace-sidebar-link"
               data-active={active ? "true" : "false"}
               onClick={onNavigate}
@@ -173,19 +173,6 @@ export function WorkspaceSidebar({
             {userEmail ?? ""}
           </p>
         </div>
-        {isSignedIn ? (
-          <button
-            onClick={() => {
-              void authClient.signOut().finally(() => {
-                window.location.replace("/");
-              });
-            }}
-            title="Sign out"
-            className="workspace-signout"
-          >
-            <LogOut size={13} strokeWidth={1.8} />
-          </button>
-        ) : null}
       </div>
     </aside>
   );

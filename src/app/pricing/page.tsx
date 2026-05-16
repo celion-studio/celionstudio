@@ -3,11 +3,7 @@ import Link from "next/link";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
 import { PricingPlanGrid } from "@/components/pricing/PricingPlanGrid";
-import { buildAuthHref } from "@/lib/auth-redirect";
 import { pricingFaqs, pricingIncluded } from "@/lib/pricing-plans";
-import { getPageSession } from "@/lib/session";
-
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Pricing | Celion",
@@ -16,17 +12,12 @@ export const metadata: Metadata = {
 };
 
 export default async function PricingPage() {
-  const session = await getPageSession();
-  const actionHref = (session?.user ? "/dashboard" : buildAuthHref("sign-in", "/dashboard")) as Route;
+  const actionHref = "/#preview" as Route;
 
   return (
     <div className="editorial-landing-page pricing-page">
       <div className="grain-overlay"></div>
-      <MarketingHeader
-        initialSignedIn={Boolean(session?.user)}
-        initialUserName={session?.user?.name ?? null}
-        initialUserEmail={session?.user?.email ?? null}
-      />
+      <MarketingHeader />
 
       <main className="pricing-main">
         <section className="pricing-hero">
@@ -88,7 +79,7 @@ export default async function PricingPage() {
         <section className="pricing-final">
           <div className="container pricing-container">
             <h2>Start with a source that deserves a better form.</h2>
-            <Link className="btn btn-dark" href={actionHref}>
+            <Link className="btn btn-dark" href={actionHref} prefetch={false}>
               Create an ebook
             </Link>
           </div>

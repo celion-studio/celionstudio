@@ -84,6 +84,7 @@ export function ProjectCard({
       {mode === "active" ? (
         <Link
           href={`/editor/${project.id}` as Route}
+          prefetch={false}
           className="project-link"
         >
           <ProjectCardPreview />

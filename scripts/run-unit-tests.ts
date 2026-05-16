@@ -4,6 +4,7 @@ import process from "node:process";
 const testFiles = [
   "src/lib/ai/json.test.ts",
   "src/lib/ai/gemini.test.ts",
+  "src/lib/auth-redirect.test.ts",
   "src/components/editor/export-cleanup.test.ts",
   "src/components/editor/editor-layout-chrome.test.ts",
   "src/components/editor/editor-preview.test.ts",

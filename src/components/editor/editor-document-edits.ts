@@ -1,4 +1,9 @@
 import type { CelionEditableElement, CelionEbookDocument } from "@/lib/ebook-document";
+import {
+  MAX_EBOOK_DOCUMENT_JSON_LENGTH,
+  MAX_EBOOK_PAGE_CSS_LENGTH,
+  MAX_EBOOK_PAGE_HTML_LENGTH,
+} from "@/lib/request-limits";
 import { getRuntimeTextElements, normalizeEditorHtml } from "./editor-preview";
 import {
   LAYOUT_PROPS,
@@ -322,6 +327,14 @@ export function insertImageIntoDocument(input: {
     ],
   };
   page.version += 1;
+
+  if (
+    page.html.length > MAX_EBOOK_PAGE_HTML_LENGTH ||
+    page.css.length > MAX_EBOOK_PAGE_CSS_LENGTH ||
+    JSON.stringify(nextDocument).length > MAX_EBOOK_DOCUMENT_JSON_LENGTH
+  ) {
+    return { ok: false, reason: "not-applicable" };
+  }
 
   return {
     ok: true,

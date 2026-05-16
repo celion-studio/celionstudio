@@ -79,7 +79,9 @@ const PAGE_HEIGHT: number = EBOOK_PAGE_SIZE_PX.height;
 const PAGE_GAP = 28;
 const EDITOR_TOP_RAIL_HEIGHT = 56;
 const EDITOR_EDGE_GAP = 16;
-const MAX_EDITOR_IMAGE_BYTES = 650_000;
+// Image data URLs are stored inside page HTML, so keep this below the save limit after base64 expansion.
+const MAX_EDITOR_IMAGE_BYTES = 48_000;
+const MAX_EDITOR_IMAGE_KILOBYTES = Math.floor(MAX_EDITOR_IMAGE_BYTES / 1_000);
 const SUPPORTED_EDITOR_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 type Props = {
@@ -784,7 +786,7 @@ export function EditorShell({
     }
 
     if (file.size > MAX_EDITOR_IMAGE_BYTES) {
-      setSaveError("Use an image under 650 KB for now.");
+      setSaveError(`Use an image under ${MAX_EDITOR_IMAGE_KILOBYTES} KB for now.`);
       return;
     }
 
@@ -809,7 +811,7 @@ export function EditorShell({
       alt: file.name.replace(/\.[a-z0-9]+$/i, ""),
     });
     if (!imageEdit.ok) {
-      setSaveError("Could not insert the image on this page.");
+      setSaveError(`Use a smaller image under ${MAX_EDITOR_IMAGE_KILOBYTES} KB that fits this page.`);
       return;
     }
 

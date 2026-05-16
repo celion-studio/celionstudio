@@ -205,7 +205,7 @@ export function DashboardHome({
       >
         <div className="dashboard-home-section-head">
           <h2>Recent projects</h2>
-          <Link href={"/dashboard?view=projects" as Route}>
+          <Link href={"/dashboard?view=projects" as Route} prefetch={false}>
             View all
             <DashboardHomeGlyph name="arrow" />
           </Link>
@@ -224,6 +224,7 @@ export function DashboardHome({
                 >
                   <Link
                     href={`/editor/${project.id}` as Route}
+                    prefetch={false}
                     className="dashboard-home-project"
                   >
                     <RecentProjectPreview />

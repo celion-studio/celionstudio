@@ -12,8 +12,6 @@ import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 import { useCreateProjectNavigation } from "@/components/dashboard/use-create-project-navigation";
 import { useDashboardBilling } from "@/components/dashboard/use-dashboard-billing";
 import { useDashboardProjects } from "@/components/dashboard/use-dashboard-projects";
-import { authClient } from "@/lib/auth-client";
-import { buildAuthHref, getSafeAuthNext } from "@/lib/auth-redirect";
 import { CelionButton } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
 import type { ProjectSummary } from "@/lib/projects";
@@ -81,15 +79,12 @@ export function DashboardShell({
     creatingProject,
     setCreateProjectError,
   } = useCreateProjectNavigation();
-  const hasVerifier = searchParams.has("neon_auth_session_verifier");
-  const authNext = getSafeAuthNext(searchParams.get("next"));
   const [billingOpen, setBillingOpen] = useState(initialBillingOpen);
   const billing = useDashboardBilling({ open: billingOpen, signedIn: isSignedIn });
   const dashboardProjects = useDashboardProjects({
     blankTitle: workspaceCopy.blankTitle,
     initialError: initialProjectsError,
     initialProjects,
-    loadingFromVerifier: hasVerifier,
     resetKey: activeItem,
   });
   const visibleError = dashboardProjects.error || createProjectError;
@@ -99,11 +94,6 @@ export function DashboardShell({
   const isHomeView = activeItem === "home";
   const isProjectsView = activeItem === "projects";
   const isTrashView = activeItem === "trash";
-  const stopProjectLoading = dashboardProjects.stopLoading;
-  const handleVerifierError = useCallback(() => {
-    stopProjectLoading();
-    window.location.replace(buildAuthHref("sign-in", authNext));
-  }, [authNext, stopProjectLoading]);
 
   const closeBilling = useCallback(() => {
     setBillingOpen(false);
@@ -115,39 +105,6 @@ export function DashboardShell({
   useEffect(() => {
     setBillingOpen(initialBillingOpen);
   }, [initialBillingOpen]);
-
-  useEffect(() => {
-    if (!hasVerifier) {
-      return;
-    }
-
-    let active = true;
-
-    async function finalizeSignIn() {
-      try {
-        const result = await authClient.getSession();
-        if (!active) return;
-
-        if (result?.error) {
-          handleVerifierError();
-          return;
-        }
-
-        window.location.replace(authNext);
-      } catch (err) {
-        console.error("Session verification failed", err);
-        if (active) {
-          handleVerifierError();
-        }
-      }
-    }
-
-    void finalizeSignIn();
-
-    return () => {
-      active = false;
-    };
-  }, [authNext, handleVerifierError, hasVerifier]);
 
   async function handleCreateProject() {
     dashboardProjects.clearError();

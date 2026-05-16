@@ -309,6 +309,20 @@ test("insertImageIntoDocument rejects non-image sources", () => {
   assert.equal(result.reason, "not-applicable");
 });
 
+test("insertImageIntoDocument rejects images that would exceed save payload limits", () => {
+  const result = insertImageIntoDocument({
+    document: baseDocument,
+    pageIndex: 0,
+    src: `data:image/png;base64,${"a".repeat(100_000)}`,
+    alt: "Oversized image",
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.reason, "not-applicable");
+  assert.doesNotMatch(baseDocument.pages[0]!.html, /cover-image-001/);
+});
+
 test("appendScopedStyleToDocument keeps style changes scoped to the selected page", () => {
   const result = appendScopedStyleToDocument({
     document: baseDocument,

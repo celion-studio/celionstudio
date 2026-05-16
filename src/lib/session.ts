@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth, isAuthConfigured } from "@/lib/auth";
 
 type ServerSession = {
   session: unknown;
@@ -31,7 +31,7 @@ function sessionErrorMessage(error: unknown) {
 }
 
 async function fetchCurrentSession(): Promise<ServerSession | null> {
-  if (!auth) return null;
+  if (!isAuthConfigured || !auth) return null;
 
   try {
     return normalizeSession((await auth.getSession()) as AuthSessionResult);

@@ -60,7 +60,7 @@ export function EditorTopBar({
       } as CSSProperties}
     >
       <div className="editor-topbar-left">
-        <Link href="/dashboard" className="editor-back-link">
+        <Link href="/dashboard" prefetch={false} className="editor-back-link">
           <ArrowLeft size={14} />
           Back
         </Link>

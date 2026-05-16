@@ -1,31 +1,36 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildAuthHref } from "@/lib/auth-redirect";
+import { auth, isAuthConfigured } from "@/lib/auth";
+import { NEON_AUTH_VERIFIER_PARAM } from "@/lib/auth-redirect";
 
-const NEON_SESSION_COOKIE = "__Secure-neon-auth.session_token";
-const NEON_VERIFIER_PARAM = "neon_auth_session_verifier";
-
-function isProtectedPath(pathname: string) {
-  return pathname === "/dashboard" || pathname.startsWith("/dashboard/") || pathname.startsWith("/editor/");
-}
-
-function hasSessionCookie(request: NextRequest) {
-  return request.cookies.has(NEON_SESSION_COOKIE);
-}
+const authMiddleware = auth?.middleware({ loginUrl: "/auth" });
 
 function buildNextPath(request: NextRequest) {
-  return `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const params = new URLSearchParams(request.nextUrl.searchParams);
+  params.delete(NEON_AUTH_VERIFIER_PARAM);
+
+  const query = params.toString();
+  return `${request.nextUrl.pathname}${query ? `?${query}` : ""}`;
 }
 
-export function proxy(request: NextRequest) {
-  if (!isProtectedPath(request.nextUrl.pathname)) {
-    return NextResponse.next();
-  }
+function redirectHome(request: NextRequest) {
+  return NextResponse.redirect(new URL("/", request.url));
+}
 
-  if (request.nextUrl.searchParams.has(NEON_VERIFIER_PARAM) || hasSessionCookie(request)) {
-    return NextResponse.next();
-  }
+function normalizeLoginRedirect(request: NextRequest, response: NextResponse) {
+  const location = response.headers.get("location");
+  if (!location) return response;
 
-  return NextResponse.redirect(new URL(buildAuthHref("sign-in", buildNextPath(request)), request.url));
+  const locationUrl = new URL(location, request.url);
+  if (locationUrl.pathname !== "/auth") return response;
+
+  response.headers.set("location", "/");
+  return response;
+}
+
+export async function proxy(request: NextRequest) {
+  if (!isAuthConfigured || !authMiddleware) return redirectHome(request);
+
+  return normalizeLoginRedirect(request, await authMiddleware(request));
 }
 
 export const config = {

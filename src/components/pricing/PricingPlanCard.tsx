@@ -79,7 +79,7 @@ export function PricingPlanCard({
           <ArrowRight size={14} aria-hidden="true" />
         </button>
       ) : (
-        <Link className="pricing-card-cta" href={actionHref}>
+        <Link className="pricing-card-cta" href={actionHref} prefetch={false}>
           {plan.key === "starter" ? "Start free" : "Create an ebook"}
           <ArrowRight size={14} aria-hidden="true" />
         </Link>

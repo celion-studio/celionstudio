@@ -2,24 +2,10 @@
 
 import type { Route } from 'next';
 import Link from 'next/link';
-import { buildAuthHref } from '@/lib/auth-redirect';
 import { MarketingFooter } from '@/components/marketing/MarketingFooter';
 import { MarketingHeader } from '@/components/marketing/MarketingHeader';
 
-type HeroProps = {
-  initialSignedIn: boolean;
-  initialUserName: string | null;
-  initialUserEmail: string | null;
-};
-
-export function Hero({
-  initialSignedIn,
-  initialUserName,
-  initialUserEmail,
-}: HeroProps) {
-  const isResolvedSignedIn = initialSignedIn;
-  const createEbookHref = buildAuthHref("sign-in", "/dashboard") as Route;
-  const workspaceHref = "/dashboard" as Route;
+export function Hero() {
   const pricingHref = "/pricing" as Route;
 
   return (
@@ -27,11 +13,7 @@ export function Hero({
       {/* Background grain */}
       <div className="grain-overlay"></div>
 
-      <MarketingHeader
-        initialSignedIn={initialSignedIn}
-        initialUserName={initialUserName}
-        initialUserEmail={initialUserEmail}
-      />
+      <MarketingHeader />
 
       <main>
         <section className="hero">
@@ -51,15 +33,9 @@ export function Hero({
                 Bring notes, research, or source material. Celion turns it into editable ebook pages you can refine, export, and share.
               </p>
               <div className="hero-actions fade-up">
-                {isResolvedSignedIn ? (
-                  <Link href={workspaceHref} className="btn btn-dark hero-cta-primary">
-                    Go to workspace
-                  </Link>
-                ) : (
-                  <Link href={createEbookHref} prefetch={false} className="btn btn-dark hero-cta-primary">
-                    Start creating
-                  </Link>
-                )}
+                <a href="#preview" className="btn btn-dark hero-cta-primary">
+                  Start creating
+                </a>
                 <Link href={pricingHref} className="btn btn-light hero-cta-secondary">
                   View pricing
                 </Link>
@@ -337,11 +313,7 @@ export function Hero({
                 <p>Turn it into an editable ebook draft.</p>
               </div>
               <div className="cta-buttons">
-                {isResolvedSignedIn ? (
-                  <Link href={workspaceHref} className="btn btn-dark">Go to workspace</Link>
-                ) : (
-                  <Link href={createEbookHref} prefetch={false} className="btn btn-dark">Start creating</Link>
-                )}
+                <a href="#preview" className="btn btn-dark">Start creating</a>
               </div>
             </div>
           </div>

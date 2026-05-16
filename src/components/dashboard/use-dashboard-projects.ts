@@ -7,7 +7,6 @@ type UseDashboardProjectsInput = {
   blankTitle: string;
   initialError: string;
   initialProjects: ProjectSummary[];
-  loadingFromVerifier: boolean;
   resetKey: string;
 };
 
@@ -20,23 +19,19 @@ export function useDashboardProjects({
   blankTitle,
   initialError,
   initialProjects,
-  loadingFromVerifier,
   resetKey,
 }: UseDashboardProjectsInput) {
   const [projects, setProjects] = useState<ProjectSummary[]>(initialProjects);
-  const [loading, setLoading] = useState(loadingFromVerifier);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(initialError);
   const [processingProjectId, setProcessingProjectId] = useState("");
-  const stopLoading = useCallback(() => {
-    setLoading(false);
-  }, []);
 
   useEffect(() => {
     setProjects(initialProjects);
     setError(initialError);
     setProcessingProjectId("");
-    setLoading(loadingFromVerifier);
-  }, [initialError, initialProjects, loadingFromVerifier, resetKey]);
+    setLoading(false);
+  }, [initialError, initialProjects, resetKey]);
 
   const deleteProject = useCallback(async (project: ProjectSummary) => {
     const label = project.title || blankTitle;
@@ -124,6 +119,5 @@ export function useDashboardProjects({
     processingProjectId,
     projects,
     restoreProject,
-    stopLoading,
   };
 }

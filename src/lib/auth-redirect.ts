@@ -1,4 +1,4 @@
-export type AuthMode = "sign-in" | "sign-up";
+export const NEON_AUTH_VERIFIER_PARAM = "neon_auth_session_verifier";
 
 export function getSafeAuthNext(value: string | null | undefined, fallback = "/dashboard") {
   const next = value?.trim();
@@ -16,25 +16,4 @@ export function getSafeAuthNext(value: string | null | undefined, fallback = "/d
   }
 
   return next;
-}
-
-export function buildAuthHref(mode: AuthMode, next?: string) {
-  const params = new URLSearchParams({ mode });
-  const safeNext = getSafeAuthNext(next, "");
-
-  if (safeNext) {
-    params.set("next", safeNext);
-  }
-
-  return `/auth?${params.toString()}`;
-}
-
-export function buildDashboardCallbackUrl(next?: string) {
-  const safeNext = getSafeAuthNext(next, "");
-
-  if (!safeNext || safeNext === "/dashboard") {
-    return "/dashboard";
-  }
-
-  return `/dashboard?next=${encodeURIComponent(safeNext)}`;
 }
