@@ -13,6 +13,8 @@ type PricingPlanCardProps = {
   checkoutPendingPlan: PaidBillingPlanId | "";
   currentPlan: BillingPlanId;
   plan: PricingPlan;
+  portalAvailable?: boolean;
+  signedIn?: boolean | null;
   onCheckout?: (plan: PaidBillingPlanId) => void;
 };
 
@@ -27,10 +29,13 @@ export function PricingPlanCard({
   checkoutPendingPlan,
   currentPlan,
   plan,
+  portalAvailable,
+  signedIn,
   onCheckout,
 }: PricingPlanCardProps) {
   const paidPlan = paidPlanKey(plan.key);
-  const isCurrentPlan = plan.key === currentPlan;
+  const isSignedIn = signedIn === true;
+  const isCurrentPlan = isSignedIn && plan.key === currentPlan;
   const isPending = checkoutPendingPlan === plan.key;
   const usesCheckout = Boolean(onCheckout) && Boolean(paidPlan);
   const price = billingCycle === "annual" ? plan.annualPrice : plan.price;
@@ -64,10 +69,17 @@ export function PricingPlanCard({
       </ul>
 
       {isCurrentPlan ? (
-        <button className="pricing-card-cta" type="button" disabled>
-          Current plan
-          <ArrowRight size={14} aria-hidden="true" />
-        </button>
+        portalAvailable ? (
+          <Link className="pricing-card-cta" href="/api/billing/portal" prefetch={false}>
+            Manage subscription
+            <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        ) : (
+          <button className="pricing-card-cta" type="button" disabled>
+            Current plan
+            <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        )
       ) : usesCheckout && paidPlan ? (
         <button
           className="pricing-card-cta"

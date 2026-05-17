@@ -6,9 +6,11 @@ type ServerSession = {
     id: string;
     name?: string | null;
     email?: string | null;
+    image?: string | null;
   };
 };
 
+// auth.getSession() returns Better Auth shape: { data: ServerSession | null }
 type AuthSessionResult = {
   data?: ServerSession | null;
 };
@@ -17,7 +19,6 @@ export async function getRouteSession(): Promise<ServerSession | null> {
   return fetchCurrentSession();
 }
 
-// Pages that read sessions should remain dynamic because session state depends on cookies.
 export async function getPageSession(): Promise<ServerSession | null> {
   return fetchCurrentSession();
 }
@@ -36,7 +37,9 @@ async function fetchCurrentSession(): Promise<ServerSession | null> {
   try {
     return normalizeSession((await auth.getSession()) as AuthSessionResult);
   } catch (error) {
-    console.warn(`[auth] session_fetch_failed ${JSON.stringify({ message: sessionErrorMessage(error) })}`);
+    console.warn(
+      `[auth] session_fetch_failed ${JSON.stringify({ message: sessionErrorMessage(error) })}`,
+    );
     return null;
   }
 }

@@ -5,6 +5,7 @@ import { getRouteSession } from "@/lib/session";
 
 const checkoutSchema = z.object({
   plan: z.enum(PAID_BILLING_PLAN_IDS),
+  billingCycle: z.enum(["monthly", "annual"]).optional(),
 });
 
 function requestOrigin(request: Request) {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
   try {
     const checkout = await createBillingCheckout({
       plan: parsed.data.plan,
+      billingCycle: parsed.data.billingCycle,
       user: session.user,
       origin: requestOrigin(request),
     });

@@ -5,7 +5,7 @@ import { getRouteSession } from "@/lib/session";
 
 function appReturnUrl(request: NextRequest) {
   const baseUrl = (process.env.APP_URL || request.nextUrl.origin).replace(/\/$/, "");
-  return `${baseUrl}/dashboard?view=billing`;
+  return `${baseUrl}/pricing`;
 }
 
 async function getCustomerIdForUser(userId: string) {

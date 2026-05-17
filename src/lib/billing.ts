@@ -43,6 +43,7 @@ export type BillingState = {
 
 export type CheckoutRequestInput = {
   plan: PaidBillingPlanId;
+  billingCycle?: "monthly" | "annual";
   user: {
     id: string;
     email?: string | null;
@@ -250,11 +251,12 @@ export async function createBillingCheckout(
     externalCustomerId: input.user.id,
     customerEmail: input.user.email ?? undefined,
     customerName: input.user.name ?? undefined,
-    successUrl: `${baseUrl}/dashboard?view=billing&checkout=success`,
-    returnUrl: `${baseUrl}/dashboard?view=billing`,
+    successUrl: `${baseUrl}/pricing?checkout=success`,
+    returnUrl: `${baseUrl}/pricing`,
     metadata: {
       celionUserId: input.user.id,
       plan: input.plan,
+      ...(input.billingCycle ? { billingCycle: input.billingCycle } : {}),
     },
   });
 

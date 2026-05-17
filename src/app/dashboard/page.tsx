@@ -28,12 +28,15 @@ function getDashboardView(
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const view = getDashboardView(resolvedSearchParams);
-  const initialBillingOpen = resolvedSearchParams.view === "billing";
   const session = await getPageSession();
   let initialProjects: ProjectSummary[] = [];
   let initialProjectsError = "";
 
-  if (!session?.user?.id) {
+  // OAuth callback in progress — let the client SDK handle the verifier.
+  // Do not redirect; the client component will establish the session.
+  const isOAuthCallback = typeof resolvedSearchParams[NEON_AUTH_VERIFIER_PARAM] === "string";
+
+  if (!session?.user?.id && !isOAuthCallback) {
     redirect("/");
   }
 
@@ -45,7 +48,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     redirect(authNext as Route);
   }
 
-  if (!initialBillingOpen) {
+  // Only query projects when we have a user id (skip during OAuth callback).
+  if (session?.user?.id) {
     try {
       if (view === "home" || view === "projects") {
         initialProjects = await listProjectSummariesForUser(session.user.id);
@@ -69,7 +73,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       initialProjects={initialProjects}
       initialProjectsError={initialProjectsError}
       activeItem={view}
-      initialBillingOpen={initialBillingOpen}
     />
   );
 }

@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import type { ProjectRecord, ProjectStatus } from "@/types/project";
+import { OAuthCallbackHandler } from "@/components/auth/OAuthCallbackHandler";
 import { WizardContent } from "@/components/wizard/WizardContent";
 import { EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
 import { countCelionSlides } from "@/lib/ebook-html";
@@ -983,6 +984,7 @@ export function EditorShell({
   return (
     <MotionConfig reducedMotion="user">
       <div className="editor-shell" style={editorShellStyle}>
+      <OAuthCallbackHandler />
       <input
         ref={imageInputRef}
         type="file"

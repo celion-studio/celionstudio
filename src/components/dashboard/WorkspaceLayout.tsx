@@ -11,26 +11,22 @@ import {
 
 type WorkspaceLayoutProps = {
   activeItem: SidebarItemKey;
-  billingOpen?: boolean;
   isSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
   breadcrumbCurrent: string;
   breadcrumbRoot?: string;
-  onBillingClick?: () => void;
   primaryAction?: ComponentProps<typeof WorkspaceSidebar>["primaryAction"];
   children: ReactNode;
 };
 
 export function WorkspaceLayout({
   activeItem,
-  billingOpen = false,
   isSignedIn,
   initialUserName,
   initialUserEmail,
   breadcrumbCurrent,
   breadcrumbRoot = "Workspace",
-  onBillingClick,
   primaryAction = null,
   children,
 }: WorkspaceLayoutProps) {
@@ -90,11 +86,9 @@ export function WorkspaceLayout({
 
       <WorkspaceSidebar
         activeItem={activeItem}
-        billingOpen={billingOpen}
         isSignedIn={isSignedIn}
         initialUserName={initialUserName}
         initialUserEmail={initialUserEmail}
-        onBillingClick={onBillingClick}
         onNavigate={() => setMobileMenuOpen(false)}
         primaryAction={primaryAction}
       />

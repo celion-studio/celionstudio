@@ -1,9 +1,10 @@
-import type { Metadata, Route } from "next";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
-import { PricingPlanGrid } from "@/components/pricing/PricingPlanGrid";
+import { PricingPageClient } from "@/components/pricing/PricingPageClient";
 import { pricingFaqs, pricingIncluded } from "@/lib/pricing-plans";
+import { getPageSession } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: "Pricing | Celion",
@@ -12,12 +13,18 @@ export const metadata: Metadata = {
 };
 
 export default async function PricingPage() {
-  const actionHref = "/#preview" as Route;
+  const session = await getPageSession();
+  const user = session?.user
+    ? {
+        name: session.user.name ?? null,
+        email: session.user.email ?? null,
+        image: session.user.image ?? null,
+      }
+    : null;
 
   return (
     <div className="editorial-landing-page pricing-page">
-      <div className="grain-overlay"></div>
-      <MarketingHeader />
+      <MarketingHeader user={user} />
 
       <main className="pricing-main">
         <section className="pricing-hero">
@@ -38,7 +45,7 @@ export default async function PricingPage() {
 
         <section className="pricing-plans">
           <div className="container pricing-container">
-            <PricingPlanGrid actionHref={actionHref} />
+            <PricingPageClient />
           </div>
         </section>
 
@@ -79,8 +86,12 @@ export default async function PricingPage() {
         <section className="pricing-final">
           <div className="container pricing-container">
             <h2>Start with a source that deserves a better form.</h2>
-            <Link className="btn btn-dark" href={actionHref} prefetch={false}>
-              Create an ebook
+            <Link
+              className="btn btn-dark"
+              href={session?.user ? "/dashboard" : "/auth?mode=sign-up"}
+              prefetch={false}
+            >
+              {session?.user ? "Create an ebook" : "Sign up free"}
             </Link>
           </div>
         </section>

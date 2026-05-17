@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Settings } from "lucide-react";
+import { BookOpen, LogOut, Settings } from "lucide-react";
+import { signOut } from "@/app/auth/actions";
 
 type SettingsPanelProps = {
   userEmail: string | null;
@@ -38,6 +39,23 @@ export function SettingsPanel({ userEmail, userName }: SettingsPanelProps) {
           <p className="dashboard-muted-note">
             Default ebook style, brand kit, and export preferences can live here as the product grows.
           </p>
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="dashboard-section-icon">
+          <LogOut size={15} strokeWidth={1.8} />
+        </div>
+        <div>
+          <h2>Sign out</h2>
+          <p className="dashboard-muted-note">
+            Sign out of your Celion account.
+          </p>
+          <form action={signOut}>
+            <button type="submit" className="btn btn-light" style={{ marginTop: "12px" }}>
+              Sign out
+            </button>
+          </form>
         </div>
       </section>
     </div>

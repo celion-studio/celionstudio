@@ -489,21 +489,20 @@
 
 
 .workspace-signout {
-
   align-items: center;
-
   background: none;
-
   border: none;
-
-  color: var(--celion-muted-soft);
-
+  color: var(--color-muted-soft, #a9afb7);
   cursor: pointer;
-
   display: flex;
-
   padding: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
 
+.workspace-signout:hover {
+  color: var(--color-ink, #24272c);
+  background: var(--color-surface-subtle, #f4f5f6);
 }
 
 .workspace-mobile-header,

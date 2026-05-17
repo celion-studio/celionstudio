@@ -3,19 +3,18 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
-import { FiCreditCard, FiFileText, FiHome, FiSettings, FiTrash2 } from "react-icons/fi";
+import { LogOut, Plus } from "lucide-react";
+import { FiFileText, FiHome, FiSettings, FiTrash2 } from "react-icons/fi";
+import { signOut } from "@/app/auth/actions";
 
 export type SidebarItemKey = "home" | "projects" | "trash" | "settings";
-type SidebarIconName = SidebarItemKey | "billing";
+type SidebarIconName = SidebarItemKey;
 
 type WorkspaceSidebarProps = {
   activeItem: SidebarItemKey;
-  billingOpen?: boolean;
   isSignedIn: boolean;
   initialUserName: string | null;
   initialUserEmail: string | null;
-  onBillingClick?: () => void;
   onNavigate?: () => void;
   primaryAction?: {
     href: Route;
@@ -42,7 +41,6 @@ export const WORKSPACE_EDGE_GAP = 16;
 
 function WorkspaceSidebarGlyph({ name }: { name: SidebarIconName }) {
   const icons = {
-    billing: FiCreditCard,
     home: FiHome,
     projects: FiFileText,
     settings: FiSettings,
@@ -62,11 +60,9 @@ function WorkspaceSidebarGlyph({ name }: { name: SidebarIconName }) {
 
 export function WorkspaceSidebar({
   activeItem,
-  billingOpen = false,
   isSignedIn,
   initialUserName,
   initialUserEmail,
-  onBillingClick,
   onNavigate,
   primaryAction = null,
 }: WorkspaceSidebarProps) {
@@ -109,7 +105,7 @@ export function WorkspaceSidebar({
 
       <nav className="workspace-sidebar-nav">
         {NAV_ITEMS.map((item) => {
-          const active = !billingOpen && item.key === activeItem;
+          const active = item.key === activeItem;
 
           return (
             <Link
@@ -125,19 +121,6 @@ export function WorkspaceSidebar({
             </Link>
           );
         })}
-
-        <button
-          type="button"
-          className="workspace-sidebar-link workspace-sidebar-button"
-          data-active={billingOpen ? "true" : "false"}
-          onClick={() => {
-            onBillingClick?.();
-            onNavigate?.();
-          }}
-        >
-          <WorkspaceSidebarGlyph name="billing" />
-          Billing
-        </button>
       </nav>
 
       {primaryAction ? (
@@ -173,6 +156,11 @@ export function WorkspaceSidebar({
             {userEmail ?? ""}
           </p>
         </div>
+        <form action={signOut}>
+          <button type="submit" className="workspace-signout" title="Sign out" aria-label="Sign out">
+            <LogOut size={13} strokeWidth={1.8} />
+          </button>
+        </form>
       </div>
     </aside>
   );

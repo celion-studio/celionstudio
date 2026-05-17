@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { FiArrowUpRight, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import { CelionDocumentPreview } from "@/components/ui/CelionDocumentPreview";
+import { FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { CelionButton, CelionIconButton } from "@/components/ui/celion-controls";
 import type { ProjectSummary } from "@/lib/projects";
 
@@ -28,24 +27,33 @@ function formatProjectDate(value: string) {
   return `${day} ${month} ${year}`;
 }
 
-function ProjectCardGlyph({ name }: { name: "open" | "restore" | "delete" }) {
+const CARD_COLORS = [
+  { bg: "#1a1f2e" },
+  { bg: "#2d2f33" },
+  { bg: "#3d2e4a" },
+  { bg: "#2e4a3a" },
+  { bg: "#4a3728" },
+  { bg: "#1a2e3a" },
+  { bg: "#3a2e3a" },
+  { bg: "#2e3a3a" },
+];
+
+function getProjectColor(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return CARD_COLORS[Math.abs(hash) % CARD_COLORS.length];
+}
+
+function ProjectCardGlyph({ name }: { name: "restore" | "delete" }) {
   const icons = {
     delete: FiTrash2,
-    open: FiArrowUpRight,
     restore: FiRefreshCw,
   };
   const Icon = icons[name];
 
   return <Icon aria-hidden="true" size={13} strokeWidth={1.8} />;
-}
-
-function ProjectCardPreview() {
-  return (
-    <CelionDocumentPreview
-      className="project-card-preview"
-      showLeadingIcon
-    />
-  );
 }
 
 export function ProjectCard({
@@ -75,6 +83,38 @@ export function ProjectCard({
     </CelionIconButton>
   ) : null;
 
+  const cardHead = (
+    <div className="project-card-head">
+      <svg
+        width="36"
+        height="36"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="project-card-head-mark"
+      >
+        <path d="M12 4v16M4 12h16M6.34 6.34l11.32 11.32M6.34 17.66l11.32-11.32" />
+      </svg>
+    </div>
+  );
+
+  const cardBody = (
+    <div className="project-card-body">
+      <p className="project-title">{title}</p>
+      {displayDate ? (
+        <time
+          dateTime={mode === "active" ? project.updatedAt : (project.deletedAt ?? project.updatedAt)}
+          className="project-date"
+        >
+          {mode === "trash" ? `Deleted ${displayDate}` : displayDate}
+        </time>
+      ) : null}
+    </div>
+  );
+
   return (
     <article
       className="project-card"
@@ -87,32 +127,13 @@ export function ProjectCard({
           prefetch={false}
           className="project-link"
         >
-          <ProjectCardPreview />
-          <div className="project-card-body">
-            {displayDate ? (
-              <time dateTime={project.updatedAt} className="project-date">
-                {displayDate}
-              </time>
-            ) : null}
-            <p className="project-title">{title}</p>
-          </div>
-
-          <div className="project-action">
-            <span className="project-action-text">Open</span>
-            <ProjectCardGlyph name="open" />
-          </div>
+          {cardHead}
+          {cardBody}
         </Link>
       ) : (
         <>
-          <ProjectCardPreview />
-          <div className="project-card-body">
-            {displayDate ? (
-              <time dateTime={project.deletedAt ?? project.updatedAt} className="project-date">
-                Deleted {displayDate}
-              </time>
-            ) : null}
-            <p className="project-title">{title}</p>
-          </div>
+          {cardHead}
+          {cardBody}
         </>
       )}
 

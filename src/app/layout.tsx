@@ -9,6 +9,7 @@ import "@/styles/wizard.css";
 import "@/styles/marketing.css";
 import "@/styles/landing.css";
 import "@/styles/pricing.css";
+import "@/styles/auth.css";
 
 const geist = Geist({
   subsets: ["latin"],

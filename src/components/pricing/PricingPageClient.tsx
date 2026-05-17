@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { PricingPlanGrid } from "@/components/pricing/PricingPlanGrid";
+import { CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { BillingState, PaidBillingPlanId } from "@/lib/billing";
 import type { BillingCycle } from "@/lib/pricing-plans";
 
@@ -13,23 +16,16 @@ const defaultBillingState: BillingState = {
   configured: true,
 };
 
-type UseDashboardBillingInput = {
-  open: boolean;
-  signedIn: boolean;
-};
-
-export function useDashboardBilling({ open, signedIn }: UseDashboardBillingInput) {
+export function PricingPageClient() {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [billingState, setBillingState] = useState<BillingState>(defaultBillingState);
-  const [billingStateLoaded, setBillingStateLoaded] = useState(false);
+  const [billingLoaded, setBillingLoaded] = useState(false);
   const [billingError, setBillingError] = useState("");
   const [checkoutPendingPlan, setCheckoutPendingPlan] = useState<PaidBillingPlanId | "">("");
-  const [portalPending, setPortalPending] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!open || !signedIn || billingStateLoaded) {
-      return;
-    }
+    if (billingLoaded) return;
 
     let active = true;
     setBillingError("");
@@ -42,16 +38,24 @@ export function useDashboardBilling({ open, signedIn }: UseDashboardBillingInput
           | null;
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Not signed in — show all cards with sign-up CTAs
+            setSignedIn(false);
+            setBillingLoaded(true);
+            return;
+          }
           throw new Error(payload?.message ?? "Could not load billing state.");
         }
 
         if (active && payload?.billing) {
           setBillingState(payload.billing);
-          setBillingStateLoaded(true);
+          setSignedIn(true);
+          setBillingLoaded(true);
         }
       } catch (caught) {
         if (active) {
           setBillingError(caught instanceof Error ? caught.message : "Could not load billing state.");
+          setBillingLoaded(true);
         }
       }
     }
@@ -61,7 +65,7 @@ export function useDashboardBilling({ open, signedIn }: UseDashboardBillingInput
     return () => {
       active = false;
     };
-  }, [billingStateLoaded, open, signedIn]);
+  }, [billingLoaded]);
 
   const startCheckout = useCallback(async (plan: PaidBillingPlanId) => {
     setBillingError("");
@@ -72,65 +76,57 @@ export function useDashboardBilling({ open, signedIn }: UseDashboardBillingInput
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, billingCycle }),
       });
       const payload = (await response.json().catch(() => null)) as
         | { url?: string; message?: string }
         | null;
 
       if (!response.ok || !payload?.url) {
-        throw new Error(payload?.message ?? "Could not create checkout.");
+        throw new Error(payload?.message ?? "Could not create checkout session.");
       }
 
-      window.location.assign(payload.url);
+      window.location.href = payload.url;
     } catch (caught) {
-      setBillingError(caught instanceof Error ? caught.message : "Could not create checkout.");
+      setBillingError(caught instanceof Error ? caught.message : "Could not start checkout.");
       setCheckoutPendingPlan("");
     }
-  }, []);
+  }, [billingCycle]);
 
-  const openPortal = useCallback(async () => {
-    setBillingError("");
-    setPortalPending(true);
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <div className="pricing-cycle-toggle">
+        <CelionSegmentedControl
+          ariaLabel="Billing cycle"
+          options={[
+            { value: "monthly", label: "Monthly" },
+            { value: "annual", label: "Annual" },
+          ]}
+          value={billingCycle}
+          onChange={(value) => setBillingCycle(value as BillingCycle)}
+        />
+      </div>
 
-    try {
-      const response = await fetch("/api/billing/portal", {
-        method: "GET",
-        cache: "no-store",
-        redirect: "manual",
-      });
+      {billingError ? (
+        <div className="pricing-billing-error">
+          <p>{billingError}</p>
+        </div>
+      ) : null}
 
-      if (response.type === "opaqueredirect" || response.status === 0) {
-        window.location.assign("/api/billing/portal");
-        return;
-      }
-
-      if (response.redirected) {
-        window.location.assign(response.url);
-        return;
-      }
-
-      if (response.ok && response.url && !response.url.includes("/api/billing/portal")) {
-        window.location.assign(response.url);
-        return;
-      }
-
-      const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-      throw new Error(payload?.message ?? "Could not open billing portal.");
-    } catch (caught) {
-      setBillingError(caught instanceof Error ? caught.message : "Could not open billing portal.");
-      setPortalPending(false);
-    }
-  }, []);
-
-  return {
-    billingCycle,
-    billingError,
-    billingState,
-    checkoutPendingPlan,
-    portalPending,
-    setBillingCycle,
-    startCheckout,
-    openPortal,
-  };
+      <PricingPlanGrid
+        actionHref="/auth?mode=sign-up"
+        billingCycle={billingCycle}
+        billingConfigured={billingState.configured}
+        checkoutPendingPlan={checkoutPendingPlan}
+        currentPlan={billingState.activePlan}
+        portalAvailable={billingState.portalAvailable}
+        signedIn={signedIn}
+        onCheckout={signedIn ? startCheckout : undefined}
+      />
+    </motion.div>
+  );
 }

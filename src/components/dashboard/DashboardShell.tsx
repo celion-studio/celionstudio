@@ -1,20 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { FileText, Trash2 } from "lucide-react";
-import { BillingDialog } from "@/components/dashboard/BillingDialog";
 import { DashboardEmptyState } from "@/components/dashboard/DashboardEmptyState";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { ProjectList } from "@/components/dashboard/ProjectList";
 import { SettingsPanel } from "@/components/dashboard/SettingsPanel";
 import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 import { useCreateProjectNavigation } from "@/components/dashboard/use-create-project-navigation";
-import { useDashboardBilling } from "@/components/dashboard/use-dashboard-billing";
 import { useDashboardProjects } from "@/components/dashboard/use-dashboard-projects";
 import { CelionButton } from "@/components/ui/celion-controls";
 import type { SidebarItemKey } from "@/components/dashboard/WorkspaceSidebar";
 import type { ProjectSummary } from "@/lib/projects";
+import { OAuthCallbackHandler } from "@/components/auth/OAuthCallbackHandler";
 
 type DashboardShellProps = {
   isSignedIn: boolean;
@@ -23,7 +21,6 @@ type DashboardShellProps = {
   initialProjects: ProjectSummary[];
   initialProjectsError?: string;
   activeItem?: SidebarItemKey;
-  initialBillingOpen?: boolean;
 };
 
 const workspaceCopy = {
@@ -69,18 +66,13 @@ export function DashboardShell({
   initialProjects,
   initialProjectsError = "",
   activeItem = "projects",
-  initialBillingOpen = false,
 }: DashboardShellProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const {
     createAndOpenProject,
     createProjectError,
     creatingProject,
     setCreateProjectError,
   } = useCreateProjectNavigation();
-  const [billingOpen, setBillingOpen] = useState(initialBillingOpen);
-  const billing = useDashboardBilling({ open: billingOpen, signedIn: isSignedIn });
   const dashboardProjects = useDashboardProjects({
     blankTitle: workspaceCopy.blankTitle,
     initialError: initialProjectsError,
@@ -95,17 +87,6 @@ export function DashboardShell({
   const isProjectsView = activeItem === "projects";
   const isTrashView = activeItem === "trash";
 
-  const closeBilling = useCallback(() => {
-    setBillingOpen(false);
-    if (searchParams.get("view") === "billing") {
-      router.replace("/dashboard");
-    }
-  }, [router, searchParams]);
-
-  useEffect(() => {
-    setBillingOpen(initialBillingOpen);
-  }, [initialBillingOpen]);
-
   async function handleCreateProject() {
     dashboardProjects.clearError();
     setCreateProjectError("");
@@ -113,14 +94,14 @@ export function DashboardShell({
   }
 
   return (
-    <WorkspaceLayout
+    <>
+      <OAuthCallbackHandler />
+      <WorkspaceLayout
       activeItem={activeItem}
-      billingOpen={billingOpen}
       isSignedIn={isSignedIn}
       initialUserName={initialUserName}
       initialUserEmail={initialUserEmail}
       breadcrumbCurrent={currentView.breadcrumbCurrent}
-      onBillingClick={() => setBillingOpen(true)}
     >
       {!isHomeView ? (
         <div className="dashboard-head">
@@ -221,18 +202,7 @@ export function DashboardShell({
         />
       ) : null}
 
-      <BillingDialog
-        billingCycle={billing.billingCycle}
-        billingError={billing.billingError}
-        billingState={billing.billingState}
-        checkoutPendingPlan={billing.checkoutPendingPlan}
-        open={billingOpen}
-        portalPending={billing.portalPending}
-        onBillingCycleChange={billing.setBillingCycle}
-        onCheckout={billing.startCheckout}
-        onClose={closeBilling}
-        onOpenPortal={billing.openPortal}
-      />
     </WorkspaceLayout>
+    </>
   );
 }
