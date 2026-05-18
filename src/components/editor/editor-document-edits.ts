@@ -1,4 +1,4 @@
-import type { CelionEditableElement, CelionEbookDocument } from "@/lib/ebook-document";
+import type { CelionEditableElement, CelionSlideDocument } from "@/lib/slide-document";
 import {
   MAX_EBOOK_DOCUMENT_JSON_LENGTH,
   MAX_EBOOK_PAGE_CSS_LENGTH,

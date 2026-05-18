@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileEbookDocumentToHtml, insertSlide, sanitizeEbookDocument, type CelionEbookDocument, validateEbookDocument } from "./ebook-document";
+import { compileSlideDocumentToHtml, insertSlide, sanitizeSlideDocument, type CelionSlideDocument, validateSlideDocument } from "./ebook-document";
 import { validateCelionSlideHtml } from "./ebook-html";
 
 const validDocument: CelionEbookDocument = {
   version: 1,
   title: "TOEFL Reading Guide",
   size: { width: 559, height: 794, unit: "px" },
+  format: "a5_portrait",
   themeCss: "",
   slides: [
     {
@@ -57,7 +58,7 @@ const validDocument: CelionEbookDocument = {
 };
 
 test("validateEbookDocument accepts scoped slide HTML, CSS, and manifest", () => {
-  const result = validateEbookDocument(validDocument);
+  const result = validateSlideDocument(validDocument);
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.errors, []);
@@ -73,7 +74,7 @@ test("insertSlide reindexes slides and keeps slide ids unique", () => {
       title: "Inserted slide",
     },
   });
-  const validation = validateEbookDocument(inserted);
+  const validation = validateSlideDocument(inserted);
 
   assert.equal(inserted.slides.length, 2);
   assert.equal(inserted.slides[0].index, 0);
@@ -85,7 +86,7 @@ test("insertSlide reindexes slides and keeps slide ids unique", () => {
 });
 
 test("compileEbookDocumentToHtml produces valid Celion slide HTML", () => {
-  const html = compileEbookDocumentToHtml(validDocument);
+  const html = compileSlideDocumentToHtml(validDocument);
   const result = validateCelionSlideHtml(html, {
     minSlides: 1,
     minVisibleTextLength: 40,
@@ -96,7 +97,7 @@ test("compileEbookDocumentToHtml produces valid Celion slide HTML", () => {
 });
 
 test("sanitizeEbookDocument decorates clean HTML with stable editor ids and manifest entries", () => {
-  const document = sanitizeEbookDocument({
+  const document = sanitizeSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -123,7 +124,7 @@ test("sanitizeEbookDocument decorates clean HTML with stable editor ids and mani
     ],
   });
   const slide = document.slides[0]!;
-  const validation = validateEbookDocument(document);
+  const validation = validateSlideDocument(document);
 
   assert.equal(validation.ok, true, validation.errors.join("\n"));
   assert.match(slide.html, /data-celion-slide="clean"/);
@@ -141,7 +142,7 @@ test("sanitizeEbookDocument decorates clean HTML with stable editor ids and mani
 });
 
 test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate ids", () => {
-  const document = sanitizeEbookDocument({
+  const document = sanitizeSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -165,7 +166,7 @@ test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate
   });
   const slide = document.slides[0]!;
   const ids = slide.manifest.editableElements.map((element) => element.id);
-  const validation = validateEbookDocument(document);
+  const validation = validateSlideDocument(document);
 
   assert.equal(validation.ok, true, validation.errors.join("\n"));
   assert.ok(ids.includes("hero-title"));
@@ -174,7 +175,7 @@ test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate
 });
 
 test("validateEbookDocument rejects unscoped CSS selectors", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -189,7 +190,7 @@ test("validateEbookDocument rejects unscoped CSS selectors", () => {
 });
 
 test("validateEbookDocument rejects unscoped CSS selectors inside at-rules", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -207,7 +208,7 @@ test("validateEbookDocument rejects unscoped CSS selectors inside at-rules", () 
 });
 
 test("validateEbookDocument rejects unscoped pseudo selectors", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -222,7 +223,7 @@ test("validateEbookDocument rejects unscoped pseudo selectors", () => {
 });
 
 test("validateEbookDocument rejects non-block CSS at-rules", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -237,7 +238,7 @@ test("validateEbookDocument rejects non-block CSS at-rules", () => {
 });
 
 test("validateEbookDocument rejects unsafe CSS tokens", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -252,7 +253,7 @@ test("validateEbookDocument rejects unsafe CSS tokens", () => {
 });
 
 test("validateEbookDocument rejects style-bearing slide HTML", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -267,7 +268,7 @@ test("validateEbookDocument rejects style-bearing slide HTML", () => {
 });
 
 test("validateEbookDocument rejects inline style attributes", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -282,14 +283,14 @@ test("validateEbookDocument rejects inline style attributes", () => {
 });
 
 test("validateEbookDocument restricts theme CSS to root custom properties", () => {
-  const unsafeTheme = validateEbookDocument({
+  const unsafeTheme = validateSlideDocument({
     ...validDocument,
     themeCss: `.global { color: red; }`,
   });
   assert.equal(unsafeTheme.ok, false);
   assert.ok(unsafeTheme.errors.some((error) => error.includes("Theme CSS only supports :root custom property blocks")));
 
-  const safeTheme = validateEbookDocument({
+  const safeTheme = validateSlideDocument({
     ...validDocument,
     themeCss: `:root { --accent: #111111; --muted: rgba(0,0,0,0.5); }`,
   });
@@ -297,7 +298,7 @@ test("validateEbookDocument restricts theme CSS to root custom properties", () =
 });
 
 test("validateEbookDocument rejects unsupported block CSS at-rules", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -312,7 +313,7 @@ test("validateEbookDocument rejects unsupported block CSS at-rules", () => {
 });
 
 test("validateEbookDocument rejects malformed manifest entries", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -340,7 +341,7 @@ test("validateEbookDocument rejects malformed manifest entries", () => {
 });
 
 test("validateEbookDocument rejects editable HTML missing from manifest", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -355,7 +356,7 @@ test("validateEbookDocument rejects editable HTML missing from manifest", () => 
 });
 
 test("validateEbookDocument rejects duplicate editable ids", () => {
-  const duplicateHtml = validateEbookDocument({
+  const duplicateHtml = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -371,7 +372,7 @@ test("validateEbookDocument rejects duplicate editable ids", () => {
   assert.equal(duplicateHtml.ok, false);
   assert.ok(duplicateHtml.errors.some((error) => error.includes('HTML editable id "cover-title" must be unique')));
 
-  const duplicateManifest = validateEbookDocument({
+  const duplicateManifest = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -394,7 +395,7 @@ test("validateEbookDocument rejects duplicate editable ids", () => {
 });
 
 test("validateEbookDocument detects spaced and unquoted editable ids", () => {
-  const spacedDuplicate = validateEbookDocument({
+  const spacedDuplicate = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -410,7 +411,7 @@ test("validateEbookDocument detects spaced and unquoted editable ids", () => {
   assert.equal(spacedDuplicate.ok, false);
   assert.ok(spacedDuplicate.errors.some((error) => error.includes('HTML editable id "cover-title" must be unique')));
 
-  const unquotedOrphan = validateEbookDocument({
+  const unquotedOrphan = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -428,7 +429,7 @@ test("validateEbookDocument detects spaced and unquoted editable ids", () => {
 });
 
 test("validateEbookDocument rejects manifest selectors that do not target their id", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {
@@ -451,7 +452,7 @@ test("validateEbookDocument rejects manifest selectors that do not target their 
 });
 
 test("validateEbookDocument rejects manifest entries missing from HTML", () => {
-  const result = validateEbookDocument({
+  const result = validateSlideDocument({
     ...validDocument,
     slides: [
       {

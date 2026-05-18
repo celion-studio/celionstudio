@@ -1,4 +1,4 @@
-import type { CelionEbookDocument } from "@/lib/ebook-document";
+import type { CelionSlideDocument } from "@/lib/slide-document";
 import { getRuntimeTextElements } from "./editor-preview";
 import type { InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
 import { formatLayoutNumber, parseTranslate } from "./editor-layout-values";

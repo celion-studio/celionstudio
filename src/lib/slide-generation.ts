@@ -6,16 +6,16 @@ import {
 } from "@/lib/ai/gemini";
 import {
   validateCelionSlideHtml,
-} from "@/lib/ebook-html";
-import { SLIDE_SIZE_CSS_PX, SLIDE_SIZE_PX } from "@/lib/ebook-format";
-import { EBOOK_STYLE_PROMPTS } from "@/lib/ebook-style";
+} from "@/lib/slide-html";
+import { SLIDE_FORMATS, SLIDE_SIZE_CSS_PX, SLIDE_SIZE_PX, type CelionSlideFormat } from "@/lib/slide-format";
+import { EBOOK_STYLE_PROMPTS } from "@/lib/slide-style";
 import {
-  compileEbookDocumentToHtml,
-  normalizeEbookDocument,
-  sanitizeEbookDocument,
-  validateEbookDocument,
-  type CelionEbookDocument,
-} from "@/lib/ebook-document";
+  compileSlideDocumentToHtml,
+  normalizeSlideDocument,
+  sanitizeSlideDocument,
+  validateSlideDocument,
+  type CelionSlideDocument,
+} from "@/lib/slide-document";
 import {
   MAX_EBOOK_PLAN_SLIDES,
   MIN_EBOOK_PLAN_SLIDES,
@@ -32,7 +32,7 @@ const TONE_PROMPTS: Record<string, string> = {
   friendly: "make the writing warm, approachable, and easy to keep reading",
 };
 
-export type EbookGenerationArgs = {
+export type SlideGenerationArgs = {
   title: string;
   author: string;
   purpose: string;
@@ -41,9 +41,10 @@ export type EbookGenerationArgs = {
   sourceText: string;
   ebookStyle: EbookStyle;
   accentColor: string;
+  slideFormat?: CelionSlideFormat;
 };
 
-export type EbookPlanSlide = {
+export type SlidePlanSlide = {
   role: string;
   eyebrow: string;
   headline: string;
@@ -53,7 +54,7 @@ export type EbookPlanSlide = {
   visualDirection: string;
 };
 
-export type EbookPlan = {
+export type SlidePlan = {
   title: string;
   subtitle: string;
   author: string;
@@ -89,21 +90,21 @@ export type EbookPlan = {
     layoutRhythm: string;
     avoid: string[];
   };
-  slides: EbookPlanSlide[];
+  slides: SlidePlanSlide[];
 };
 
-export type EbookGenerationDiagnostics = {
+export type SlideGenerationDiagnostics = {
   planModel: string;
   htmlModel: string;
-  plan: EbookPlan;
+  plan: SlidePlan;
   ebookDocument: CelionEbookDocument;
   validation: ReturnType<typeof validateUsableEbookHtml>;
-  generationTrace: EbookGenerationBatchTrace[];
+  generationTrace: SlideGenerationBatchTrace[];
   htmlLength: number;
   slideCount: number;
 };
 
-export type EbookGenerationBatchTrace = {
+export type SlideGenerationBatchTrace = {
   stage: "html";
   batchNumber: number;
   batchCount: number;
@@ -125,26 +126,26 @@ export type EbookGenerationBatchTrace = {
   errorStatus?: number;
 };
 
-const PLAN_SYSTEM = `You are a senior editorial strategist for source-led A5 slide publications.
+const PLAN_SYSTEM = `You are a senior editorial strategist for source-led slide publications.
 
 Create the plan and copy before design. Do not write HTML.
 Use the source material as the main authority: extract its argument, examples, numbers, vocabulary, method, warnings, and proof.
-The output must be a specific A5 slide publication plan, not a generic outline.
+The output must be a specific slide publication plan, not a generic outline.
 The publication may be for selling, teaching, explaining, organizing expertise, or reporting. Do not assume a sales funnel unless the purpose says so.
 Return JSON only.`;
 
-const HTML_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designer.
+const HTML_SYSTEM = (width: number, height: number) => `You are a world-class HTML/CSS slide publication designer.
 
 You receive an approved editorial plan.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
-Your job is to turn the plan into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
-Return JSON only: { "document": { "version": 1, "size": { "width": ${SLIDE_SIZE_PX.width}, "height": ${SLIDE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "slides": [] } }`;
+Your job is to turn the plan into a beautiful finished HTML/CSS slide document with strong layout variety and editorial taste.
+Return JSON only: { "document": { "version": 1, "size": { "width": ${width}, "height": ${height}, "unit": "px" }, "title": "publication title", "themeCss": "", "slides": [] } }`;
 
 function tonePromptFor(tone?: string) {
   return TONE_PROMPTS[tone ?? ""] ?? tone ?? "use the best tone for the source and reader";
 }
 
-function buildPlanPrompt(args: EbookGenerationArgs): string {
+function buildPlanPrompt(args: SlideGenerationArgs): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
 
   return `Create a source-led A5 slide publication plan.
@@ -213,7 +214,7 @@ Return JSON in exactly this shape:
 }`;
 }
 
-function planForHtmlPrompt(plan: EbookPlan) {
+function planForHtmlPrompt(plan: SlidePlan) {
   return {
     title: plan.title,
     subtitle: plan.subtitle,
@@ -228,15 +229,18 @@ function planForHtmlPrompt(plan: EbookPlan) {
   };
 }
 
-function buildHtmlPrompt(args: EbookGenerationArgs, plan: EbookPlan): string {
+function buildHtmlPrompt(args: SlideGenerationArgs, plan: SlidePlan): string {
   const stylePrompt = EBOOK_STYLE_PROMPTS[args.ebookStyle];
+  const fmt = args.slideFormat ?? "a5_portrait";
+  const size = SLIDE_FORMATS[fmt];
+  const sizeLabel = `${size.width}px x ${size.height}px`;
 
-  return `Render this approved plan as a finished A5 HTML/CSS slide publication.
+  return `Render this approved plan as a finished HTML/CSS slide publication.
 
 Design inputs:
 - Visual mood: ${args.ebookStyle} (${stylePrompt})
 - Accent color: ${args.accentColor}
-- Page size: ${SLIDE_SIZE_CSS_PX}
+- Slide size: ${sizeLabel}
 
 Approved plan:
 ${JSON.stringify(planForHtmlPrompt(plan), null, 2)}
@@ -268,7 +272,7 @@ Technical contract:
 - Output only JSON with one "document" field.
 - Generate all slides in one response. Do not require slide-by-slide calls.
 - Generate exactly ${plan.slides.length} slides: one slide per approved slide, no more and no fewer.
-- The document must have version: 1, title, size: { width: ${SLIDE_SIZE_PX.width}, height: ${SLIDE_SIZE_PX.height}, unit: "px" }, themeCss, and slides.
+- The document must have version: 1, title, size: { width: ${size.width}, height: ${size.height}, unit: "px" }, themeCss, and slides.
 - themeCss may be empty or contain only a single :root block with CSS custom properties such as --accent. Do not put selectors, layout rules, imports, or slide styles in themeCss.
 - Each slide includes id, index, title, role, html, css, and version.
 - Each slide html has root <section data-celion-slide="{slideId}" class="celion-page">.
@@ -282,7 +286,7 @@ Technical contract:
 - Do not use url(), @import, @keyframes, animations, transitions, or markup-like tokens inside CSS.
 - Do not use global selectors like html, body, *, h1, p, div, span, section, or unscoped class selectors.
 - No editable manifest is required from the model.
-- Use slide CSS to make each [data-celion-slide="{slideId}"] exactly ${SLIDE_SIZE_CSS_PX} and overflow: hidden.
+- Use slide CSS to make each [data-celion-slide="{slideId}"] exactly ${sizeLabel} and overflow: hidden.
 - Use only browser-safe CSS colors: hex, rgb, rgba, hsl, hsla, named colors, or variables that resolve to those values.
 - Do not use color(), color-mix(), oklch(), lab(), or lch().
 - No placeholders, lorem ipsum, markdown fences, scripts, external assets, or generic filler.
@@ -299,9 +303,9 @@ function stringArrayValue(value: unknown) {
     : [];
 }
 
-export function normalizePlan(raw: unknown, args: EbookGenerationArgs): EbookPlan {
+export function normalizePlan(raw: unknown, args: SlideGenerationArgs): SlidePlan {
   if (typeof raw !== "object" || raw === null) {
-    throw new EbookGenerationError("plan_invalid", "Gemini Flash did not return an ebook plan object.");
+    throw new SlideGenerationError("plan_invalid", "Gemini Flash did not return an ebook plan object.");
   }
 
   const record = raw as Record<string, unknown>;
@@ -320,7 +324,7 @@ export function normalizePlan(raw: unknown, args: EbookGenerationArgs): EbookPla
   const slides = Array.isArray(record.slides) ? record.slides : [];
 
   const normalizedSlides = slides
-    .map((slide): EbookPlanSlide | null => {
+    .map((slide): SlidePlanSlide | null => {
       if (typeof slide !== "object" || slide === null) return null;
       const slideRecord = slide as Record<string, unknown>;
       const headline = stringValue(slideRecord.headline);
@@ -336,11 +340,11 @@ export function normalizePlan(raw: unknown, args: EbookGenerationArgs): EbookPla
         visualDirection: stringValue(slideRecord.visualDirection),
       };
     })
-    .filter((slide): slide is EbookPlanSlide => Boolean(slide))
+    .filter((slide): slide is SlidePlanSlide => Boolean(slide))
     .slice(0, MAX_EBOOK_PLAN_SLIDES);
 
   if (normalizedSlides.length < MIN_EBOOK_PLAN_SLIDES) {
-    throw new EbookGenerationError(
+    throw new SlideGenerationError(
       "plan_invalid",
       `Gemini Flash returned an ebook plan with only ${normalizedSlides.length} usable slides.`,
     );
@@ -402,7 +406,7 @@ function validateUsableEbookHtml(html: string) {
 function capEbookDocumentPagesForGeneration(document: CelionEbookDocument, maxPages: number): CelionEbookDocument {
   if (document.slides.length <= maxPages) return document;
 
-  return normalizeEbookDocument({
+  return normalizeSlideDocument({
     ...document,
     slides: document.slides.slice(0, maxPages).map((page, index) => ({
       ...page,
@@ -413,25 +417,25 @@ function capEbookDocumentPagesForGeneration(document: CelionEbookDocument, maxPa
 
 type EbookFailureReason = "gemini_call_failed" | "missing_html" | "invalid_html" | "plan_invalid";
 type EbookGenerationStage = "plan" | "html";
-type EbookGenerationErrorOptions = {
+type SlideGenerationErrorOptions = {
   status?: number;
   stage?: EbookGenerationStage;
   validation?: unknown;
   slideCount?: number;
-  generationTrace?: EbookGenerationBatchTrace[];
+  generationTrace?: SlideGenerationBatchTrace[];
 };
 
-export class EbookGenerationError extends Error {
+export class SlideGenerationError extends Error {
   readonly reason: EbookFailureReason;
   readonly status?: number;
   readonly stage?: EbookGenerationStage;
   readonly validation?: unknown;
   readonly slideCount?: number;
-  readonly generationTrace?: EbookGenerationBatchTrace[];
+  readonly generationTrace?: SlideGenerationBatchTrace[];
 
-  constructor(reason: EbookFailureReason, message: string, options: EbookGenerationErrorOptions = {}) {
+  constructor(reason: EbookFailureReason, message: string, options: SlideGenerationErrorOptions = {}) {
     super(message);
-    this.name = "EbookGenerationError";
+    this.name = "SlideGenerationError";
     this.reason = reason;
     this.status = options.status;
     this.stage = options.stage;
@@ -463,12 +467,12 @@ function warnEbookGenerationFailure(reason: EbookFailureReason, details: Record<
 function failGeneration(
   reason: EbookFailureReason,
   message: string,
-  options: EbookGenerationErrorOptions = {},
+  options: SlideGenerationErrorOptions = {},
 ): never {
-  throw new EbookGenerationError(reason, message, options);
+  throw new SlideGenerationError(reason, message, options);
 }
 
-export async function generateEbookPlan(args: EbookGenerationArgs) {
+export async function generateSlidePlan(args: SlideGenerationArgs) {
   try {
     const raw = await generateJsonWithGemini({
       system: PLAN_SYSTEM,
@@ -478,7 +482,7 @@ export async function generateEbookPlan(args: EbookGenerationArgs) {
     });
     return normalizePlan(raw, args);
   } catch (error) {
-    if (error instanceof EbookGenerationError) {
+    if (error instanceof SlideGenerationError) {
       warnEbookGenerationFailure(error.reason, { stage: "plan" });
       throw error;
     }
@@ -497,13 +501,15 @@ export async function generateEbookPlan(args: EbookGenerationArgs) {
 }
 
 async function generateCompleteEbookDocument(
-  args: EbookGenerationArgs,
-  plan: EbookPlan,
-  generationTrace: EbookGenerationBatchTrace[],
+  args: SlideGenerationArgs,
+  plan: SlidePlan,
+  generationTrace: SlideGenerationBatchTrace[],
 ) {
   const startedAtMs = Date.now();
+  const fmt = args.slideFormat ?? "a5_portrait";
+  const size = SLIDE_FORMATS[fmt];
   const prompt = buildHtmlPrompt(args, plan);
-  const trace: EbookGenerationBatchTrace = {
+  const trace: SlideGenerationBatchTrace = {
     stage: "html",
     batchNumber: 1,
     batchCount: 1,
@@ -519,7 +525,7 @@ async function generateCompleteEbookDocument(
   };
   generationTrace.push(trace);
 
-  const completeTrace = (status: EbookGenerationBatchTrace["status"], details: Partial<EbookGenerationBatchTrace> = {}) => {
+  const completeTrace = (status: SlideGenerationBatchTrace["status"], details: Partial<SlideGenerationBatchTrace> = {}) => {
     const completedAtMs = Date.now();
     Object.assign(trace, {
       ...details,
@@ -532,7 +538,7 @@ async function generateCompleteEbookDocument(
   let raw: unknown;
   try {
     raw = await generateJsonWithGemini({
-      system: HTML_SYSTEM,
+      system: HTML_SYSTEM(size.width, size.height),
       user: prompt,
       model: EBOOK_GEMINI_MODEL,
       temperature: 1,
@@ -577,10 +583,10 @@ async function generateCompleteEbookDocument(
   }
 
   const ebookDocument = capEbookDocumentPagesForGeneration(
-    sanitizeEbookDocument(normalizeEbookDocument(result.document)),
+    sanitizeSlideDocument(normalizeSlideDocument(result.document)),
     plan.slides.length,
   );
-  const documentValidation = validateEbookDocument(ebookDocument);
+  const documentValidation = validateSlideDocument(ebookDocument);
   if (!documentValidation.ok) {
     completeTrace("failure", {
       slideCount: ebookDocument.slides.length,
@@ -638,7 +644,7 @@ async function generateCompleteEbookDocument(
     );
   }
 
-  const html = compileEbookDocumentToHtml(ebookDocument);
+  const html = compileSlideDocumentToHtml(ebookDocument);
   const validation = validateUsableEbookHtml(html);
 
   completeTrace("success", {
@@ -649,8 +655,8 @@ async function generateCompleteEbookDocument(
   return { html, validation, ebookDocument };
 }
 
-export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan: EbookPlan) {
-  const generationTrace: EbookGenerationBatchTrace[] = [];
+export async function generateSlideHtmlFromPlan(args: SlideGenerationArgs, plan: SlidePlan) {
+  const generationTrace: SlideGenerationBatchTrace[] = [];
   const { html, validation, ebookDocument } = await generateCompleteEbookDocument(args, plan, generationTrace);
   if (!validation.ok) {
     warnEbookGenerationFailure("invalid_html", {
@@ -678,16 +684,16 @@ export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan:
   };
 }
 
-export async function generateEbookHtml(args: EbookGenerationArgs): Promise<string> {
-  const result = await generateEbookHtmlWithDiagnostics(args);
+export async function generateSlideHtml(args: SlideGenerationArgs): Promise<string> {
+  const result = await generateSlideHtmlWithDiagnostics(args);
   return result.html;
 }
 
-export async function generateEbookHtmlWithDiagnostics(
-  args: EbookGenerationArgs,
-): Promise<{ html: string; diagnostics: EbookGenerationDiagnostics }> {
-  const plan = await generateEbookPlan(args);
-  const { html, validation, ebookDocument, generationTrace } = await generateEbookHtmlFromPlan(args, plan);
+export async function generateSlideHtmlWithDiagnostics(
+  args: SlideGenerationArgs,
+): Promise<{ html: string; diagnostics: SlideGenerationDiagnostics }> {
+  const plan = await generateSlidePlan(args);
+  const { html, validation, ebookDocument, generationTrace } = await generateSlideHtmlFromPlan(args, plan);
   return {
     html,
     diagnostics: {

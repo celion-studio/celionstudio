@@ -1,4 +1,4 @@
-import type { CelionEditableElement } from "@/lib/ebook-document";
+import type { CelionEditableElement } from "@/lib/slide-document";
 
 export type LayoutTarget = {
   slideId: string;

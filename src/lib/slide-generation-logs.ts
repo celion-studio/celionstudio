@@ -2,7 +2,7 @@ import { getSql } from "@/lib/db";
 
 type EbookGenerationLogStatus = "success" | "failure";
 
-type EbookGenerationLogInput = {
+type SlideGenerationLogInput = {
   userId: string;
   projectId?: string;
   status: EbookGenerationLogStatus;
@@ -12,7 +12,7 @@ type EbookGenerationLogInput = {
   title: string;
   purpose: string;
   targetAudience: string;
-  ebookStyle?: string;
+  slideStyle?: string;
   accentColor?: string;
   sourceCount: number;
   sourceTextLength: number;
@@ -65,7 +65,7 @@ function isoString(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
-export async function recordEbookGenerationLog(input: EbookGenerationLogInput) {
+export async function recordSlideGenerationLog(input: EbookGenerationLogInput) {
   try {
     const sql = getSql();
     await sql`

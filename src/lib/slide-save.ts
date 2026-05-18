@@ -1,5 +1,5 @@
-import { compileEbookDocumentToHtml, normalizeEbookDocument, sanitizeEbookDocument, validateEbookDocument } from "@/lib/ebook-document";
-import { sanitizeEbookHtmlForCanvas, validateCelionSlideHtml, validateLegacyEbookHtmlSafety } from "@/lib/ebook-html";
+import { compileSlideDocumentToHtml, normalizeSlideDocument, sanitizeSlideDocument, validateSlideDocument } from "@/lib/slide-document";
+import { sanitizeEbookHtmlForCanvas, validateCelionSlideHtml, validateLegacyEbookHtmlSafety } from "@/lib/slide-html";
 import {
   MAX_EBOOK_DOCUMENT_JSON_LENGTH,
   MAX_EBOOK_DOCUMENT_PAGES,
@@ -14,7 +14,7 @@ type PrepareSaveHtmlResult =
   | { ok: false; message: string };
 
 type PrepareSaveDocumentResult =
-  | { ok: true; document: ReturnType<typeof normalizeEbookDocument>; html: string }
+  | { ok: true; document: ReturnType<typeof normalizeSlideDocument>; html: string }
   | { ok: false; message: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -94,7 +94,7 @@ export function prepareEbookDocumentForSave(document: unknown): PrepareSaveDocum
     };
   }
 
-  const rawValidation = validateEbookDocument(document);
+  const rawValidation = validateSlideDocument(document);
   if (!rawValidation.ok) {
     return {
       ok: false,
@@ -102,8 +102,8 @@ export function prepareEbookDocumentForSave(document: unknown): PrepareSaveDocum
     };
   }
 
-  const normalizedDocument = sanitizeEbookDocument(document);
-  const sanitizedValidation = validateEbookDocument(normalizedDocument);
+  const normalizedDocument = sanitizeSlideDocument(document);
+  const sanitizedValidation = validateSlideDocument(normalizedDocument);
   if (!sanitizedValidation.ok) {
     return {
       ok: false,
@@ -111,7 +111,7 @@ export function prepareEbookDocumentForSave(document: unknown): PrepareSaveDocum
     };
   }
 
-  const html = compileEbookDocumentToHtml(normalizedDocument);
+  const html = compileSlideDocumentToHtml(normalizedDocument);
   const htmlValidation = validateCelionSlideHtml(html, {
     allowGenericOutlineHeadings: true,
   });

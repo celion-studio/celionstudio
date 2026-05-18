@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import type { EbookPlan } from "@/lib/ebook-generation";
-import type { EbookStyle, ProjectSource } from "@/types/project";
+import type { SlidePlan } from "@/lib/slide-generation";
+import type { CelionSlideFormat } from "@/lib/slide-format";
+import type { SlideStyle, ProjectSource } from "@/types/project";
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
@@ -28,14 +29,15 @@ type WizardState = {
   purpose: WizardPurpose;
   purposeDetail: string;
   tone: WizardTone;
+  slideFormat: CelionSlideFormat;
   // Step 2: Style
-  ebookStyle: EbookStyle | null;
+  slideStyle: SlideStyle | null;
   // Step 2: Style
   accentColor: string;
   // Step 3: Source
   sourceFiles: ProjectSource[];
   // Step 4: Plan
-  plan: EbookPlan | null;
+  plan: SlidePlan | null;
   planning: boolean;
   // Step 5: Generate
   generating: boolean;
@@ -45,10 +47,11 @@ type WizardState = {
   setField: (field: "title" | "author" | "targetAudience" | "purposeDetail", value: string) => void;
   setPurpose: (purpose: WizardPurpose) => void;
   setTone: (tone: WizardTone) => void;
+  setSlideFormat: (format: CelionSlideFormat) => void;
   setSourceFiles: (sources: ProjectSource[]) => void;
   setEbookStyle: (style: EbookStyle) => void;
   setAccentColor: (color: string) => void;
-  setPlan: (plan: EbookPlan | null) => void;
+  setPlan: (plan: SlidePlan | null) => void;
   setPlanning: (value: boolean) => void;
   setGenerating: (value: boolean) => void;
   setError: (value: string) => void;
@@ -63,10 +66,11 @@ const initialState = {
   purpose: "" as WizardPurpose,
   purposeDetail: "",
   tone: "preserve" as WizardTone,
-  ebookStyle: null as EbookStyle | null,
+  slideFormat: "a5_portrait" as CelionSlideFormat,
+  slideStyle: null as SlideStyle | null,
   accentColor: "#6366f1",
   sourceFiles: [],
-  plan: null as EbookPlan | null,
+  plan: null as SlidePlan | null,
   planning: false,
   generating: false,
   error: "",
@@ -78,8 +82,9 @@ export const useProjectWizardStore = create<WizardState>((set) => ({
   setField: (field, value) => set({ [field]: value, plan: null, error: "" }),
   setPurpose: (purpose) => set({ purpose, purposeDetail: purpose === "other" ? "" : "", plan: null, error: "" }),
   setTone: (tone) => set({ tone, plan: null, error: "" }),
+  setSlideFormat: (slideFormat) => set({ slideFormat, plan: null, error: "" }),
   setSourceFiles: (sourceFiles) => set({ sourceFiles, plan: null, error: "" }),
-  setEbookStyle: (ebookStyle) => set({ ebookStyle, plan: null, error: "" }),
+  setSlideStyle: (slideStyle) => set({ slideStyle, plan: null, error: "" }),
   setAccentColor: (accentColor) => set({ accentColor, plan: null }),
   setPlan: (plan) => set({ plan, error: "" }),
   setPlanning: (planning) => set({ planning }),

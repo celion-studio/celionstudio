@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { Check, Palette } from "lucide-react";
-import { EBOOK_STYLE_OPTIONS } from "@/lib/ebook-style";
+import { EBOOK_STYLE_OPTIONS } from "@/lib/slide-style";
 import type { EbookStyle } from "@/types/project";
 
 const ACCENT_COLORS = [

@@ -1,9 +1,9 @@
-﻿import { createProjectRecord } from "@/lib/project-planning";
+import { createProjectRecord } from "@/lib/project-planning";
 import {
-  normalizeEbookDocument,
-  type CelionEbookDocument,
-} from "@/lib/ebook-document";
-import { countCelionSlides } from "@/lib/ebook-html";
+  normalizeSlideDocument,
+  type CelionSlideDocument,
+} from "@/lib/slide-document";
+import { countCelionSlides } from "@/lib/slide-html";
 import { getSql } from "@/lib/db";
 import type {
   DesignMode,
@@ -16,8 +16,8 @@ import type {
 
 type ProjectSqlClient = ReturnType<typeof getSql>;
 
-type ProjectCreateProfileInput = Omit<ProjectProfile, "ebookDocument"> & {
-  ebookDocument?: CelionEbookDocument | null;
+type ProjectCreateProfileInput = Omit<ProjectProfile, "slideDocument"> & {
+  slideDocument?: CelionEbookDocument | null;
 };
 
 type ProjectCreateInput = {
@@ -49,10 +49,10 @@ type ProfileRow = {
   author: string;
   purpose: string;
   designMode: string;
-  ebookStyle: string | null;
-  ebookHtml: string | null;
-  ebookDocument: unknown;
-  ebookPageCount: number | string;
+  slideStyle: string | null;
+  slideHtml: string | null;
+  slideDocument: unknown;
+  slideCount: number | string;
   accentColor: string;
 };
 
@@ -78,7 +78,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function normalizeStoredEbookDocument(raw: unknown): CelionEbookDocument | null {
+function normalizeStoredSlideDocument(raw: unknown): CelionEbookDocument | null {
   if (!isRecord(raw)) {
     return null;
   }
@@ -91,7 +91,7 @@ function normalizeStoredEbookDocument(raw: unknown): CelionEbookDocument | null 
 
   if (rawSlides.length === 0) return null;
 
-  return normalizeEbookDocument(raw);
+  return normalizeSlideDocument(raw);
 }
 
 function emptyProfile(): ProjectProfile {
@@ -101,10 +101,10 @@ function emptyProfile(): ProjectProfile {
     purpose: "",
     designMode: "balanced",
     tone: "",
-    ebookStyle: null,
-    ebookHtml: null,
-    ebookDocument: null,
-    ebookPageCount: 16,
+    slideStyle: null,
+    slideHtml: null,
+    slideDocument: null,
+    slideCount: 16,
     accentColor: "#6366f1",
   };
 }
@@ -116,10 +116,10 @@ export function profileFromRow(row: ProfileRow): ProjectProfile {
     purpose: row.purpose ?? "",
     designMode: (row.designMode as DesignMode) || "balanced",
     tone: row.tone,
-    ebookStyle: (row.ebookStyle as EbookStyle | null) ?? null,
-    ebookHtml: row.ebookHtml ?? null,
-    ebookDocument: normalizeStoredEbookDocument(row.ebookDocument),
-    ebookPageCount: Number(row.ebookPageCount) || 16,
+    slideStyle: (row.slideStyle as EbookStyle | null) ?? null,
+    slideHtml: row.slideHtml ?? null,
+    slideDocument: normalizeStoredSlideDocument(row.slideDocument),
+    slideCount: Number(row.slideCount) || 16,
     accentColor: row.accentColor ?? "#6366f1",
   };
 }
@@ -195,10 +195,10 @@ export async function listProjectRecordsForUser(
         COALESCE(author, '') AS author,
         COALESCE(purpose, '') AS purpose,
         COALESCE(design_mode, 'balanced') AS "designMode",
-        ebook_style AS "ebookStyle",
-        ebook_html AS "ebookHtml",
-        ebook_document AS "ebookDocument",
-        COALESCE(ebook_page_count, 16) AS "ebookPageCount",
+        ebook_style AS "slideStyle",
+        ebook_html AS "slideHtml",
+        ebook_document AS "slideDocument",
+        COALESCE(ebook_page_count, 16) AS "slideCount",
         COALESCE(accent_color, '#6366f1') AS "accentColor"
       FROM project_profiles WHERE project_id::text = ANY(${projectIds})
     `,
@@ -254,10 +254,10 @@ export async function getProjectRecordForUser(userId: string, projectId: string)
         COALESCE(author, '') AS author,
         COALESCE(purpose, '') AS purpose,
         COALESCE(design_mode, 'balanced') AS "designMode",
-        ebook_style AS "ebookStyle",
-        ebook_html AS "ebookHtml",
-        ebook_document AS "ebookDocument",
-        COALESCE(ebook_page_count, 16) AS "ebookPageCount",
+        ebook_style AS "slideStyle",
+        ebook_html AS "slideHtml",
+        ebook_document AS "slideDocument",
+        COALESCE(ebook_page_count, 16) AS "slideCount",
         COALESCE(accent_color, '#6366f1') AS "accentColor"
       FROM project_profiles WHERE project_id::text = ${projectRow.id} LIMIT 1
     `,
@@ -288,8 +288,8 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
   const sql = getSql();
   const p: ProjectProfile = {
     ...input.profile,
-    ebookDocument: input.profile.ebookDocument
-      ? normalizeEbookDocument(input.profile.ebookDocument)
+    slideDocument: input.profile.slideDocument
+      ? normalizeSlideDocument(input.profile.slideDocument)
       : null,
   };
   const draft = createProjectRecord({ ...input, profile: p });
@@ -321,9 +321,9 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
           ${projectId},
           ${p.targetAudience}, ${p.tone},
           ${p.author}, ${p.purpose}, ${p.designMode},
-          ${p.ebookStyle ?? null}, ${p.ebookHtml ?? null},
-          ${p.ebookDocument ? JSON.stringify(p.ebookDocument) : null}::jsonb,
-          ${p.ebookPageCount ?? 16}, ${p.accentColor ?? "#6366f1"},
+          ${p.slideStyle ?? null}, ${p.slideHtml ?? null},
+          ${p.slideDocument ? JSON.stringify(p.slideDocument) : null}::jsonb,
+          ${p.slideCount ?? 16}, ${p.accentColor ?? "#6366f1"},
           ${createdAt}, ${updatedAt}
         )
       `,
@@ -336,24 +336,24 @@ export async function createProjectForUser(userId: string, input: ProjectCreateI
   return getProjectRecordForUser(userId, projectId);
 }
 
-export function getEbookPageCountForHtml(ebookHtml: string) {
-  return Math.max(1, countCelionSlides(ebookHtml));
+export function getEbookPageCountForHtml(slideHtml: string) {
+  return Math.max(1, countCelionSlides(slideHtml));
 }
 
 export async function updateProjectEbookHtml(
   userId: string,
   projectId: string,
-  ebookHtml: string,
+  slideHtml: string,
 ) {
   const sql = getSql();
   const updatedAt = new Date();
-  const ebookPageCount = getEbookPageCountForHtml(ebookHtml);
+  const slideCount = getEbookPageCountForHtml(slideHtml);
   const [profileRows, projectRows] = await sql.transaction([
     sql`
       UPDATE project_profiles
-      SET ebook_html = ${ebookHtml},
+      SET ebook_html = ${slideHtml},
           ebook_document = NULL,
-          ebook_page_count = ${ebookPageCount},
+          ebook_page_count = ${slideCount},
           updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
         AND EXISTS (
@@ -382,19 +382,19 @@ export async function updateProjectEbookHtml(
 async function writeProjectEbookDocument(
   userId: string,
   projectId: string,
-  ebookDocument: CelionEbookDocument,
-  ebookHtml: string,
+  slideDocument: CelionEbookDocument,
+  slideHtml: string,
 ) {
   const sql = getSql();
   const updatedAt = new Date();
-  const normalizedDocument = normalizeEbookDocument(ebookDocument);
-  const ebookPageCount = getEbookPageCountForHtml(ebookHtml);
+  const normalizedDocument = normalizeSlideDocument(slideDocument);
+  const slideCount = getEbookPageCountForHtml(slideHtml);
   const [profileRows, projectRows] = await sql.transaction([
     sql`
       UPDATE project_profiles
       SET ebook_document = ${JSON.stringify(normalizedDocument)}::jsonb,
-          ebook_html = ${ebookHtml},
-          ebook_page_count = ${ebookPageCount},
+          ebook_html = ${slideHtml},
+          ebook_page_count = ${slideCount},
           updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}
         AND EXISTS (
@@ -423,19 +423,19 @@ async function writeProjectEbookDocument(
 export async function updateProjectEbookDocumentForSave(
   userId: string,
   projectId: string,
-  ebookDocument: CelionEbookDocument,
-  ebookHtml: string,
+  slideDocument: CelionEbookDocument,
+  slideHtml: string,
 ) {
-  return writeProjectEbookDocument(userId, projectId, ebookDocument, ebookHtml);
+  return writeProjectEbookDocument(userId, projectId, slideDocument, slideHtml);
 }
 
 export async function updateProjectEbookDocument(
   userId: string,
   projectId: string,
-  ebookDocument: CelionEbookDocument,
-  ebookHtml: string,
+  slideDocument: CelionEbookDocument,
+  slideHtml: string,
 ) {
-  const result = await writeProjectEbookDocument(userId, projectId, ebookDocument, ebookHtml);
+  const result = await writeProjectEbookDocument(userId, projectId, slideDocument, slideHtml);
   if (!result) return null;
 
   return getProjectRecordForUser(userId, projectId);
@@ -452,8 +452,8 @@ export async function updateProjectWithGeneratedEbook(
   const sql = getSql();
   const p: ProjectProfile = {
     ...input.profile,
-    ebookDocument: input.profile.ebookDocument
-      ? normalizeEbookDocument(input.profile.ebookDocument)
+    slideDocument: input.profile.slideDocument
+      ? normalizeSlideDocument(input.profile.slideDocument)
       : null,
   };
   const updatedAt = new Date();
@@ -483,10 +483,10 @@ export async function updateProjectWithGeneratedEbook(
           author = ${p.author},
           purpose = ${p.purpose},
           design_mode = ${p.designMode},
-          ebook_style = ${p.ebookStyle ?? null},
-          ebook_html = ${p.ebookHtml ?? null},
-          ebook_document = ${p.ebookDocument ? JSON.stringify(p.ebookDocument) : null}::jsonb,
-          ebook_page_count = ${p.ebookPageCount ?? 16},
+          ebook_style = ${p.slideStyle ?? null},
+          ebook_html = ${p.slideHtml ?? null},
+          ebook_document = ${p.slideDocument ? JSON.stringify(p.slideDocument) : null}::jsonb,
+          ebook_page_count = ${p.slideCount ?? 16},
           accent_color = ${p.accentColor ?? "#6366f1"},
           updated_at = ${updatedAt}
       WHERE project_id::text = ${projectId}

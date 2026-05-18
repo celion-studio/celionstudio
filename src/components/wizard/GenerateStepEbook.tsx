@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 import { Loader2, Sparkles } from "lucide-react";
-import { EBOOK_STYLE_LABELS } from "@/lib/ebook-style";
+import { EBOOK_STYLE_LABELS } from "@/lib/slide-style";
 import type { EbookStyle } from "@/types/project";
 
 type Props = {

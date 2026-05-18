@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { getRouteSession } from "@/lib/session";
 import { EBOOK_GEMINI_MODEL, EBOOK_PLAN_GEMINI_MODEL } from "@/lib/ai/gemini";
 import {
-  EbookGenerationError,
-  generateEbookHtmlFromPlan,
-  generateEbookHtmlWithDiagnostics,
+  SlideGenerationError,
+  generateSlideHtmlFromPlan,
+  generateSlideHtmlWithDiagnostics,
   normalizePlan,
-  type EbookGenerationDiagnostics,
-} from "@/lib/ebook-generation";
-import { getEbookGenerationArgs, parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
-import { recordEbookGenerationLog } from "@/lib/ebook-generation-logs";
+  type SlideGenerationDiagnostics,
+} from "@/lib/slide-generation";
+import { getSlideGenerationArgs, parseSlideGenerateRequest } from "@/lib/slide-generate-request";
+import { recordSlideGenerationLog } from "@/lib/slide-generation-logs";
 import { isDatabaseUnavailableError } from "@/lib/db";
 import {
   createProjectForUser,
@@ -18,20 +18,20 @@ import {
 } from "@/lib/projects";
 import type { ProjectSource } from "@/types/project";
 
-export { parseEbookGenerateRequest } from "@/lib/ebook-generate-request";
+export { parseSlideGenerateRequest } from "@/lib/slide-generate-request";
 
 function logStageFor(error: unknown) {
-  if (!(error instanceof EbookGenerationError)) return "unknown";
+  if (!(error instanceof SlideGenerationError)) return "unknown";
   return error.stage ?? "unknown";
 }
 
 function logReasonFor(error: unknown) {
-  if (!(error instanceof EbookGenerationError)) return undefined;
+  if (!(error instanceof SlideGenerationError)) return undefined;
   return error.reason;
 }
 
 export function ebookGenerationFailureStatus(hasSubmittedPlan: boolean, error: unknown) {
-  if (!(error instanceof EbookGenerationError)) return 500;
+  if (!(error instanceof SlideGenerationError)) return 500;
   if (hasSubmittedPlan && error.reason === "plan_invalid") return 400;
   if (error.status === 408 || error.status === 429 || error.status === 503 || error.status === 504) {
     return error.status;
@@ -39,7 +39,7 @@ export function ebookGenerationFailureStatus(hasSubmittedPlan: boolean, error: u
   return 500;
 }
 
-function sanitizePlanForLog(plan: EbookGenerationDiagnostics["plan"]) {
+function sanitizePlanForLog(plan: SlideGenerationDiagnostics["plan"]) {
   return {
     ...plan,
     slideCount: plan.slides.length,
@@ -58,21 +58,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const parsed = await parseEbookGenerateRequest(request);
+  const parsed = await parseSlideGenerateRequest(request);
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
 
   const d = parsed.data;
-  const generationArgs = getEbookGenerationArgs(d);
+  const generationArgs = getSlideGenerationArgs(d);
   const sourceText = generationArgs.sourceText;
 
   let html: string;
-  let diagnostics: EbookGenerationDiagnostics;
+  let diagnostics: SlideGenerationDiagnostics;
   try {
     if (d.plan) {
       const plan = normalizePlan(d.plan, generationArgs);
-      const rendered = await generateEbookHtmlFromPlan(generationArgs, plan);
+      const rendered = await generateSlideHtmlFromPlan(generationArgs, plan);
       html = rendered.html;
       diagnostics = {
         planModel: "approved-plan",
@@ -85,14 +85,14 @@ export async function POST(request: Request) {
         slideCount: rendered.validation.slideCount,
       };
     } else {
-      const result = await generateEbookHtmlWithDiagnostics(generationArgs);
+      const result = await generateSlideHtmlWithDiagnostics(generationArgs);
       html = result.html;
       diagnostics = result.diagnostics;
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to generate ebook";
     const status = ebookGenerationFailureStatus(Boolean(d.plan), error);
-    await recordEbookGenerationLog({
+    await recordSlideGenerationLog({
       userId: session.user.id,
       status: "failure",
       stage: logStageFor(error),
@@ -102,16 +102,16 @@ export async function POST(request: Request) {
       title: d.title,
       purpose: d.purpose,
       targetAudience: d.targetAudience,
-      ebookStyle: d.ebookStyle,
+      slideStyle: d.slideStyle,
       accentColor: d.accentColor,
       sourceCount: d.sources.length,
       sourceTextLength: sourceText.length,
-      validation: error instanceof EbookGenerationError ? error.validation : undefined,
-      generationTrace: error instanceof EbookGenerationError ? error.generationTrace : undefined,
+      validation: error instanceof SlideGenerationError ? error.validation : undefined,
+      generationTrace: error instanceof SlideGenerationError ? error.generationTrace : undefined,
       errorReason: logReasonFor(error),
       errorMessage: message,
       errorStatus: status,
-      slideCount: error instanceof EbookGenerationError ? error.slideCount : undefined,
+      slideCount: error instanceof SlideGenerationError ? error.slideCount : undefined,
     });
     return NextResponse.json({ message }, { status });
   }
@@ -130,10 +130,10 @@ export async function POST(request: Request) {
       purpose: d.purpose,
       designMode: "balanced" as const,
       tone: d.tone,
-      ebookStyle: d.ebookStyle,
-      ebookHtml: html,
-      ebookDocument: diagnostics.ebookDocument,
-      ebookPageCount: getEbookPageCountForHtml(html),
+      slideStyle: d.ebookStyle,
+      slideHtml: html,
+      slideDocument: diagnostics.slideDocument,
+      slideCount: getEbookPageCountForHtml(html),
       accentColor: d.accentColor,
     },
     sources: projectSources,
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     }
 
     const message = "Database is temporarily unavailable. Please retry in a moment.";
-    await recordEbookGenerationLog({
+    await recordSlideGenerationLog({
       userId: session.user.id,
       projectId: d.projectId,
       status: "failure",
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
       title: d.title,
       purpose: d.purpose,
       targetAudience: d.targetAudience,
-      ebookStyle: d.ebookStyle,
+      slideStyle: d.slideStyle,
       accentColor: d.accentColor,
       sourceCount: d.sources.length,
       sourceTextLength: sourceText.length,
@@ -184,7 +184,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await recordEbookGenerationLog({
+  await recordSlideGenerationLog({
     userId: session.user.id,
     projectId: project.id,
     status: "success",
@@ -194,7 +194,7 @@ export async function POST(request: Request) {
     title: d.title,
     purpose: d.purpose,
     targetAudience: d.targetAudience,
-    ebookStyle: d.ebookStyle,
+    slideStyle: d.slideStyle,
     accentColor: d.accentColor,
     sourceCount: d.sources.length,
     sourceTextLength: sourceText.length,

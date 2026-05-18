@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listEbookGenerationLogsForProject } from "@/lib/ebook-generation-logs";
+import { listEbookGenerationLogsForProject } from "@/lib/slide-generation-logs";
 import { getRouteSession } from "@/lib/session";
 
 export async function GET(

@@ -6,14 +6,14 @@ import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import type { ProjectRecord, ProjectStatus } from "@/types/project";
 import { OAuthCallbackHandler } from "@/components/auth/OAuthCallbackHandler";
 import { WizardContent } from "@/components/wizard/WizardContent";
-import { SLIDE_SIZE_PX } from "@/lib/ebook-format";
-import { countCelionSlides } from "@/lib/ebook-html";
+import { SLIDE_FORMATS, SLIDE_SIZE_PX } from "@/lib/slide-format";
+import { countCelionSlides } from "@/lib/slide-html";
 import {
   compileEbookDocumentToHtml,
   normalizeEbookDocument,
   type CelionEditableElement,
   type CelionEbookDocument,
-} from "@/lib/ebook-document";
+} from "@/lib/slide-document";
 import {
   buildSlideSummariesFromDocument,
   buildSlideSummariesFromElements,
@@ -74,7 +74,7 @@ import { useEditorSave } from "./use-editor-save";
 import { useEditorSelection } from "./use-editor-selection";
 
 const PREVIEW_WIDTH = 640;
-const SLIDE_HEIGHT: number = SLIDE_SIZE_PX.height;
+const DEFAULT_SLIDE_HEIGHT: number = SLIDE_SIZE_PX.height;
 const SLIDE_GAP = 28;
 const EDITOR_TOP_RAIL_HEIGHT = 56;
 const EDITOR_EDGE_GAP = 16;
@@ -151,12 +151,17 @@ export function EditorShell({
   } = useEditorSave(projectId, initialEbookDocument);
   const [ebookDocument, setEbookDocument] = useState<CelionEbookDocument | null>(initialEbookDocument);
   const [html, setHtml] = useState(() => initialEbookDocument ? compileEbookDocumentToHtml(initialEbookDocument) : normalizeEditorHtml(initialHtml));
+
+  // Dynamic canvas dimensions based on document format
+  const currentFormat = latestDocumentRef.current?.format ?? ebookDocument?.format ?? "a5_portrait";
+  const dynamicSlideHeight = SLIDE_FORMATS[currentFormat].height;
+  const previewWidth = currentFormat === "16_9_landscape" ? 1280 : 640;
   const [displayTitle, setDisplayTitle] = useState(projectTitle);
   const [setupOpen, setSetupOpen] = useState(initialSetupOpen);
   const [editorMode, setEditorMode] = useState<EditorMode>("view");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [slideCount, setSlideCount] = useState(0);
-  const [iframeHeight, setIframeHeight] = useState(SLIDE_HEIGHT);
+  const [iframeHeight, setIframeHeight] = useState(DEFAULT_SLIDE_HEIGHT);
   const [slideSummaries, setSlideSummaries] = useState<SlideSummary[]>([]);
   const {
     exportOpen,
@@ -224,7 +229,7 @@ export function EditorShell({
 
   const measurePreview = useCallback(() => {
     const height = measurePreviewFrameHeight(iframeRef.current, {
-      slideHeight: SLIDE_HEIGHT,
+      slideHeight: dynamicSlideHeight,
       slideGap: SLIDE_GAP,
     });
     if (height !== null) {
@@ -388,7 +393,7 @@ export function EditorShell({
     cleanupIframeEffects();
 
     const previewFrame = preparePreviewFrame(iframeRef.current, {
-      previewWidth: PREVIEW_WIDTH,
+      previewWidth,
       slideGap: SLIDE_GAP,
     });
     if (!previewFrame) return;
@@ -499,7 +504,7 @@ export function EditorShell({
       const target = e.target as HTMLElement;
       const pointedElements = getPointedElements(doc, e, target);
 
-      // Read from ref dynamically — not from outer closure.
+      // Read from ref dynamically ??not from outer closure.
       // If the document becomes available after the iframe first loaded,
       // the outer `currentDocument` would stay null forever.
       const currentDocumentFresh = latestDocumentRef.current;
@@ -686,7 +691,7 @@ export function EditorShell({
   useEffect(() => {
     const count = ebookDocument ? ebookDocument.slides.length : countCelionSlides(html);
     setSlideCount((current) => current === count ? current : count);
-    const estimatedHeight = estimatePreviewIframeHeight(count, SLIDE_HEIGHT, SLIDE_GAP);
+    const estimatedHeight = estimatePreviewIframeHeight(count, dynamicSlideHeight, SLIDE_GAP);
     setIframeHeight((current) => current === estimatedHeight ? current : estimatedHeight);
     setSlideSummaries(ebookDocument ? buildSlideSummariesFromDocument(ebookDocument) : []);
   }, [ebookDocument, html]);
@@ -1115,7 +1120,7 @@ export function EditorShell({
             >
               <EditorPreviewPane
                 html={html}
-                width={PREVIEW_WIDTH}
+                width={previewWidth}
                 iframeHeight={iframeHeight}
                 iframeRef={iframeRef}
                 previewScrollRef={previewScrollRef}

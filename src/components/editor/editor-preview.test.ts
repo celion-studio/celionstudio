@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CelionEbookDocument } from "@/lib/ebook-document";
+import type { CelionSlideDocument } from "@/lib/slide-document";
 import {
   applyPreviewSlideSpacing,
   buildSlideSummariesFromDocument,
@@ -14,6 +14,7 @@ const documentWithGenericPageTitle: CelionEbookDocument = {
   version: 1,
   title: "TOEFL Guide",
   size: { width: 559, height: 794, unit: "px" },
+  format: "a5_portrait",
   themeCss: "",
   slides: [
     {

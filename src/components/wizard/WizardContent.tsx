@@ -12,7 +12,7 @@ import { SourceStepEbook } from "@/components/wizard/SourceStepEbook";
 import { PlanStepEbook } from "@/components/wizard/PlanStepEbook";
 import { GenerateStepEbook } from "@/components/wizard/GenerateStepEbook";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
-import type { EbookPlan } from "@/lib/ebook-generation";
+import type { SlidePlan } from "@/lib/slide-generation";
 import type { ProjectRecord } from "@/types/project";
 import { CelionButton } from "@/components/ui/celion-controls";
 
@@ -20,18 +20,18 @@ export const TOTAL_STEPS = 5;
 
 export const STEP_LABELS = ["Basics", "Style", "Source", "Plan", "Generate"] as const;
 export const STEP_TITLES = [
-  "Set up your ebook",
+  "Set up your slides",
   "Choose style and accent",
   "Add your source",
   "Review the plan",
-  "Generate your ebook",
+  "Generate your slides",
 ] as const;
 export const STEP_DESCRIPTIONS = [
   "Title, author, target reader, and purpose.",
-  "Pick the visual style and accent color for your ebook design.",
+  "Pick the visual style and accent color for your slide design.",
   "Upload source files for the AI to use.",
   "Check the source-led plan before final design.",
-  "Celion will render the approved plan into an editable ebook.",
+  "Celion will render the approved plan into editable slides.",
 ] as const;
 
 const basicsSchema = z.object({
@@ -106,7 +106,7 @@ export function getStepIssue(step: WizardStep, state: ReturnType<typeof useProje
     return result.success ? null : (result.error.issues[0]?.message ?? "Complete this step.");
   }
   if (step === 2) {
-    if (!state.ebookStyle) return "Choose a style to continue.";
+    if (!state.slideStyle) return "Choose a style to continue.";
     return null;
   }
   if (step === 3) {
@@ -135,10 +135,10 @@ export function WizardContent({
   const initializedProjectIdRef = useRef<string | null>(null);
   const store = useProjectWizardStore();
   const {
-    step, title, author, targetAudience, purpose, purposeDetail, tone,
-    ebookStyle, accentColor, sourceFiles,
+    step, title, author, targetAudience, purpose, purposeDetail, tone, slideFormat,
+    slideStyle, accentColor, sourceFiles,
     plan, planning, generating, error,
-    setStep, setField, setPurpose, setTone, setEbookStyle, setAccentColor,
+    setStep, setField, setPurpose, setTone, setSlideFormat, setEbookStyle, setAccentColor,
     setSourceFiles, setPlan, setPlanning, setGenerating, setError, reset,
   } = store;
 
@@ -177,9 +177,10 @@ export function WizardContent({
     purpose: resolvedPurpose,
     targetAudience,
     tone,
+    slideFormat,
     sourceText: fallbackSourceText,
     sources: sourceFiles,
-    ebookStyle,
+    slideStyle,
     accentColor,
   };
 
@@ -194,12 +195,12 @@ export function WizardContent({
     setEditingPlan(false);
     setError("");
     try {
-      const res = await fetch("/api/ebook/plan", {
+      const res = await fetch("/api/slide/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestPayload),
       });
-      const data = await res.json() as { plan?: EbookPlan; message?: string };
+      const data = await res.json() as { plan?: SlidePlan; message?: string };
       if (!res.ok || !data.plan) throw new Error(data.message ?? "Could not create plan.");
       setPlan(data.plan);
       setStep(4);
@@ -246,13 +247,13 @@ export function WizardContent({
     setSubmitting(true);
     setGenerating(true);
     try {
-      const res = await fetch("/api/ebook/generate", {
+      const res = await fetch("/api/slide/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...requestPayload, plan }),
       });
       const data = await res.json() as { projectId?: string; project?: ProjectRecord; message?: string };
-      if (!res.ok || !data.projectId) throw new Error(data.message ?? "Could not generate ebook.");
+      if (!res.ok || !data.projectId) throw new Error(data.message ?? "Could not generate slides.");
       if (onGenerated && data.project) {
         resetOnUnmountRef.current = true;
         onGenerated(data.project);
@@ -279,7 +280,7 @@ export function WizardContent({
     : step === 3
         ? "Create plan"
     : step === TOTAL_STEPS
-        ? "Generate ebook"
+        ? "Generate slides"
         : "Continue";
 
   const ctaIcon = step === TOTAL_STEPS ? <Zap size={13} /> : <ArrowRight size={12} />;
@@ -384,13 +385,15 @@ export function WizardContent({
             targetAudience={targetAudience}
             purpose={purpose}
             purposeDetail={purposeDetail}
+            slideFormat={slideFormat}
             onFieldChange={setField}
             onPurposeChange={setPurpose}
+            onFormatChange={setSlideFormat}
           />
         )}
         {step === 2 && (
           <StyleStep
-            ebookStyle={ebookStyle}
+            slideStyle={slideStyle}
             onStyleChange={setEbookStyle}
             accentColor={accentColor}
             onAccentColorChange={setAccentColor}
@@ -420,7 +423,7 @@ export function WizardContent({
           <GenerateStepEbook
             title={title}
             author={author}
-            ebookStyle={ebookStyle}
+            slideStyle={slideStyle}
             accentColor={accentColor}
             generating={generating}
           />

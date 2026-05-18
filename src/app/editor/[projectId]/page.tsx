@@ -35,8 +35,8 @@ export default async function EditorPage({
       projectId={project.id}
       projectTitle={project.title}
       projectStatus={project.status}
-      initialHtml={project.profile.ebookHtml ?? ""}
-      initialDocument={project.profile.ebookDocument}
+initialHtml={project.profile.slideHtml ?? ""}
+          initialDocument={project.profile.slideDocument}
     />
   );
 }

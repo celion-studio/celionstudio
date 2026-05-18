@@ -1,5 +1,5 @@
 import { normalizeEbookHtmlSlideContract, sanitizeEbookHtmlForCanvas } from "./ebook-html";
-import { SLIDE_SIZE_MM, SLIDE_SIZE_PX } from "./ebook-format";
+import { SLIDE_FORMATS, SLIDE_SIZE_MM, SLIDE_SIZE_PX, type CelionSlideFormat } from "./ebook-format";
 
 export type CelionEditableProp =
   | "text"
@@ -42,9 +42,10 @@ export type CelionSlide = {
   version: number;
 };
 
-export type CelionEbookDocument = {
+export type CelionSlideDocument = {
   version: 1;
   title: string;
+  format: CelionSlideFormat;
   size: { width: number; height: number; unit: "px" };
   themeCss: string;
   slides: CelionSlide[];
@@ -190,7 +191,7 @@ function reindexPages(pages: CelionSlide[]) {
   }));
 }
 
-export function normalizeEbookDocument(input: unknown): CelionEbookDocument {
+export function normalizeSlideDocument(input: unknown): CelionEbookDocument {
   const value = isRecord(input) ? input : {};
   const size = isRecord(value.size) ? value.size : {};
   const rawSlides = Array.isArray(value.slides)
@@ -199,14 +200,20 @@ export function normalizeEbookDocument(input: unknown): CelionEbookDocument {
       ? value.pages
       : [];
 
+  const width = normalizeNumber(size.width, SLIDE_SIZE_PX.width);
+  const height = normalizeNumber(size.height, SLIDE_SIZE_PX.height);
+
+  // Detect format from size, default to a5_portrait
+  let format: CelionSlideFormat = "a5_portrait";
+  if (width === SLIDE_FORMATS["16_9_landscape"].width && height === SLIDE_FORMATS["16_9_landscape"].height) {
+    format = "16_9_landscape";
+  }
+
   return {
     version: 1,
     title: normalizeString(value.title),
-    size: {
-      width: normalizeNumber(size.width, SLIDE_SIZE_PX.width),
-      height: normalizeNumber(size.height, SLIDE_SIZE_PX.height),
-      unit: "px",
-    },
+    format,
+    size: { width, height, unit: "px" },
     themeCss: normalizeString(value.themeCss),
     slides: rawSlides.map(normalizePage),
   };
@@ -217,7 +224,7 @@ export function insertSlide({
   slide,
   insertIndex,
 }: InsertSlideInput): CelionEbookDocument {
-  const normalizedDocument = normalizeEbookDocument(document);
+  const normalizedDocument = normalizeSlideDocument(document);
   const normalizedSlide = normalizePage(slide, insertIndex);
   const clampedIndex = Math.max(0, Math.min(insertIndex, normalizedDocument.slides.length));
   const usedIds = new Set(normalizedDocument.slides.map((item) => item.id));
@@ -228,7 +235,7 @@ export function insertSlide({
     ...normalizedDocument.slides.slice(clampedIndex),
   ];
 
-  return normalizeEbookDocument({
+  return normalizeSlideDocument({
     ...normalizedDocument,
     slides: reindexPages(slides),
   });
@@ -665,8 +672,8 @@ function validateRawManifestEntries(input: unknown, slideIndex: number, slideId:
   return errors;
 }
 
-export function validateEbookDocument(input: unknown): EbookDocumentValidation {
-  const document = normalizeEbookDocument(input);
+export function validateSlideDocument(input: unknown): EbookDocumentValidation {
+  const document = normalizeSlideDocument(input);
   const errors: string[] = [];
   const slideIds = new Set<string>();
 
@@ -731,9 +738,9 @@ export function validateEbookDocument(input: unknown): EbookDocumentValidation {
   return { ok: errors.length === 0, errors };
 }
 
-export function sanitizeEbookDocument(input: unknown): CelionEbookDocument {
-  const document = normalizeEbookDocument(input);
-  return normalizeEbookDocument({
+export function sanitizeSlideDocument(input: unknown): CelionEbookDocument {
+  const document = normalizeSlideDocument(input);
+  return normalizeSlideDocument({
     ...document,
     themeCss: sanitizeEbookHtmlForCanvas(document.themeCss),
     slides: document.slides.map((page) => ({
@@ -744,8 +751,8 @@ export function sanitizeEbookDocument(input: unknown): CelionEbookDocument {
   });
 }
 
-export function compileEbookDocumentToHtml(input: CelionEbookDocument): string {
-  const document = normalizeEbookDocument(input);
+export function compileSlideDocumentToHtml(input: CelionEbookDocument): string {
+  const document = normalizeSlideDocument(input);
   const pageCss = document.slides.map((page) => page.css).filter(Boolean).join("\n");
   const slides = document.slides
     .map((page, index) => `<div class="slide celion-page-shell" data-slide="${index + 1}" data-page-id="${page.id}">${page.html}</div>`)

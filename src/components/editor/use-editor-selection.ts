@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { CelionEditableElement } from "@/lib/ebook-document";
+import type { CelionEditableElement } from "@/lib/slide-document";
 import type { InspectorStyleValues, RuntimeTextSelection, SelectedElementState } from "./editor-types";
 
 export function useEditorSelection() {

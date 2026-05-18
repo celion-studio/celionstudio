@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRouteSession } from "@/lib/session";
-import { prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "@/lib/ebook-save";
+import { prepareEbookDocumentForSave, prepareEbookHtmlForSave } from "@/lib/slide-save";
 import { updateProjectEbookDocumentForSave, updateProjectEbookHtml } from "@/lib/projects";
 
 const schema = z.object({

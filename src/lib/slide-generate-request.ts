@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { EBOOK_STYLE_IDS } from "@/lib/ebook-style";
+import { EBOOK_STYLE_IDS } from "@/lib/slide-style";
+import { SLIDE_FORMATS } from "@/lib/slide-format";
 import {
   MAX_EBOOK_PLAN_SLIDES,
   MAX_SOURCE_TEXT_LENGTH,
@@ -8,7 +9,7 @@ import {
   validateSourceLimits,
 } from "@/lib/request-limits";
 import { formatSourcesForPrompt } from "@/lib/source-ingestion";
-import type { EbookGenerationArgs } from "@/lib/ebook-generation";
+import type { SlideGenerationArgs } from "@/lib/slide-generation";
 import { SOURCE_KIND_IDS } from "@/types/project";
 
 const MAX_PLAN_LIST_ITEMS = 24;
@@ -88,13 +89,14 @@ const schema = z.object({
   sources: z.array(sourceSchema).default([]),
   ebookStyle: z.enum(EBOOK_STYLE_IDS),
   accentColor: z.string().default("#6366f1"),
+  slideFormat: z.enum(["a5_portrait", "16_9_landscape"]).default("a5_portrait"),
   plan: planSchema.optional(),
 });
 
-export type EbookGenerateRequestBody = z.infer<typeof schema>;
+export type SlideGenerateRequestBody = z.infer<typeof schema>;
 
 type ParseGenerateRequestResult =
-  | { ok: true; data: EbookGenerateRequestBody }
+  | { ok: true; data: SlideGenerateRequestBody }
   | { ok: false; message: string };
 
 function clampNumber(value: unknown, min: number, max: number, fallback?: number) {
@@ -217,7 +219,7 @@ function normalizeApprovedPlanInput(plan: unknown) {
   };
 }
 
-function validateGenerateRequestLimits(data: EbookGenerateRequestBody): string | null {
+function validateGenerateRequestLimits(data: SlideGenerateRequestBody): string | null {
   if (data.title.length > MAX_TITLE_LENGTH) {
     return `Title is too long. Maximum is ${MAX_TITLE_LENGTH} characters.`;
   }
@@ -232,7 +234,7 @@ function validateGenerateRequestLimits(data: EbookGenerateRequestBody): string |
   return null;
 }
 
-export async function parseEbookGenerateRequest(
+export async function parseSlideGenerateRequest(
   request: Request,
 ): Promise<ParseGenerateRequestResult> {
   let json: unknown;
@@ -265,7 +267,7 @@ export async function parseEbookGenerateRequest(
   return { ok: true, data: parsed.data };
 }
 
-export function getEbookGenerationArgs(data: EbookGenerateRequestBody): EbookGenerationArgs {
+export function getSlideGenerationArgs(data: SlideGenerateRequestBody): EbookGenerationArgs {
   return {
     title: data.title,
     author: data.author,
@@ -275,5 +277,6 @@ export function getEbookGenerationArgs(data: EbookGenerateRequestBody): EbookGen
     sourceText: formatSourcesForPrompt(data.sources, data.sourceText),
     ebookStyle: data.ebookStyle,
     accentColor: data.accentColor,
+    slideFormat: data.slideFormat,
   };
 }

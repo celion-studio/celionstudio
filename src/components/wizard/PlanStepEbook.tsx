@@ -2,19 +2,19 @@
 
 import { useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import type { EbookPlan } from "@/lib/ebook-generation";
+import type { SlidePlan } from "@/lib/slide-generation";
 import { CelionButton } from "@/components/ui/celion-controls";
 
 type Props = {
-  plan: EbookPlan | null;
+  plan: SlidePlan | null;
   planning?: boolean;
   onBackToSource?: () => void;
   onRegeneratePlan?: () => void;
-  onPlanChange?: (plan: EbookPlan) => void;
+  onPlanChange?: (plan: SlidePlan) => void;
   onEditingChange?: (editing: boolean) => void;
 };
 
-function clonePlan(plan: EbookPlan): EbookPlan {
+function clonePlan(plan: SlidePlan): SlidePlan {
   return {
     ...plan,
     sourceAssessment: {
@@ -80,7 +80,7 @@ export function PlanStepEbook({
   onEditingChange,
 }: Props) {
   const [editing, setEditing] = useState(false);
-  const [draftPlan, setDraftPlan] = useState<EbookPlan | null>(null);
+  const [draftPlan, setDraftPlan] = useState<SlidePlan | null>(null);
 
   if (!plan) {
     return (
@@ -97,7 +97,7 @@ export function PlanStepEbook({
   const strategy = visiblePlan.editorialStrategy;
   const design = visiblePlan.designBrief;
 
-  function updateDraft(updater: (current: EbookPlan) => EbookPlan) {
+  function updateDraft(updater: (current: SlidePlan) => SlidePlan) {
     setDraftPlan((current) => current ? updater(current) : current);
   }
 

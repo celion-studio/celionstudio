@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { CelionEbookDocument } from "@/lib/ebook-document";
+import type { CelionSlideDocument } from "@/lib/slide-document";
 
 type SavePayload = { html: string } | { document: CelionEbookDocument };
 

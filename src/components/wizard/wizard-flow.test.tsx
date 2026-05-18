@@ -14,7 +14,7 @@ import {
   getStepIssue,
 } from "./WizardContent";
 import { useProjectWizardStore } from "@/store/useProjectWizardStore";
-import type { EbookPlan } from "@/lib/ebook-generation";
+import type { SlidePlan } from "@/lib/slide-generation";
 import type { ProjectSource } from "@/types/project";
 
 globalThis.React = React;
@@ -30,7 +30,7 @@ function collectText(node: ReactNode): string {
   return "";
 }
 
-function validWizardPlan(): EbookPlan {
+function validWizardPlan(): SlidePlan {
   return {
     title: "Launch brief",
     subtitle: "A useful planning document",
@@ -107,8 +107,10 @@ test("basics step uses a purpose dropdown without onboarding or sharing presets"
     targetAudience: "",
     purpose: "",
     purposeDetail: "",
+    slideFormat: "a5_portrait",
     onFieldChange: () => {},
     onPurposeChange: () => {},
+    onFormatChange: () => {},
   } as Parameters<typeof BasicsStep>[0]);
 
   const text = collectText(step).replace(/\s+/g, " ");

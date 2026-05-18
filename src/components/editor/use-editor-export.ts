@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState, type RefObject } from "react";
-import { compileEbookDocumentToHtml, type CelionEbookDocument } from "@/lib/ebook-document";
-import { EBOOK_PDF_A5_SIZE_PT } from "@/lib/ebook-format";
+import { compileSlideDocumentToHtml, type CelionSlideDocument } from "@/lib/slide-document";
+import { EBOOK_PDF_A5_SIZE_PT } from "@/lib/slide-format";
 import type { ExportFormat } from "./editor-shell-panels";
 import { clearEditorSelectionFromDocument, stripEditorMetadataFromHtml } from "./export-cleanup";
 
@@ -61,7 +61,7 @@ export function useEditorExport({
 
       if (format === "html") {
         const exportHtml = latestDocumentRef.current
-          ? compileEbookDocumentToHtml(latestDocumentRef.current)
+          ? compileSlideDocumentToHtml(latestDocumentRef.current)
           : html;
         if (!exportHtml.trim()) {
           throw new Error("No HTML content was found to export.");

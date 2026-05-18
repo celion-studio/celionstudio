@@ -4,7 +4,7 @@ import { memo, type CSSProperties, type RefObject } from "react";
 import { ArrowLeft, ChevronDown, Download, ImagePlus, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import type { CelionEditableElement } from "@/lib/ebook-document";
+import type { CelionEditableElement } from "@/lib/slide-document";
 import { CelionButton, CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { SlideSummary } from "./editor-preview";
 import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
@@ -113,7 +113,7 @@ export function EditorTopBar({
             </motion.div>
           )}
         </AnimatePresence>
-        {saving && <span className="editor-status editor-status-saving">Saving…</span>}
+        {saving && <span className="editor-status editor-status-saving">Saving...</span>}
         {saveError && (
           <span className="editor-status editor-status-error">
             {saveError}

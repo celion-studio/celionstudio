@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { countCelionSlides, normalizeEbookHtmlSlideContract, sanitizeEbookHtmlForCanvas, validateCelionSlideHtml } from "./ebook-html";
-import { ebookGenerationFailureStatus, parseEbookGenerateRequest } from "../app/api/ebook/generate/route";
-import { EbookGenerationError } from "./ebook-generation";
+import { ebookGenerationFailureStatus, parseSlideGenerateRequest } from "../app/api/ebook/generate/route";
+import { SlideGenerationError } from "./ebook-generation";
 import { MAX_EBOOK_PLAN_SLIDES } from "./request-limits";
 
 const validSlideHtml = `<!doctype html>
@@ -190,7 +190,7 @@ test("ebook generate request reports malformed JSON as invalid requests", async 
     body: "{not-json",
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(request.clone()), {
+  assert.deepEqual(await parseSlideGenerateRequest(request.clone()), {
     ok: false,
     message: "Invalid JSON",
   });
@@ -213,7 +213,7 @@ test("ebook generate request rejects excessive source volume before generation",
     }),
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(request), {
+  assert.deepEqual(await parseSlideGenerateRequest(request), {
     ok: false,
     message: "Too many sources. Maximum is 8.",
   });
@@ -230,7 +230,7 @@ test("ebook generate request rejects oversized fields before generation", async 
     }),
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(request), {
+  assert.deepEqual(await parseSlideGenerateRequest(request), {
     ok: false,
     message: "Title is too long. Maximum is 200 characters.",
   });
@@ -255,7 +255,7 @@ test("ebook generate request rejects oversized source content before generation"
     }),
   });
 
-  assert.deepEqual(await parseEbookGenerateRequest(request), {
+  assert.deepEqual(await parseSlideGenerateRequest(request), {
     ok: false,
     message: "Source content is too long. Maximum is 50000 characters per source.",
   });
@@ -280,7 +280,7 @@ test("ebook generate request ignores fallback sourceText limit when structured s
     }),
   });
 
-  const result = await parseEbookGenerateRequest(request);
+  const result = await parseSlideGenerateRequest(request);
 
   assert.equal(result.ok, true);
 });
@@ -297,7 +297,7 @@ test("ebook generate request accepts a bounded approved plan", async () => {
     }),
   });
 
-  const result = await parseEbookGenerateRequest(request);
+  const result = await parseSlideGenerateRequest(request);
 
   assert.equal(result.ok, true);
 });
@@ -314,7 +314,7 @@ test("ebook generate request normalizes oversized approved plans before generati
     }),
   });
 
-  const tooManySlidesResult = await parseEbookGenerateRequest(tooManySlides);
+  const tooManySlidesResult = await parseSlideGenerateRequest(tooManySlides);
   assert.equal(tooManySlidesResult.ok, true);
   if (tooManySlidesResult.ok) {
     assert.equal(tooManySlidesResult.data.plan?.slides.length, MAX_EBOOK_PLAN_SLIDES);
@@ -334,7 +334,7 @@ test("ebook generate request normalizes oversized approved plans before generati
     }),
   });
 
-  const overlongSlideBodyResult = await parseEbookGenerateRequest(overlongSlideBody);
+  const overlongSlideBodyResult = await parseSlideGenerateRequest(overlongSlideBody);
   assert.equal(overlongSlideBodyResult.ok, true);
   if (overlongSlideBodyResult.ok) {
     assert.equal(overlongSlideBodyResult.data.plan?.slides[0]?.body.length, 4000);
@@ -343,7 +343,7 @@ test("ebook generate request normalizes oversized approved plans before generati
 
 test("ebook generation route preserves provider timeout status", () => {
   assert.equal(
-    ebookGenerationFailureStatus(false, new EbookGenerationError(
+    ebookGenerationFailureStatus(false, new SlideGenerationError(
       "gemini_call_failed",
       "Vertex AI timed out while designing the ebook.",
       { status: 504, stage: "html" },
@@ -351,7 +351,7 @@ test("ebook generation route preserves provider timeout status", () => {
     504,
   );
   assert.equal(
-    ebookGenerationFailureStatus(true, new EbookGenerationError(
+    ebookGenerationFailureStatus(true, new SlideGenerationError(
       "plan_invalid",
       "Plan is too large or invalid.",
       { status: 504, stage: "plan" },
@@ -374,7 +374,7 @@ test("ebook generate request caps approved plan recommendation to actual slide c
     }),
   });
 
-  const result = await parseEbookGenerateRequest(request);
+  const result = await parseSlideGenerateRequest(request);
 
   assert.equal(result.ok, true);
   if (result.ok) {
@@ -405,7 +405,7 @@ test("ebook generate request accepts approved plans with nullable optional field
     }),
   });
 
-  const result = await parseEbookGenerateRequest(request);
+  const result = await parseSlideGenerateRequest(request);
 
   assert.equal(result.ok, true);
   if (result.ok) {

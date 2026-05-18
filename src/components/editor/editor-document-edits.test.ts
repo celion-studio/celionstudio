@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CelionEditableElement, CelionEbookDocument } from "@/lib/ebook-document";
+import type { CelionEditableElement, CelionSlideDocument } from "@/lib/slide-document";
 import type { RuntimeTextSelection } from "./editor-types";
 import {
   appendScopedLayoutBoxToDocument,
@@ -25,6 +25,7 @@ const baseDocument: CelionEbookDocument = {
   version: 1,
   title: "Guide",
   size: { width: 559, height: 794, unit: "px" },
+  format: "a5_portrait",
   themeCss: "",
   slides: [
     {

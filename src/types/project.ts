@@ -1,7 +1,7 @@
-import type { CelionEbookDocument } from "@/lib/ebook-document";
-import type { EbookStyle } from "@/lib/ebook-style";
+import type { CelionSlideDocument } from "@/lib/slide-document";
+import type { SlideStyle } from "@/lib/slide-style";
 
-export type { EbookStyle } from "@/lib/ebook-style";
+export type { SlideStyle } from "@/lib/slide-style";
 
 export type ProjectStatus =
   | "draft"
@@ -33,10 +33,10 @@ export type ProjectProfile = {
   purpose: string;
   designMode: DesignMode;
   tone: string;
-  ebookStyle: EbookStyle | null;
-  ebookHtml: string | null;
-  ebookDocument: CelionEbookDocument | null;
-  ebookPageCount: number;
+  slideStyle: SlideStyle | null;
+  slideHtml: string | null;
+  slideDocument: CelionSlideDocument | null;
+  slideCount: number;
   accentColor: string;
 };
 

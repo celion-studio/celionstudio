@@ -1,6 +1,7 @@
 "use client";
 
 import type { WizardPurpose } from "@/store/useProjectWizardStore";
+import type { CelionSlideFormat } from "@/lib/slide-format";
 import { Check, ChevronDown } from "lucide-react";
 
 const purposeOptions: {
@@ -29,6 +30,23 @@ const purposeOptions: {
   },
 ];
 
+const formatOptions: {
+  value: CelionSlideFormat;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "a5_portrait",
+    label: "A5 세로",
+    description: "559 × 794px – ebook, guide, report",
+  },
+  {
+    value: "16_9_landscape",
+    label: "16:9 가로",
+    description: "1280 × 720px – presentation, deck",
+  },
+];
+
 function Label({
   children,
 }: {
@@ -47,11 +65,13 @@ type BasicsStepProps = {
   targetAudience: string;
   purpose: WizardPurpose;
   purposeDetail: string;
+  slideFormat: CelionSlideFormat;
   onFieldChange: (
     field: "title" | "author" | "targetAudience" | "purposeDetail",
     value: string,
   ) => void;
   onPurposeChange: (purpose: WizardPurpose) => void;
+  onFormatChange: (format: CelionSlideFormat) => void;
 };
 
 export function BasicsStep({
@@ -60,10 +80,13 @@ export function BasicsStep({
   targetAudience,
   purpose,
   purposeDetail,
+  slideFormat,
   onFieldChange,
   onPurposeChange,
+  onFormatChange,
 }: BasicsStepProps) {
   const selectedPurpose = purposeOptions.find((option) => option.value === purpose);
+  const selectedFormat = formatOptions.find((option) => option.value === slideFormat);
 
   return (
     <div className="space-y-5">
@@ -98,6 +121,34 @@ export function BasicsStep({
           className="wizard-input"
         />
       </label>
+
+      <div className="wizard-field">
+        <Label>Slide format</Label>
+        <details className="wizard-purpose-details">
+          <summary
+            className="wizard-purpose-summary"
+            style={{ cursor: "pointer" }}
+          >
+            <span className="wizard-purpose-label">{selectedFormat?.label ?? "A5 ?�로"}</span>
+            <span className="wizard-purpose-hint">{selectedFormat?.description ?? "559 × 794px"}</span>
+            <ChevronDown size={16} strokeWidth={2} />
+          </summary>
+          <div className="wizard-purpose-dropdown">
+            {formatOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`wizard-purpose-option ${option.value === slideFormat ? "active" : ""}`}
+                onClick={() => onFormatChange(option.value)}
+              >
+                <Check size={16} strokeWidth={2} className={option.value === slideFormat ? "visible" : "hidden"} />
+                <span className="wizard-purpose-option-label">{option.label}</span>
+                <span className="wizard-purpose-option-hint">{option.description}</span>
+              </button>
+            ))}
+          </div>
+        </details>
+      </div>
 
       <div className="wizard-field">
         <Label>Purpose</Label>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { CelionEditableElement } from "@/lib/ebook-document";
+import type { CelionEditableElement } from "@/lib/slide-document";
 import { getLayoutTargetElement } from "./editor-layout-chrome";
 
 test("getLayoutTargetElement resolves duplicate editable ids inside the selected page", () => {

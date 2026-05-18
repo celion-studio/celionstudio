@@ -1,8 +1,21 @@
-export const SLIDE_SIZE_PX = {
-  width: 559,
-  height: 794,
-  unit: "px",
+export type CelionSlideFormat = "a5_portrait" | "16_9_landscape";
+
+export const SLIDE_FORMATS = {
+  a5_portrait: {
+    width: 559,
+    height: 794,
+    label: "A5 세로",
+    unit: "px",
+  },
+  "16_9_landscape": {
+    width: 1280,
+    height: 720,
+    label: "16:9 가로",
+    unit: "px",
+  },
 } as const;
+
+export const SLIDE_SIZE_PX = SLIDE_FORMATS.a5_portrait;
 
 export const SLIDE_SIZE_MM = {
   width: 148,

@@ -1,6 +1,6 @@
-import type { CelionEbookDocument, CelionSlide } from "@/lib/ebook-document";
-import { SLIDE_SIZE_PX } from "@/lib/ebook-format";
-import { sanitizeEbookHtmlForCanvas } from "@/lib/ebook-html";
+import type { CelionSlideDocument, CelionSlide } from "@/lib/slide-document";
+import { SLIDE_SIZE_PX } from "@/lib/slide-format";
+import { sanitizeEbookHtmlForCanvas } from "@/lib/slide-html";
 
 const SLIDE_HEIGHT: number = SLIDE_SIZE_PX.height;
 const SLIDE_GAP = 18;

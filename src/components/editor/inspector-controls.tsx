@@ -14,7 +14,7 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import type { CelionEditableElement } from "@/lib/ebook-document";
+import type { CelionEditableElement } from "@/lib/slide-document";
 import { CelionSegmentedControl } from "@/components/ui/celion-controls";
 import type { InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
 

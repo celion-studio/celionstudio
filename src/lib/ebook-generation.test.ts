@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  EbookGenerationError,
-  generateEbookHtml,
-  generateEbookHtmlFromPlan,
-  generateEbookHtmlWithDiagnostics,
+  SlideGenerationError,
+  generateSlideHtml,
+  generateSlideHtmlFromPlan,
+  generateSlideHtmlWithDiagnostics,
 } from "./ebook-generation";
-import { validateEbookDocument, type CelionEbookDocument } from "./ebook-document";
+import { validateSlideDocument, type CelionSlideDocument } from "./ebook-document";
 import { setGeminiClientFactoryForTests } from "./ai/gemini";
 
 const originalGoogleCloudProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -86,6 +86,7 @@ function validEbookDocument(titlePrefix = "Founder decision", slideCount = 10): 
     version: 1,
     title: "Source-led guide",
     size: { width: 559, height: 794, unit: "px" },
+    format: "a5_portrait",
     themeCss: "",
     slides: Array.from({ length: slideCount }, (_, index) => {
       const slideId = `page-${index + 1}`;
@@ -222,7 +223,7 @@ test("generateEbookHtml throws instead of saving fallback when plan Gemini is un
 
   try {
     await assert.rejects(
-      () => generateEbookHtml(baseArgs),
+      () => generateSlideHtml(baseArgs),
       /AI ebook planning failed/,
     );
   } finally {
@@ -253,19 +254,19 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
         },
       },
     }));
-    await assert.rejects(() => generateEbookHtml(args), /AI ebook planning failed/);
+    await assert.rejects(() => generateSlideHtml(args), /AI ebook planning failed/);
 
     setQueuedGemini([
       geminiJsonResponse(validPlan()),
       geminiJsonResponse({}),
     ]);
-    await assert.rejects(() => generateEbookHtml(args), /Gemini did not return an ebook document/);
+    await assert.rejects(() => generateSlideHtml(args), /Gemini did not return an ebook document/);
 
     setQueuedGemini([
       geminiJsonResponse(validPlan()),
       geminiJsonResponse({ document: { ...validEbookDocument(), slides: [] } }),
     ]);
-    await assert.rejects(() => generateEbookHtml(args), /did not pass Celion document validation/);
+    await assert.rejects(() => generateSlideHtml(args), /did not pass Celion document validation/);
 
     const warningText = JSON.stringify(warnings);
     assert.match(warningText, /gemini_call_failed/);
@@ -295,7 +296,7 @@ test("generateEbookHtml surfaces plan Gemini rate limits as retryable generation
 
   try {
     await assert.rejects(
-      () => generateEbookHtml(baseArgs),
+      () => generateSlideHtml(baseArgs),
       (error) =>
         error instanceof Error &&
         error.message.includes("Gemini rate limit") &&
@@ -326,7 +327,7 @@ test("generateEbookHtml surfaces document Gemini rate limits as retryable genera
 
   try {
     await assert.rejects(
-      () => generateEbookHtml(baseArgs),
+      () => generateSlideHtml(baseArgs),
       (error) =>
         error instanceof Error &&
         error.message.includes("Gemini rate limit") &&
@@ -351,7 +352,7 @@ test("generateEbookHtml rejects invalid plans before HTML generation", async () 
 
   try {
     await assert.rejects(
-      () => generateEbookHtml(baseArgs),
+      () => generateSlideHtml(baseArgs),
       /plan with only 0 usable slides/,
     );
     assert.equal(calls.length, 1);
@@ -385,9 +386,9 @@ test("generateEbookHtml rejects structurally unusable Gemini document with valid
 
   try {
     await assert.rejects(
-      () => generateEbookHtml(baseArgs),
+      () => generateSlideHtml(baseArgs),
       (error) =>
-        error instanceof EbookGenerationError &&
+        error instanceof SlideGenerationError &&
         error.stage === "html" &&
         error.reason === "invalid_html" &&
         typeof error.validation === "object" &&
@@ -417,7 +418,7 @@ test("generateEbookHtml compiles structurally valid Gemini documents into HTML",
   ]);
 
   try {
-    const html = await generateEbookHtml(baseArgs);
+    const html = await generateSlideHtml(baseArgs);
 
     assert.match(html, /The core idea/i);
   } finally {
@@ -452,7 +453,7 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
 
     assert.ok(result.diagnostics.ebookDocument);
     assert.match(result.html, /cov-eyebrow/);
@@ -476,9 +477,9 @@ test("generateEbookHtml decorates clean Gemini HTML without manifest entries", a
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
     const page = result.diagnostics.ebookDocument.slides[0]!;
-    const validation = validateEbookDocument(result.diagnostics.ebookDocument);
+    const validation = validateSlideDocument(result.diagnostics.ebookDocument);
 
     assert.equal(validation.ok, true, validation.errors.join("\n"));
     assert.match(page.html, /data-celion-slide="page-1"/);
@@ -523,7 +524,7 @@ test("generateEbookHtml removes inline style attributes from Gemini page HTML", 
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
     assert.ok(result.diagnostics.ebookDocument);
     const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
 
@@ -547,7 +548,7 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
 
     assert.match(result.html, /class="slide celion-page-shell"/);
     assert.match(result.html, /data-slide="1"/);
@@ -572,7 +573,7 @@ test("generateEbookHtmlWithDiagnostics caps extra document pages to the MVP coun
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
 
     assert.ok(result.diagnostics.ebookDocument);
     assert.equal(result.diagnostics.ebookDocument.slides.length, 10);
@@ -597,7 +598,7 @@ test("generateEbookHtmlWithDiagnostics rejects documents with fewer pages than t
 
   try {
     await assert.rejects(
-      () => generateEbookHtmlWithDiagnostics(baseArgs),
+      () => generateSlideHtmlWithDiagnostics(baseArgs),
       /Gemini returned 8 pages for a 10-slide plan/,
     );
   } finally {
@@ -628,7 +629,7 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
   ]);
 
   try {
-    const result = await generateEbookHtmlWithDiagnostics(baseArgs);
+    const result = await generateSlideHtmlWithDiagnostics(baseArgs);
     assert.ok(result.diagnostics.ebookDocument);
     const storedDocumentJson = JSON.stringify(result.diagnostics.ebookDocument);
 
@@ -654,7 +655,7 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
   ], calls, requestBodies);
 
   try {
-    await generateEbookHtml({ ...baseArgs, tone: "practical" });
+    await generateSlideHtml({ ...baseArgs, tone: "practical" });
 
     assert.ok(calls[0]?.includes("/models/gemini-2.5-flash-lite:generateContent"));
     assert.ok(calls[1]?.includes("/models/gemini-3.1-pro-preview:generateContent"));
@@ -738,7 +739,7 @@ test("generateEbookHtmlFromPlan renders approved plans in one document call", as
   ], calls, requestBodies);
 
   try {
-    const result = await generateEbookHtmlFromPlan(baseArgs, longPlan);
+    const result = await generateSlideHtmlFromPlan(baseArgs, longPlan);
 
     type HtmlRequestBody = {
       generationConfig?: { httpOptions?: { timeout?: number } };
@@ -793,7 +794,7 @@ test("ebook plan prompt matches the legacy 8-14 slide plan budget", async () => 
   ], calls, requestBodies);
 
   try {
-    await generateEbookHtml({ ...baseArgs, sourceText: longSource });
+    await generateSlideHtml({ ...baseArgs, sourceText: longSource });
     const planRequest = requestBodies[0] as {
       contents?: { parts?: { text?: string }[] }[];
     };
@@ -820,7 +821,7 @@ test("generateEbookHtml renders the normalized plan in a single HTML request", a
   ], [], requestBodies);
 
   try {
-    const html = await generateEbookHtml(baseArgs);
+    const html = await generateSlideHtml(baseArgs);
     const htmlRequest = requestBodies[1] as {
       contents?: { parts?: { text?: string }[] }[];
     };
