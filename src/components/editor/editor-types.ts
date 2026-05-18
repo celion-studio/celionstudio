@@ -4,8 +4,8 @@ export type EditorMode = "view" | "edit";
 
 export type RuntimeTextSelection = {
   mode: "document" | "legacy";
-  pageId: string;
-  pageIndex: number;
+  slideId: string;
+  slideIndex: number;
   textIndex: number;
 };
 
@@ -27,7 +27,7 @@ export type ReadyPreviewDocument = {
 
 export type SelectedElementState = {
   text: string;
-  pageId: string;
+  slideId: string;
   element: CelionEditableElement | null;
   selector: string;
   runtimeText: RuntimeTextSelection | null;

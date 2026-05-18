@@ -79,9 +79,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function normalizeStoredEbookDocument(raw: unknown): CelionEbookDocument | null {
-  if (!isRecord(raw) || !Array.isArray(raw.pages) || raw.pages.length === 0) {
+  if (!isRecord(raw)) {
     return null;
   }
+
+  const rawSlides = Array.isArray(raw.slides)
+    ? raw.slides
+    : Array.isArray(raw.pages)
+      ? raw.pages
+      : [];
+
+  if (rawSlides.length === 0) return null;
 
   return normalizeEbookDocument(raw);
 }

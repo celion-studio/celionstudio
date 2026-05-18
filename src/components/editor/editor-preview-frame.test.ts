@@ -75,7 +75,7 @@ class FakeDocument {
   };
   frameStyle: FakeStyleElement | null = null;
 
-  constructor(private readonly pages: FakePage[]) {}
+  constructor(private readonly slides: FakePage[]) {}
 
   getElementById(id: string) {
     return id === "celion-preview-frame-style" ? this.frameStyle : null;
@@ -86,7 +86,7 @@ class FakeDocument {
   }
 
   querySelectorAll(selector: string) {
-    return selector === ".slide" ? this.pages : [];
+    return selector === ".slide" ? this.slides : [];
   }
 }
 
@@ -103,10 +103,10 @@ test("preparePreviewFrame applies page spacing, no-ring frame CSS, and runtime t
 
   const result = preparePreviewFrame(
     { contentDocument: doc } as unknown as HTMLIFrameElement,
-    { previewWidth: 640, pageGap: 28 },
+    { previewWidth: 640, slideGap: 28 },
   );
 
-  assert.equal(result?.pages.length, 2);
+  assert.equal(result?.slides.length, 2);
   assert.equal((doc.body.style as Record<string, string>).minWidth, "640px");
   assert.equal(pages[0]!.style.marginBottom, "28px");
   assert.equal(pages[1]!.style.marginBottom, "0");
@@ -123,7 +123,7 @@ test("measurePreviewFrameHeight uses measured and deterministic page heights", (
 
   const height = measurePreviewFrameHeight(
     { contentDocument: doc } as unknown as HTMLIFrameElement,
-    { pageHeight: 794, pageGap: 28 },
+    { slideHeight: 794, slideGap: 28 },
   );
 
   assert.equal(height, 1684);

@@ -77,14 +77,14 @@ test("hideEditorChromeForExport hides editor-only controls and restores them", (
 });
 
 test("stripEditorMetadataFromHtml removes transient editor attributes but keeps stable edit ids", () => {
-  const html = `<section data-celion-page="page-1" class="celion-page">
+  const html = `<section data-celion-slide="page-1" class="celion-page">
   <h1 data-celion-id="title" data-role="title" data-editable="true" data-selected="true">Title</h1>
   <div data-celion-editor-chrome="true" data-celion-hovered="layout"></div>
 </section>`;
 
   const cleanHtml = stripEditorMetadataFromHtml(html);
 
-  assert.match(cleanHtml, /data-celion-page="page-1"/);
+  assert.match(cleanHtml, /data-celion-slide="page-1"/);
   assert.match(cleanHtml, /data-celion-id="title"/);
   assert.doesNotMatch(cleanHtml, /data-role|data-editable|data-selected|data-celion-hovered|data-celion-editor-chrome/);
 });

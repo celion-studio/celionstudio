@@ -29,7 +29,7 @@ function validateEbookDocumentSaveSize(document: unknown) {
   }
 
   if (!isRecord(document)) return null;
-  const pages = Array.isArray(document.pages) ? document.pages : [];
+  const pages = Array.isArray(document.slides) ? document.slides : [];
   if (pages.length > MAX_EBOOK_DOCUMENT_PAGES) {
     return `Too many ebook pages. Maximum is ${MAX_EBOOK_DOCUMENT_PAGES}.`;
   }

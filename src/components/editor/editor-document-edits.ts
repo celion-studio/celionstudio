@@ -47,8 +47,8 @@ function escapeHtmlAttribute(value: string) {
     .replace(/>/g, "&gt;");
 }
 
-function imageIdBase(pageId: string) {
-  const normalizedPageId = pageId
+function imageIdBase(slideId: string) {
+  const normalizedPageId = slideId
     .trim()
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/^-+|-+$/g, "")
@@ -56,7 +56,7 @@ function imageIdBase(pageId: string) {
   return `${normalizedPageId}-image`;
 }
 
-function nextImageElementId(page: CelionEbookDocument["pages"][number]) {
+function nextImageElementId(page: CelionEbookDocument["slides"][number]) {
   const base = imageIdBase(page.id);
   const usedIds = new Set([
     ...page.manifest.editableElements.map((element) => element.id),
@@ -103,10 +103,10 @@ function appendScopedDeclarationsToDocument(input: {
   if (declarations.length === 0) return { ok: false, reason: "not-applicable" };
 
   const nextDocument = structuredClone(input.document) as CelionEbookDocument;
-  const page = nextDocument.pages.find((item) => item.id === input.selectedPageId);
+  const page = nextDocument.slides.find((item) => item.id === input.selectedPageId);
   if (!page) return { ok: false, reason: "not-applicable" };
 
-  const selector = `[data-celion-page="${page.id}"] ${input.selectedElement.selector}`;
+  const selector = `[data-celion-slide="${page.id}"] ${input.selectedElement.selector}`;
   if (selector.includes("runtime-text:")) return { ok: false, reason: "not-applicable" };
 
   const markers = styleMarker(page.id, input.selectedElement.id);
@@ -145,10 +145,10 @@ function replaceScopedLayoutDeclarationsInDocument(input: {
   if (nextDeclarations.length === 0) return { ok: false, reason: "not-applicable" };
 
   const nextDocument = structuredClone(input.document) as CelionEbookDocument;
-  const page = nextDocument.pages.find((item) => item.id === input.selectedPageId);
+  const page = nextDocument.slides.find((item) => item.id === input.selectedPageId);
   if (!page) return { ok: false, reason: "not-applicable" };
 
-  const selector = `[data-celion-page="${page.id}"] ${input.selectedElement.selector}`;
+  const selector = `[data-celion-slide="${page.id}"] ${input.selectedElement.selector}`;
   if (selector.includes("runtime-text:")) return { ok: false, reason: "not-applicable" };
 
   const markers = layoutMarker(page.id, input.selectedElement.id);
@@ -174,8 +174,8 @@ export function applyDocumentTextEdit(input: {
   const currentDocument = input.document;
   if (!currentDocument || !input.selectedPageId) return { ok: false, reason: "not-applicable" };
 
-  const pageIndex = currentDocument.pages.findIndex((page) => page.id === input.selectedPageId);
-  const page = pageIndex >= 0 ? currentDocument.pages[pageIndex] : null;
+  const slideIndex = currentDocument.slides.findIndex((page) => page.id === input.selectedPageId);
+  const page = slideIndex >= 0 ? currentDocument.slides[slideIndex] : null;
   if (!page) return { ok: false, reason: "not-applicable" };
 
   const doc = (input.parseHtml ?? parseHtmlDocument)(page.html);
@@ -192,7 +192,7 @@ export function applyDocumentTextEdit(input: {
     ok: true,
     value: {
       ...currentDocument,
-      pages: currentDocument.pages.map((item, index) => index === pageIndex
+      slides: currentDocument.slides.map((item, index) => index === slideIndex
         ? {
             ...item,
             html: doc.body.innerHTML,
@@ -287,20 +287,20 @@ export function appendScopedLayoutBoxToDocument(input: {
 
 export function insertImageIntoDocument(input: {
   document: CelionEbookDocument | null;
-  pageIndex: number;
+  slideIndex: number;
   src: string;
   alt: string;
-}): EditResult<{ document: CelionEbookDocument; pageId: string; element: CelionEditableElement }> {
-  if (!input.document || !Number.isFinite(input.pageIndex) || !isSafeEditorImageSrc(input.src)) {
+}): EditResult<{ document: CelionEbookDocument; slideId: string; element: CelionEditableElement }> {
+  if (!input.document || !Number.isFinite(input.slideIndex) || !isSafeEditorImageSrc(input.src)) {
     return { ok: false, reason: "not-applicable" };
   }
 
-  const pageIndex = Math.trunc(input.pageIndex);
-  const currentPage = input.document.pages[pageIndex];
+  const slideIndex = Math.trunc(input.slideIndex);
+  const currentPage = input.document.slides[slideIndex];
   if (!currentPage) return { ok: false, reason: "not-applicable" };
 
   const nextDocument = structuredClone(input.document) as CelionEbookDocument;
-  const page = nextDocument.pages[pageIndex];
+  const page = nextDocument.slides[slideIndex];
   if (!page) return { ok: false, reason: "not-applicable" };
 
   const id = nextImageElementId(page);
@@ -315,7 +315,7 @@ export function insertImageIntoDocument(input: {
   const safeSrc = escapeHtmlAttribute(input.src.trim());
   const safeAlt = escapeHtmlAttribute(input.alt.trim() || "Inserted image");
   const imageHtml = `<img class="celion-inserted-image" data-celion-id="${id}" data-role="image" data-editable="true" src="${safeSrc}" alt="${safeAlt}" />`;
-  const selector = `[data-celion-page="${page.id}"] ${element.selector}`;
+  const selector = `[data-celion-slide="${page.id}"] ${element.selector}`;
   const imageCss = `${selector} { position: absolute; left: 48px; top: 96px; width: 220px; height: 160px; object-fit: cover; display: block; border-radius: 10px; }`;
 
   page.html = insertBeforePageClose(page.html, imageHtml);
@@ -340,7 +340,7 @@ export function insertImageIntoDocument(input: {
     ok: true,
     value: {
       document: nextDocument,
-      pageId: page.id,
+      slideId: page.id,
       element,
     },
   };
@@ -356,10 +356,10 @@ export function removeScopedLayoutFromDocument(input: {
   }
 
   const nextDocument = structuredClone(input.document) as CelionEbookDocument;
-  const page = nextDocument.pages.find((item) => item.id === input.selectedPageId);
+  const page = nextDocument.slides.find((item) => item.id === input.selectedPageId);
   if (!page) return { ok: false, reason: "not-applicable" };
 
-  const selector = `[data-celion-page="${page.id}"] ${input.selectedElement.selector}`;
+  const selector = `[data-celion-slide="${page.id}"] ${input.selectedElement.selector}`;
   if (selector.includes("runtime-text:")) return { ok: false, reason: "not-applicable" };
 
   const originalCss = page.css.trim();

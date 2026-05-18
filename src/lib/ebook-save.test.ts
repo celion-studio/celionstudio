@@ -63,19 +63,19 @@ test("prepareEbookDocumentForSave validates and compiles a page-level document",
     title: "Minimal ebook",
     size: { width: 559, height: 794, unit: "px" },
     themeCss: "",
-    pages: [
+    slides: [
       {
         id: "page-1",
         index: 0,
         title: "Opening page",
         role: "cover",
         html: `
-          <section data-celion-page="page-1">
+          <section data-celion-slide="page-1">
             <h1>Opening page</h1>
             <p>A concise page-level ebook document can be compiled for the canvas.</p>
           </section>
         `,
-        css: `[data-celion-page="page-1"] { color: oklch(0.2 0.03 240); }`,
+        css: `[data-celion-slide="page-1"] { color: oklch(0.2 0.03 240); }`,
         manifest: { editableElements: [] },
         version: 1,
       },
@@ -86,7 +86,7 @@ test("prepareEbookDocumentForSave validates and compiles a page-level document",
   assert.match(result.html, /class="slide celion-page-shell"/);
   assert.doesNotMatch(result.html, /oklch/i);
   if (result.ok) {
-    assert.doesNotMatch(result.document.pages[0]?.css ?? "", /oklch/i);
+    assert.doesNotMatch(result.document.slides[0]?.css ?? "", /oklch/i);
   }
 });
 
@@ -96,12 +96,12 @@ test("prepareEbookDocumentForSave rejects oversized save payloads", () => {
     title: "Too many pages",
     size: { width: 559, height: 794, unit: "px" },
     themeCss: "",
-    pages: Array.from({ length: 31 }, (_, index) => ({
+    slides: Array.from({ length: 31 }, (_, index) => ({
       id: `page-${index + 1}`,
       index,
       title: `Page ${index + 1}`,
       role: "page",
-      html: `<section data-celion-page="page-${index + 1}"><p>Readable page.</p></section>`,
+      html: `<section data-celion-slide="page-${index + 1}"><p>Readable page.</p></section>`,
       css: "",
       manifest: { editableElements: [] },
       version: 1,
@@ -122,14 +122,14 @@ test("prepareEbookDocumentForSave rejects malformed document inputs", () => {
       title: "Malformed manifest",
       size: { width: 559, height: 794, unit: "px" },
       themeCss: "",
-      pages: [
+      slides: [
         {
           id: "page-1",
           index: 0,
           title: "Opening page",
           role: "cover",
           html: `
-            <section data-celion-page="page-1">
+            <section data-celion-slide="page-1">
               <h1 data-celion-id="headline">Opening page</h1>
             </section>
           `,

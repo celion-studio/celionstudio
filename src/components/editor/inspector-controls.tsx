@@ -242,9 +242,14 @@ export function InspectorControls({
 }: Props) {
   if (!element) {
     return (
-      <p className="inspector-empty">
-        Click an editable element in the preview.
-      </p>
+      <div className="inspector-empty">
+        <Type size={22} strokeWidth={1.5} />
+        <p className="inspector-empty-heading">Select an element</p>
+        <p className="inspector-empty-text">
+          Click any text or shape on a page in the preview to edit its
+          content, style, and layout.
+        </p>
+      </div>
     );
   }
 
@@ -348,6 +353,12 @@ export function InspectorControls({
           <textarea
             value={textValue}
             onChange={(event) => onTextChange(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                onApplyText();
+              }
+            }}
             rows={6}
             className="inspector-input inspector-textarea"
           />

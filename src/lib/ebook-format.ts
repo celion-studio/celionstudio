@@ -1,10 +1,10 @@
-export const EBOOK_PAGE_SIZE_PX = {
+export const SLIDE_SIZE_PX = {
   width: 559,
   height: 794,
   unit: "px",
 } as const;
 
-export const EBOOK_PAGE_SIZE_MM = {
+export const SLIDE_SIZE_MM = {
   width: 148,
   height: 210,
   unit: "mm",
@@ -16,5 +16,5 @@ export const EBOOK_PDF_A5_SIZE_PT = {
   unit: "pt",
 } as const;
 
-export const EBOOK_PAGE_SIZE_CSS_PX = `${EBOOK_PAGE_SIZE_PX.width}px x ${EBOOK_PAGE_SIZE_PX.height}px`;
-export const EBOOK_PAGE_SIZE_CSS_MM = `${EBOOK_PAGE_SIZE_MM.width}mm ${EBOOK_PAGE_SIZE_MM.height}mm`;
+export const SLIDE_SIZE_CSS_PX = `${SLIDE_SIZE_PX.width}px x ${SLIDE_SIZE_PX.height}px`;
+export const SLIDE_SIZE_CSS_MM = `${SLIDE_SIZE_MM.width}mm ${SLIDE_SIZE_MM.height}mm`;

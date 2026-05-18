@@ -57,8 +57,8 @@ test("profileFromRow normalizes stored ebook document JSON", () => {
 
   assert.equal(profile.ebookDocument?.version, 1);
   assert.equal(profile.ebookDocument?.title, "Stored book");
-  assert.equal(profile.ebookDocument?.pages[0]?.id, "cover");
-  assert.equal(profile.ebookDocument?.pages[0]?.title, "Page 1");
+  assert.equal(profile.ebookDocument?.slides[0]?.id, "cover");
+  assert.equal(profile.ebookDocument?.slides[0]?.title, "Page 1");
 });
 
 test("profileFromRow ignores empty or malformed ebook document JSON", () => {

@@ -81,27 +81,27 @@ function geminiJsonResponse(value: unknown, init: ResponseInit = {}) {
   );
 }
 
-function validEbookDocument(titlePrefix = "Founder decision", pageCount = 10): CelionEbookDocument {
+function validEbookDocument(titlePrefix = "Founder decision", slideCount = 10): CelionEbookDocument {
   return {
     version: 1,
     title: "Source-led guide",
     size: { width: 559, height: 794, unit: "px" },
     themeCss: "",
-    pages: Array.from({ length: pageCount }, (_, index) => {
-      const pageId = `page-${index + 1}`;
-      const titleId = `${pageId}-title`;
-      const bodyId = `${pageId}-body`;
+    slides: Array.from({ length: slideCount }, (_, index) => {
+      const slideId = `page-${index + 1}`;
+      const titleId = `${slideId}-title`;
+      const bodyId = `${slideId}-body`;
       return {
-        id: pageId,
+        id: slideId,
         index,
         title: `${titlePrefix} ${index + 1}`,
-        role: index === 0 ? "cover" : index === pageCount - 1 ? "cta" : "insight",
+        role: index === 0 ? "cover" : index === slideCount - 1 ? "cta" : "insight",
         version: 1,
-        html: `<section data-celion-page="${pageId}" class="celion-page">
+        html: `<section data-celion-slide="${slideId}" class="celion-page">
   <h1 data-celion-id="${titleId}" data-role="title" data-editable="true">${titlePrefix} ${index + 1}</h1>
   <p data-celion-id="${bodyId}" data-role="body" data-editable="true">${"Useful ebook content ".repeat(14)}</p>
 </section>`,
-        css: `[data-celion-page="${pageId}"] {
+        css: `[data-celion-slide="${slideId}"] {
   width: 559px;
   height: 794px;
   overflow: hidden;
@@ -109,12 +109,12 @@ function validEbookDocument(titlePrefix = "Founder decision", pageCount = 10): C
   color: #111111;
   background: #ffffff;
 }
-[data-celion-page="${pageId}"] h1 {
+[data-celion-slide="${slideId}"] h1 {
   margin: 0 0 28px;
   font-size: 42px;
   line-height: 1.08;
 }
-[data-celion-page="${pageId}"] p {
+[data-celion-slide="${slideId}"] p {
   margin: 0;
   font-size: 18px;
   line-height: 1.62;
@@ -146,14 +146,14 @@ function validEbookDocument(titlePrefix = "Founder decision", pageCount = 10): C
   };
 }
 
-function cleanEbookDocument(titlePrefix = "Clean decision", pageCount = 10): CelionEbookDocument {
-  const document = validEbookDocument(titlePrefix, pageCount);
+function cleanEbookDocument(titlePrefix = "Clean decision", slideCount = 10): CelionEbookDocument {
+  const document = validEbookDocument(titlePrefix, slideCount);
   return {
     ...document,
-    pages: document.pages.map((page) => ({
+    slides: document.slides.map((page) => ({
       ...page,
       html: page.html
-        .replace(/\sdata-celion-page="[^"]+"/, "")
+        .replace(/\sdata-celion-slide="[^"]+"/, "")
         .replace(/\sdata-celion-id="[^"]+"/g, "")
         .replace(/\sdata-role="[^"]+"/g, "")
         .replace(/\sdata-editable="true"/g, ""),
@@ -263,7 +263,7 @@ test("generateEbookHtml logs failure reasons without source text", async () => {
 
     setQueuedGemini([
       geminiJsonResponse(validPlan()),
-      geminiJsonResponse({ document: { ...validEbookDocument(), pages: [] } }),
+      geminiJsonResponse({ document: { ...validEbookDocument(), slides: [] } }),
     ]);
     await assert.rejects(() => generateEbookHtml(args), /did not pass Celion document validation/);
 
@@ -373,9 +373,9 @@ test("generateEbookHtml rejects structurally unusable Gemini document with valid
     geminiJsonResponse({
       document: {
         ...validEbookDocument(),
-        pages: [
+        slides: [
           {
-            ...validEbookDocument().pages[0],
+            ...validEbookDocument().slides[0],
             css: `.bad { color: red; }`,
           },
         ],
@@ -395,7 +395,7 @@ test("generateEbookHtml rejects structurally unusable Gemini document with valid
         "errors" in error.validation &&
         Array.isArray(error.validation.errors) &&
         error.validation.errors.some((message: unknown) =>
-          typeof message === "string" && message.includes('must start with [data-celion-page="page-1"]'),
+          typeof message === "string" && message.includes('must start with [data-celion-slide="page-1"]'),
         ),
     );
   } finally {
@@ -434,8 +434,8 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   const document = validEbookDocument("Recovered manifest");
-  const firstPage = document.pages[0]!;
-  document.pages[0] = {
+  const firstPage = document.slides[0]!;
+  document.slides[0] = {
     ...firstPage,
     html: firstPage.html.replace(
       "<h1",
@@ -456,7 +456,7 @@ test("generateEbookHtml repairs missing manifest entries from Gemini page HTML",
 
     assert.ok(result.diagnostics.ebookDocument);
     assert.match(result.html, /cov-eyebrow/);
-    assert.ok(result.diagnostics.ebookDocument.pages[0]?.manifest.editableElements.some((element) => element.id === "cov-eyebrow"));
+    assert.ok(result.diagnostics.ebookDocument.slides[0]?.manifest.editableElements.some((element) => element.id === "cov-eyebrow"));
   } finally {
     restoreWarn();
     globalThis.fetch = originalFetch;
@@ -477,11 +477,11 @@ test("generateEbookHtml decorates clean Gemini HTML without manifest entries", a
 
   try {
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
-    const page = result.diagnostics.ebookDocument.pages[0]!;
+    const page = result.diagnostics.ebookDocument.slides[0]!;
     const validation = validateEbookDocument(result.diagnostics.ebookDocument);
 
     assert.equal(validation.ok, true, validation.errors.join("\n"));
-    assert.match(page.html, /data-celion-page="page-1"/);
+    assert.match(page.html, /data-celion-slide="page-1"/);
     assert.match(page.html, /data-celion-id="page-1-text-001"/);
     assert.ok(page.manifest.editableElements.some((element) => element.id === "page-1-text-001"));
   } finally {
@@ -498,23 +498,23 @@ test("generateEbookHtml removes inline style attributes from Gemini page HTML", 
   const restoreWarn = muteConsoleWarn();
   process.env.GEMINI_API_KEY = "test-key";
   const document = validEbookDocument("Inline style repair");
-  const fourthPage = document.pages[3]!;
-  const sixthPage = document.pages[5]!;
-  document.pages[3] = {
+  const fourthPage = document.slides[3]!;
+  const sixthPage = document.slides[5]!;
+  document.slides[3] = {
     ...fourthPage,
     id: "p4",
     html: fourthPage.html
-      .replace(/data-celion-page="page-4"/g, `data-celion-page="p4"`)
+      .replace(/data-celion-slide="page-4"/g, `data-celion-slide="p4"`)
       .replace("<h1", `<h1 style="font-size: 999px; color: red;"`),
-    css: fourthPage.css.replaceAll(`[data-celion-page="page-4"]`, `[data-celion-page="p4"]`),
+    css: fourthPage.css.replaceAll(`[data-celion-slide="page-4"]`, `[data-celion-slide="p4"]`),
   };
-  document.pages[5] = {
+  document.slides[5] = {
     ...sixthPage,
     id: "p6",
     html: sixthPage.html
-      .replace(/data-celion-page="page-6"/g, `data-celion-page="p6"`)
+      .replace(/data-celion-slide="page-6"/g, `data-celion-slide="p6"`)
       .replace("<p", `<p style='margin-top:0'`),
-    css: sixthPage.css.replaceAll(`[data-celion-page="page-6"]`, `[data-celion-page="p6"]`),
+    css: sixthPage.css.replaceAll(`[data-celion-slide="page-6"]`, `[data-celion-slide="p6"]`),
   };
 
   setQueuedGemini([
@@ -553,8 +553,8 @@ test("generateEbookHtmlWithDiagnostics includes the normalized ebook document", 
     assert.match(result.html, /data-slide="1"/);
     assert.ok(result.diagnostics.ebookDocument);
     assert.equal(result.diagnostics.ebookDocument.version, 1);
-    assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
-    assert.equal(result.diagnostics.ebookDocument.pages[0]?.id, "page-1");
+    assert.equal(result.diagnostics.ebookDocument.slides.length, 10);
+    assert.equal(result.diagnostics.ebookDocument.slides[0]?.id, "page-1");
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -575,7 +575,7 @@ test("generateEbookHtmlWithDiagnostics caps extra document pages to the MVP coun
     const result = await generateEbookHtmlWithDiagnostics(baseArgs);
 
     assert.ok(result.diagnostics.ebookDocument);
-    assert.equal(result.diagnostics.ebookDocument.pages.length, 10);
+    assert.equal(result.diagnostics.ebookDocument.slides.length, 10);
     assert.match(result.html, /Extra page 10/i);
     assert.doesNotMatch(result.html, /Extra page 11/i);
   } finally {
@@ -614,11 +614,11 @@ test("generateEbookHtmlWithDiagnostics sanitizes unsupported color functions in 
   process.env.GEMINI_API_KEY = "test-key";
   const document = validEbookDocument("Color-safe insight");
   document.themeCss = `:root { --shadow-color: color-mix(in srgb, #111 30%, white); }`;
-  const firstPage = document.pages[0]!;
-  document.pages[0] = {
+  const firstPage = document.slides[0]!;
+  document.slides[0] = {
     ...firstPage,
     css: `${firstPage.css}
-[data-celion-page="page-1"] .accent {
+[data-celion-slide="page-1"] .accent {
   background: oklch(0.72 0.12 240);
 }`,
   };
@@ -695,11 +695,11 @@ test("ebook generation uses Flash-Lite for plan and Pro for document design", as
     assert.match(htmlPrompt, /at least five distinct layout families/);
     assert.match(htmlPrompt, /Do not reuse the same "headline \+ paragraph \+ one box" skeleton on consecutive pages/);
     assert.match(htmlPrompt, /Output only JSON with one "document" field/);
-    assert.match(htmlPrompt, /Generate all pages in one response/);
-    assert.match(htmlPrompt, /Generate exactly 10 pages/);
-    assert.match(htmlPrompt, /data-celion-page="\{pageId\}"/);
+    assert.match(htmlPrompt, /Generate all slides in one response/);
+    assert.match(htmlPrompt, /Generate exactly 10 slides/);
+    assert.match(htmlPrompt, /data-celion-slide="\{slideId\}"/);
     assert.match(htmlPrompt, /Never put style="" attributes in HTML/);
-    assert.match(htmlPrompt, /Every page CSS selector starts with \[data-celion-page="\{pageId\}"\]/);
+    assert.match(htmlPrompt, /Every slide CSS selector starts with \[data-celion-slide="\{slideId\}"\]/);
     assert.match(htmlPrompt, /Use clean semantic HTML with meaningful class names/);
     assert.match(htmlPrompt, /Keep editable text, images, card titles, block titles, labels, captions, badges, and list headings as separate DOM nodes/);
     assert.match(htmlPrompt, /Do not add Celion editor metadata manually/);
@@ -751,15 +751,15 @@ test("generateEbookHtmlFromPlan renders approved plans in one document call", as
     assert.ok(calls.every((call) => call.includes("/models/gemini-3.1-pro-preview:generateContent")));
     assert.ok(htmlRequests.every((request) => request.generationConfig?.httpOptions === undefined));
     assert.ok(result.ebookDocument);
-    assert.equal(result.ebookDocument.pages.length, 14);
+    assert.equal(result.ebookDocument.slides.length, 14);
     assert.equal(result.generationTrace.length, 1);
     assert.deepEqual(result.generationTrace.map((trace) => trace.status), ["success"]);
     assert.deepEqual(result.generationTrace.map((trace) => [trace.slideStart, trace.slideEnd]), [[1, 14]]);
-    assert.deepEqual(result.generationTrace.map((trace) => trace.pageCount), [14]);
+      assert.deepEqual(result.generationTrace.map((trace) => trace.slideCount), [14]);
     assert.ok(result.generationTrace.every((trace) => trace.durationMs !== undefined && trace.durationMs >= 0));
     assert.ok(result.generationTrace.every((trace) => trace.promptLength > 0));
     assert.equal(result.generationTrace[0]?.slideHeadlines[13], "Source-led decision 14");
-    assert.deepEqual(result.ebookDocument.pages.map((page) => page.id), Array.from({ length: 14 }, (_, index) => `page-${index + 1}`));
+    assert.deepEqual(result.ebookDocument.slides.map((page) => page.id), Array.from({ length: 14 }, (_, index) => `page-${index + 1}`));
     assert.match(result.html, /Single pass 14/i);
 
     assert.doesNotMatch(htmlPrompts[0] ?? "", /Batch 1 of/);

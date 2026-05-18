@@ -1,5 +1,5 @@
 import { normalizeEbookHtmlSlideContract, sanitizeEbookHtmlForCanvas } from "./ebook-html";
-import { EBOOK_PAGE_SIZE_MM, EBOOK_PAGE_SIZE_PX } from "./ebook-format";
+import { SLIDE_SIZE_MM, SLIDE_SIZE_PX } from "./ebook-format";
 
 export type CelionEditableProp =
   | "text"
@@ -27,18 +27,18 @@ export type CelionEditableElement = {
   maxLength?: number;
 };
 
-export type CelionPageManifest = {
+export type CelionSlideManifest = {
   editableElements: CelionEditableElement[];
 };
 
-export type CelionEbookPage = {
+export type CelionSlide = {
   id: string;
   index: number;
   title: string;
   role: string;
   html: string;
   css: string;
-  manifest: CelionPageManifest;
+  manifest: CelionSlideManifest;
   version: number;
 };
 
@@ -47,7 +47,7 @@ export type CelionEbookDocument = {
   title: string;
   size: { width: number; height: number; unit: "px" };
   themeCss: string;
-  pages: CelionEbookPage[];
+  slides: CelionSlide[];
 };
 
 export type EbookDocumentValidation = {
@@ -55,9 +55,9 @@ export type EbookDocumentValidation = {
   errors: string[];
 };
 
-type InsertEbookDocumentPageInput = {
+type InsertSlideInput = {
   document: CelionEbookDocument;
-  page: CelionEbookPage;
+  slide: CelionSlide;
   insertIndex: number;
 };
 
@@ -124,8 +124,9 @@ function normalizeEditableElement(value: unknown): CelionEditableElement {
   return element;
 }
 
-function normalizeManifest(value: unknown): CelionPageManifest {
+function normalizeManifest(value: unknown): CelionSlideManifest {
   const input = isRecord(value) ? value : {};
+
   return {
     editableElements: Array.isArray(input.editableElements)
       ? input.editableElements.map(normalizeEditableElement)
@@ -133,7 +134,7 @@ function normalizeManifest(value: unknown): CelionPageManifest {
   };
 }
 
-function normalizePage(value: unknown, index: number): CelionEbookPage {
+function normalizePage(value: unknown, index: number): CelionSlide {
   const input = isRecord(value) ? value : {};
   const id = normalizeString(input.id, `page-${index + 1}`) || `page-${index + 1}`;
 
@@ -165,24 +166,24 @@ function uniquePageId(baseId: string, usedIds: Set<string>) {
   return candidate;
 }
 
-function rewritePageId(page: CelionEbookPage, nextId: string): CelionEbookPage {
+function rewritePageId(page: CelionSlide, nextId: string): CelionSlide {
   if (page.id === nextId) return page;
 
   const escapedPageId = page.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const quotedPagePattern = new RegExp(`data-celion-page=(["'])${escapedPageId}\\1`, "g");
-  const cssScopePattern = new RegExp(`\\[data-celion-page=(["'])${escapedPageId}\\1\\]`, "g");
+  const quotedPagePattern = new RegExp(`data-celion-slide=(["'])${escapedPageId}\\1`, "g");
+  const cssScopePattern = new RegExp(`\\[data-celion-slide=(["'])${escapedPageId}\\1\\]`, "g");
 
   return {
     ...page,
     id: nextId,
-    html: page.html.replace(quotedPagePattern, `data-celion-page="${
+    html: page.html.replace(quotedPagePattern, `data-celion-slide="${
       nextId
     }"`),
-    css: page.css.replace(cssScopePattern, `[data-celion-page="${nextId}"]`),
+    css: page.css.replace(cssScopePattern, `[data-celion-slide="${nextId}"]`),
   };
 }
 
-function reindexPages(pages: CelionEbookPage[]) {
+function reindexPages(pages: CelionSlide[]) {
   return pages.map((page, index) => ({
     ...page,
     index,
@@ -192,39 +193,44 @@ function reindexPages(pages: CelionEbookPage[]) {
 export function normalizeEbookDocument(input: unknown): CelionEbookDocument {
   const value = isRecord(input) ? input : {};
   const size = isRecord(value.size) ? value.size : {};
+  const rawSlides = Array.isArray(value.slides)
+    ? value.slides
+    : Array.isArray(value.pages)
+      ? value.pages
+      : [];
 
   return {
     version: 1,
     title: normalizeString(value.title),
     size: {
-      width: normalizeNumber(size.width, EBOOK_PAGE_SIZE_PX.width),
-      height: normalizeNumber(size.height, EBOOK_PAGE_SIZE_PX.height),
+      width: normalizeNumber(size.width, SLIDE_SIZE_PX.width),
+      height: normalizeNumber(size.height, SLIDE_SIZE_PX.height),
       unit: "px",
     },
     themeCss: normalizeString(value.themeCss),
-    pages: Array.isArray(value.pages) ? value.pages.map(normalizePage) : [],
+    slides: rawSlides.map(normalizePage),
   };
 }
 
-export function insertEbookDocumentPage({
+export function insertSlide({
   document,
-  page,
+  slide,
   insertIndex,
-}: InsertEbookDocumentPageInput): CelionEbookDocument {
+}: InsertSlideInput): CelionEbookDocument {
   const normalizedDocument = normalizeEbookDocument(document);
-  const normalizedPage = normalizePage(page, insertIndex);
-  const clampedIndex = Math.max(0, Math.min(insertIndex, normalizedDocument.pages.length));
-  const usedIds = new Set(normalizedDocument.pages.map((item) => item.id));
-  const nextPage = rewritePageId(normalizedPage, uniquePageId(normalizedPage.id, usedIds));
-  const pages = [
-    ...normalizedDocument.pages.slice(0, clampedIndex),
-    nextPage,
-    ...normalizedDocument.pages.slice(clampedIndex),
+  const normalizedSlide = normalizePage(slide, insertIndex);
+  const clampedIndex = Math.max(0, Math.min(insertIndex, normalizedDocument.slides.length));
+  const usedIds = new Set(normalizedDocument.slides.map((item) => item.id));
+  const nextSlide = rewritePageId(normalizedSlide, uniquePageId(normalizedSlide.id, usedIds));
+  const slides = [
+    ...normalizedDocument.slides.slice(0, clampedIndex),
+    nextSlide,
+    ...normalizedDocument.slides.slice(clampedIndex),
   ];
 
   return normalizeEbookDocument({
     ...normalizedDocument,
-    pages: reindexPages(pages),
+    slides: reindexPages(slides),
   });
 }
 
@@ -232,7 +238,7 @@ function hasForbiddenTag(html: string) {
   return FORBIDDEN_TAGS.find((tag) => new RegExp(`<\\s*${tag}(?:\\s|>|/)`, "i").test(html));
 }
 
-function manifestIds(page: CelionEbookPage) {
+function manifestIds(page: CelionSlide) {
   return page.manifest.editableElements.map((element) => element.id).filter(Boolean);
 }
 
@@ -290,7 +296,7 @@ function hasMeaningfulContainerClass(attrs: string) {
 }
 
 function shouldDecorateElement(tag: string, attrs: string) {
-  if (hasAttribute(attrs, "data-celion-page")) return false;
+  if (hasAttribute(attrs, "data-celion-slide")) return false;
 
   const type = editableTypeForTag(tag);
   if (!type) return false;
@@ -299,16 +305,16 @@ function shouldDecorateElement(tag: string, attrs: string) {
   return true;
 }
 
-function editableIdBase(pageId: string, type: CelionEditableElement["type"]) {
-  const normalizedPageId = (pageId.trim() || "page")
+function editableIdBase(slideId: string, type: CelionEditableElement["type"]) {
+  const normalizedPageId = (slideId.trim() || "page")
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     || "page";
   return `${normalizedPageId}-${type}`;
 }
 
-function nextEditableId(pageId: string, type: CelionEditableElement["type"], usedIds: Set<string>, counters: Record<CelionEditableElement["type"], number>) {
-  const base = editableIdBase(pageId, type);
+function nextEditableId(slideId: string, type: CelionEditableElement["type"], usedIds: Set<string>, counters: Record<CelionEditableElement["type"], number>) {
+  const base = editableIdBase(slideId, type);
   let candidate = "";
 
   do {
@@ -320,25 +326,25 @@ function nextEditableId(pageId: string, type: CelionEditableElement["type"], use
   return candidate;
 }
 
-function ensurePageRoot(html: string, pageId: string) {
-  if (/\sdata-celion-page\s*=/i.test(html)) {
+function ensurePageRoot(html: string, slideId: string) {
+  if (/\sdata-celion-slide\s*=/i.test(html)) {
     return html.replace(
-      /\sdata-celion-page\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i,
-      ` data-celion-page="${pageId}"`,
+      /\sdata-celion-slide\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i,
+      ` data-celion-slide="${slideId}"`,
     );
   }
 
   const rootPattern = /<(section|article|div|main)\b([^<>]*?)(\/?)>/i;
   if (rootPattern.test(html)) {
     return html.replace(rootPattern, (_match, tag: string, attrs = "", selfClosing = "") =>
-      `<${tag}${upsertAttribute(attrs, "data-celion-page", pageId)}${selfClosing}>`,
+      `<${tag}${upsertAttribute(attrs, "data-celion-slide", slideId)}${selfClosing}>`,
     );
   }
 
-  return `<section data-celion-page="${pageId}" class="celion-page">\n${html}\n</section>`;
+  return `<section data-celion-slide="${slideId}" class="celion-page">\n${html}\n</section>`;
 }
 
-function decorateEditableHtml(html: string, pageId: string) {
+function decorateEditableHtml(html: string, slideId: string) {
   const usedIds = new Set<string>();
   const counters: Record<CelionEditableElement["type"], number> = {
     text: 0,
@@ -356,7 +362,7 @@ function decorateEditableHtml(html: string, pageId: string) {
     const existingId = attributeValue(attrs, "data-celion-id");
     const id = existingId && !usedIds.has(existingId)
       ? existingId
-      : nextEditableId(pageId, type, usedIds, counters);
+      : nextEditableId(slideId, type, usedIds, counters);
     usedIds.add(id);
 
     const role = attributeValue(attrs, "data-role") || roleForTag(tag, type);
@@ -425,7 +431,7 @@ function htmlEditableElements(html: string): CelionEditableElement[] {
   return elements;
 }
 
-function repairManifestFromHtml(page: CelionEbookPage): CelionPageManifest {
+function repairManifestFromHtml(page: CelionSlide): CelionSlideManifest {
   const editableElements = htmlEditableElements(page.html);
   const existingElementsById = new Map(page.manifest.editableElements.map((element) => [element.id, element]));
   const nextElements: CelionEditableElement[] = [];
@@ -451,7 +457,7 @@ function stripInlineStyleAttributes(html: string) {
   return html.replace(/\sstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
 }
 
-export function decorateEbookPageForEditing(input: CelionEbookPage): CelionEbookPage {
+export function decorateEbookPageForEditing(input: CelionSlide): CelionSlide {
   const page = normalizePage(input, input.index);
   const html = decorateEditableHtml(ensurePageRoot(page.html, page.id), page.id);
 
@@ -604,13 +610,13 @@ function findThemeCssErrors(css: string) {
 }
 
 function rawPages(input: unknown) {
-  if (!isRecord(input) || !Array.isArray(input.pages)) return [];
-  return input.pages;
+  if (!isRecord(input) || !Array.isArray(input.slides)) return [];
+  return input.slides;
 }
 
-function validateRawManifestEntries(input: unknown, pageIndex: number, pageId: string) {
+function validateRawManifestEntries(input: unknown, slideIndex: number, slideId: string) {
   const errors: string[] = [];
-  const rawPage = rawPages(input)[pageIndex];
+  const rawPage = rawPages(input)[slideIndex];
   if (!isRecord(rawPage) || !isRecord(rawPage.manifest) || !Array.isArray(rawPage.manifest.editableElements)) {
     return errors;
   }
@@ -618,18 +624,18 @@ function validateRawManifestEntries(input: unknown, pageIndex: number, pageId: s
   rawPage.manifest.editableElements.forEach((entry, index) => {
     const entryNumber = index + 1;
     if (!isRecord(entry)) {
-      errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} must be an object.`);
+      errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} must be an object.`);
       return;
     }
 
     for (const field of ["id", "role", "selector", "label"] as const) {
       if (typeof entry[field] !== "string" || entry[field].trim() === "") {
-        errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} is missing ${field}.`);
+        errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} is missing ${field}.`);
       }
     }
 
     if (typeof entry.type !== "string" || !EDITABLE_TYPES.has(entry.type as CelionEditableElement["type"])) {
-      errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} has invalid type.`);
+      errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} has invalid type.`);
     }
 
     if (typeof entry.id === "string" && typeof entry.selector === "string") {
@@ -641,18 +647,18 @@ function validateRawManifestEntries(input: unknown, pageIndex: number, pageId: s
         selector !== `[data-celion-id="${id}"]` &&
         selector !== `[data-celion-id='${id}']`
       ) {
-        errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} selector must be an exact data-celion-id selector.`);
+        errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} selector must be an exact data-celion-id selector.`);
       }
     }
 
     if (!Array.isArray(entry.editableProps) || entry.editableProps.length === 0) {
-      errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} has invalid editableProps.`);
+      errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} has invalid editableProps.`);
       return;
     }
 
     const invalidProps = entry.editableProps.filter((item) => typeof item !== "string" || !EDITABLE_PROPS.has(item as CelionEditableProp));
     if (invalidProps.length > 0) {
-      errors.push(`Page "${pageId}" manifest editable entry ${entryNumber} has invalid editableProps.`);
+      errors.push(`Page "${slideId}" manifest editable entry ${entryNumber} has invalid editableProps.`);
     }
   });
 
@@ -662,23 +668,23 @@ function validateRawManifestEntries(input: unknown, pageIndex: number, pageId: s
 export function validateEbookDocument(input: unknown): EbookDocumentValidation {
   const document = normalizeEbookDocument(input);
   const errors: string[] = [];
-  const pageIds = new Set<string>();
+  const slideIds = new Set<string>();
 
   errors.push(...findThemeCssErrors(document.themeCss));
 
-  if (document.pages.length === 0) {
+  if (document.slides.length === 0) {
     errors.push("Document must include at least one page.");
   }
 
-  for (const [pageIndex, page] of document.pages.entries()) {
-    if (pageIds.has(page.id)) {
+  for (const [slideIndex, page] of document.slides.entries()) {
+    if (slideIds.has(page.id)) {
       errors.push(`Page id "${page.id}" must be unique.`);
     }
-    pageIds.add(page.id);
+    slideIds.add(page.id);
 
-    const pageScope = `[data-celion-page="${page.id}"]`;
-    if (!page.html.includes(`data-celion-page="${page.id}"`) && !page.html.includes(`data-celion-page='${page.id}'`)) {
-      errors.push(`Page "${page.id}" HTML must include matching data-celion-page.`);
+    const pageScope = `[data-celion-slide="${page.id}"]`;
+    if (!page.html.includes(`data-celion-slide="${page.id}"`) && !page.html.includes(`data-celion-slide='${page.id}'`)) {
+      errors.push(`Page "${page.id}" HTML must include matching data-celion-slide.`);
     }
 
     const forbiddenTag = hasForbiddenTag(page.html);
@@ -695,7 +701,7 @@ export function validateEbookDocument(input: unknown): EbookDocumentValidation {
     }
 
     errors.push(...findCssSelectorErrors(page.css, pageScope).map((error) => `Page "${page.id}" ${error}`));
-    errors.push(...validateRawManifestEntries(input, pageIndex, page.id));
+    errors.push(...validateRawManifestEntries(input, slideIndex, page.id));
 
     const editableIds = htmlEditableIds(page.html);
     const editableIdSet = new Set(editableIds);
@@ -730,7 +736,7 @@ export function sanitizeEbookDocument(input: unknown): CelionEbookDocument {
   return normalizeEbookDocument({
     ...document,
     themeCss: sanitizeEbookHtmlForCanvas(document.themeCss),
-    pages: document.pages.map((page) => ({
+    slides: document.slides.map((page) => ({
       ...page,
       html: stripInlineStyleAttributes(sanitizeEbookHtmlForCanvas(page.html)),
       css: sanitizeEbookHtmlForCanvas(page.css),
@@ -740,8 +746,8 @@ export function sanitizeEbookDocument(input: unknown): CelionEbookDocument {
 
 export function compileEbookDocumentToHtml(input: CelionEbookDocument): string {
   const document = normalizeEbookDocument(input);
-  const pageCss = document.pages.map((page) => page.css).filter(Boolean).join("\n");
-  const slides = document.pages
+  const pageCss = document.slides.map((page) => page.css).filter(Boolean).join("\n");
+  const slides = document.slides
     .map((page, index) => `<div class="slide celion-page-shell" data-slide="${index + 1}" data-page-id="${page.id}">${page.html}</div>`)
     .join("\n");
   const html = `<!doctype html>
@@ -749,7 +755,7 @@ export function compileEbookDocumentToHtml(input: CelionEbookDocument): string {
 <head>
   <meta charset="utf-8">
   <style>
-    @page { size: ${EBOOK_PAGE_SIZE_MM.width}mm ${EBOOK_PAGE_SIZE_MM.height}mm; margin: 0; }
+    @page { size: ${SLIDE_SIZE_MM.width}mm ${SLIDE_SIZE_MM.height}mm; margin: 0; }
     .slide {
       width: ${document.size.width}${document.size.unit};
       height: ${document.size.height}${document.size.unit};

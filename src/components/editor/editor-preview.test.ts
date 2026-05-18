@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { CelionEbookDocument } from "@/lib/ebook-document";
 import {
-  applyPreviewPageSpacing,
-  buildPageSummariesFromDocument,
+  applyPreviewSlideSpacing,
+  buildSlideSummariesFromDocument,
   buildPreviewFrameCss,
   estimatePreviewIframeHeight,
   normalizeEditorHtml,
@@ -15,14 +15,14 @@ const documentWithGenericPageTitle: CelionEbookDocument = {
   title: "TOEFL Guide",
   size: { width: 559, height: 794, unit: "px" },
   themeCss: "",
-  pages: [
+  slides: [
     {
       id: "cover",
       index: 0,
       title: "Slide 1",
       role: "cover",
-      html: `<section data-celion-page="cover" class="celion-page"><h1 data-celion-id="cover-title" data-role="title" data-editable="true">?�플 리딩 만점 가?�드</h1></section>`,
-      css: `[data-celion-page="cover"] { width: 559px; height: 794px; overflow: hidden; }`,
+      html: `<section data-celion-slide="cover" class="celion-page"><h1 data-celion-id="cover-title" data-role="title" data-editable="true">?�플 리딩 만점 가?�드</h1></section>`,
+      css: `[data-celion-slide="cover"] { width: 559px; height: 794px; overflow: hidden; }`,
       manifest: {
         editableElements: [
           {
@@ -40,10 +40,10 @@ const documentWithGenericPageTitle: CelionEbookDocument = {
     {
       id: "page-01",
       index: 1,
-      title: "Prose Summary ?�복",
+      title: "Prose Summary ?�복",
       role: "framework",
-      html: `<section data-celion-page="page-01" class="celion-page"><p>본문</p></section>`,
-      css: `[data-celion-page="page-01"] { width: 559px; height: 794px; overflow: hidden; }`,
+      html: `<section data-celion-slide="page-01" class="celion-page"><p>본문</p></section>`,
+      css: `[data-celion-slide="page-01"] { width: 559px; height: 794px; overflow: hidden; }`,
       manifest: { editableElements: [] },
       version: 1,
     },
@@ -51,9 +51,9 @@ const documentWithGenericPageTitle: CelionEbookDocument = {
 };
 
 test("buildPageSummariesFromDocument uses real document titles before iframe load", () => {
-  assert.deepEqual(buildPageSummariesFromDocument(documentWithGenericPageTitle), [
-    { title: "?�플 리딩 만점 가?�드", eyebrow: "Cover" },
-    { title: "Prose Summary ?�복", eyebrow: "Framework" },
+  assert.deepEqual(buildSlideSummariesFromDocument(documentWithGenericPageTitle), [
+    { title: "?�플 리딩 만점 가?�드", eyebrow: "Cover" },
+    { title: "Prose Summary ?�복", eyebrow: "Framework" },
   ]);
 });
 
@@ -64,7 +64,7 @@ test("estimatePreviewIframeHeight reserves scroll room for all pages without ifr
 
 test("pickSelectableElement prefers editable text under decorative overlays", () => {
   const page = {
-    ...documentWithGenericPageTitle.pages[0],
+    ...documentWithGenericPageTitle.slides[0],
     manifest: {
       editableElements: [
         {
@@ -75,7 +75,7 @@ test("pickSelectableElement prefers editable text under decorative overlays", ()
           label: "Cover shape",
           editableProps: ["backgroundColor" as const],
         },
-        documentWithGenericPageTitle.pages[0].manifest.editableElements[0]!,
+        documentWithGenericPageTitle.slides[0].manifest.editableElements[0]!,
       ],
     },
   };
@@ -109,7 +109,7 @@ test("applyPreviewPageSpacing separates pages without adding rings", () => {
     { style: {} },
   ] as HTMLElement[];
 
-  applyPreviewPageSpacing(pages, 28);
+  applyPreviewSlideSpacing(pages, 28);
 
   assert.equal(pages[0].style.marginBottom, "28px");
   assert.equal(pages[1].style.marginBottom, "0");

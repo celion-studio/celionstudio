@@ -26,7 +26,7 @@ export function useEditorSelection() {
   const selectElement = useCallback((selection: SelectedElementState) => {
     setSelectedText(selection.text);
     setEditValue(selection.text);
-    setSelectedPageId(selection.pageId);
+    setSelectedPageId(selection.slideId);
     setSelectedElement(selection.element);
     setSelectedSelector(selection.selector);
     setSelectedRuntimeText(selection.runtimeText);

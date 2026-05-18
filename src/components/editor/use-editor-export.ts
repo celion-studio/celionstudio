@@ -49,11 +49,13 @@ export function useEditorExport({
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
 
   const exportAs = useCallback(async (format: ExportFormat) => {
     setExportOpen(false);
     setExporting(true);
     setExportError("");
+    setExportProgress(null);
     try {
       const filename = sanitizeExportFilename(displayTitle);
 
@@ -91,6 +93,7 @@ export function useEditorExport({
         if (format === "pdf") {
           const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a5" });
           for (let i = 0; i < pages.length; i++) {
+            setExportProgress({ current: i + 1, total: pages.length });
             const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
             if (i > 0) pdf.addPage("a5", "portrait");
             pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, PDF_A5_WIDTH_PT, PDF_A5_HEIGHT_PT);
@@ -98,6 +101,7 @@ export function useEditorExport({
           pdf.save(`${filename}.pdf`);
         } else {
           for (let i = 0; i < pages.length; i++) {
+            setExportProgress({ current: i + 1, total: pages.length });
             const canvas = await html2canvas(pages[i], { scale: 2, useCORS: true });
             const blob = await new Promise<Blob>((resolve, reject) => {
               canvas.toBlob(
@@ -117,6 +121,7 @@ export function useEditorExport({
       setExportError(error instanceof Error ? error.message : "Could not export ebook.");
     } finally {
       setExporting(false);
+      setExportProgress(null);
     }
   }, [displayTitle, html, iframeRef, latestDocumentRef]);
 
@@ -124,7 +129,9 @@ export function useEditorExport({
     exportOpen,
     exporting,
     exportError,
+    exportProgress,
     setExportOpen,
+    setExportError,
     exportAs,
   };
 }

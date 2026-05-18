@@ -64,32 +64,32 @@ export function getCandidateCelionIds(pointedElements: Element[]) {
     .filter((id, index, ids) => id && ids.indexOf(id) === index);
 }
 
-export function getDocumentPageContext(
+export function getDocumentSlideContext(
   document: CelionEbookDocument,
   pointedElements: Element[],
   fallback: HTMLElement,
 ) {
-  const pageEl = (pointedElements.find((element) => element.closest("[data-celion-page]")) ?? fallback)
-    .closest<HTMLElement>("[data-celion-page]");
-  const pageId = pageEl?.getAttribute("data-celion-page") ?? "";
-  if (!pageId) return null;
+  const pageEl = (pointedElements.find((element) => element.closest("[data-celion-slide]")) ?? fallback)
+    .closest<HTMLElement>("[data-celion-slide]");
+  const slideId = pageEl?.getAttribute("data-celion-slide") ?? "";
+  if (!slideId) return null;
 
-  const pageIndex = document.pages.findIndex((page) => page.id === pageId);
-  const page = pageIndex >= 0 ? document.pages[pageIndex] : null;
+  const slideIndex = document.slides.findIndex((page) => page.id === slideId);
+  const page = slideIndex >= 0 ? document.slides[slideIndex] : null;
   if (!page) return null;
 
-  return { page, pageEl, pageId, pageIndex };
+  return { page, pageEl, slideId, slideIndex };
 }
 
 export function getRuntimeTextBySelection(
   doc: Document,
-  selection: { mode: "document" | "legacy"; pageId: string; pageIndex: number; textIndex: number },
+  selection: { mode: "document" | "legacy"; slideId: string; slideIndex: number; textIndex: number },
 ) {
   if (selection.mode === "document") {
-    const page = doc.querySelector<HTMLElement>(`[data-celion-page="${selection.pageId}"]`);
+    const page = doc.querySelector<HTMLElement>(`[data-celion-slide="${selection.slideId}"]`);
     return page ? getRuntimeTextElements(page)[selection.textIndex] ?? null : null;
   }
 
-  const page = doc.querySelectorAll<HTMLElement>(".slide")[selection.pageIndex];
+  const page = doc.querySelectorAll<HTMLElement>(".slide")[selection.slideIndex];
   return page ? getRuntimeTextElements(page)[selection.textIndex] ?? null : null;
 }

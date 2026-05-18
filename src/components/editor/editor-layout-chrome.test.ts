@@ -20,7 +20,7 @@ test("getLayoutTargetElement resolves duplicate editable ids inside the selected
   ]);
   const doc = {
     querySelector(selector: string) {
-      const pageMatch = selector.match(/\[data-celion-page="([^"]+)"\]/);
+      const pageMatch = selector.match(/\[data-celion-slide="([^"]+)"\]/);
       if (pageMatch) return pages.get(pageMatch[1]!) ?? null;
       return firstPageElement;
     },

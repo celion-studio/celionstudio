@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compileEbookDocumentToHtml, insertEbookDocumentPage, sanitizeEbookDocument, type CelionEbookDocument, validateEbookDocument } from "./ebook-document";
+import { compileEbookDocumentToHtml, insertSlide, sanitizeEbookDocument, type CelionEbookDocument, validateEbookDocument } from "./ebook-document";
 import { validateCelionSlideHtml } from "./ebook-html";
 
 const validDocument: CelionEbookDocument = {
@@ -8,25 +8,25 @@ const validDocument: CelionEbookDocument = {
   title: "TOEFL Reading Guide",
   size: { width: 559, height: 794, unit: "px" },
   themeCss: "",
-  pages: [
+  slides: [
     {
       id: "cover",
       index: 0,
       title: "Cover",
       role: "cover",
       version: 1,
-      html: `<section data-celion-page="cover" class="celion-page">
+      html: `<section data-celion-slide="cover" class="celion-slide">
   <h1 data-celion-id="cover-title" data-role="title" data-editable="true">TOEFL Reading Guide</h1>
   <p data-celion-id="cover-subtitle" data-role="subtitle" data-editable="true">A focused practice companion for building speed, accuracy, and confidence.</p>
 </section>`,
-      css: `[data-celion-page="cover"] {
+      css: `[data-celion-slide="cover"] {
   width: 100%;
   height: 100%;
   padding: 64px;
   color: #18181b;
   background: #f8fafc;
 }
-[data-celion-page="cover"] h1 {
+[data-celion-slide="cover"] h1 {
   margin: 0 0 24px;
   font-size: 48px;
 }`,
@@ -56,31 +56,31 @@ const validDocument: CelionEbookDocument = {
   ],
 };
 
-test("validateEbookDocument accepts scoped page HTML, CSS, and manifest", () => {
+test("validateEbookDocument accepts scoped slide HTML, CSS, and manifest", () => {
   const result = validateEbookDocument(validDocument);
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.errors, []);
 });
 
-test("insertEbookDocumentPage reindexes pages and keeps page ids unique", () => {
-  const inserted = insertEbookDocumentPage({
+test("insertSlide reindexes slides and keeps slide ids unique", () => {
+  const inserted = insertSlide({
     document: validDocument,
     insertIndex: 0,
-    page: {
-      ...validDocument.pages[0],
+    slide: {
+      ...validDocument.slides[0],
       id: "cover",
-      title: "Inserted page",
+      title: "Inserted slide",
     },
   });
   const validation = validateEbookDocument(inserted);
 
-  assert.equal(inserted.pages.length, 2);
-  assert.equal(inserted.pages[0].index, 0);
-  assert.equal(inserted.pages[1].index, 1);
-  assert.equal(inserted.pages[0].id, "cover-2");
-  assert.equal(inserted.pages[0].html.includes('data-celion-page="cover-2"'), true);
-  assert.equal(inserted.pages[0].css.includes('[data-celion-page="cover-2"]'), true);
+  assert.equal(inserted.slides.length, 2);
+  assert.equal(inserted.slides[0].index, 0);
+  assert.equal(inserted.slides[1].index, 1);
+  assert.equal(inserted.slides[0].id, "cover-2");
+  assert.equal(inserted.slides[0].html.includes('data-celion-slide="cover-2"'), true);
+  assert.equal(inserted.slides[0].css.includes('[data-celion-slide="cover-2"]'), true);
   assert.equal(validation.ok, true, validation.errors.join("\n"));
 });
 
@@ -98,40 +98,40 @@ test("compileEbookDocumentToHtml produces valid Celion slide HTML", () => {
 test("sanitizeEbookDocument decorates clean HTML with stable editor ids and manifest entries", () => {
   const document = sanitizeEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
         id: "clean",
         index: 0,
-        title: "Clean page",
+        title: "Clean slide",
         role: "insight",
         version: 1,
-        html: `<section class="clean-page">
+        html: `<section class="clean-slide">
   <h1>Clean heading</h1>
   <p>Clean body copy</p>
   <img src="/placeholder.png" alt="Placeholder" />
 </section>`,
-        css: `[data-celion-page="clean"] {
+        css: `[data-celion-slide="clean"] {
   width: 559px;
   height: 794px;
   overflow: hidden;
 }
-[data-celion-page="clean"] h1 {
+[data-celion-slide="clean"] h1 {
   font-size: 40px;
 }`,
         manifest: { editableElements: [] },
       },
     ],
   });
-  const page = document.pages[0]!;
+  const slide = document.slides[0]!;
   const validation = validateEbookDocument(document);
 
   assert.equal(validation.ok, true, validation.errors.join("\n"));
-  assert.match(page.html, /data-celion-page="clean"/);
-  assert.match(page.html, /data-celion-id="clean-text-001"/);
-  assert.match(page.html, /data-celion-id="clean-text-002"/);
-  assert.match(page.html, /data-celion-id="clean-image-001"/);
+  assert.match(slide.html, /data-celion-slide="clean"/);
+  assert.match(slide.html, /data-celion-id="clean-text-001"/);
+  assert.match(slide.html, /data-celion-id="clean-text-002"/);
+  assert.match(slide.html, /data-celion-id="clean-image-001"/);
   assert.deepEqual(
-    page.manifest.editableElements.map((element) => [element.id, element.type]),
+    slide.manifest.editableElements.map((element) => [element.id, element.type]),
     [
       ["clean-text-001", "text"],
       ["clean-text-002", "text"],
@@ -143,18 +143,18 @@ test("sanitizeEbookDocument decorates clean HTML with stable editor ids and mani
 test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate ids", () => {
   const document = sanitizeEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
         id: "dupe",
         index: 0,
         title: "Duplicate ids",
         role: "insight",
         version: 1,
-        html: `<section data-celion-page="dupe" class="celion-page">
+        html: `<section data-celion-slide="dupe" class="celion-slide">
   <h1 data-celion-id="hero-title">Existing title</h1>
   <p data-celion-id="hero-title">Duplicate body</p>
 </section>`,
-        css: `[data-celion-page="dupe"] {
+        css: `[data-celion-slide="dupe"] {
   width: 559px;
   height: 794px;
   overflow: hidden;
@@ -163,8 +163,8 @@ test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate
       },
     ],
   });
-  const page = document.pages[0]!;
-  const ids = page.manifest.editableElements.map((element) => element.id);
+  const slide = document.slides[0]!;
+  const ids = slide.manifest.editableElements.map((element) => element.id);
   const validation = validateEbookDocument(document);
 
   assert.equal(validation.ok, true, validation.errors.join("\n"));
@@ -176,26 +176,26 @@ test("sanitizeEbookDocument preserves existing editor ids and rewrites duplicate
 test("validateEbookDocument rejects unscoped CSS selectors", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         css: `.cover-title { color: #18181b; }`,
       },
     ],
   });
 
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((error) => error.includes("must start with [data-celion-page=\"cover\"]")));
+  assert.ok(result.errors.some((error) => error.includes("must start with [data-celion-slide=\"cover\"]")));
 });
 
 test("validateEbookDocument rejects unscoped CSS selectors inside at-rules", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         css: `@media print {
-  [data-celion-page="cover"] { color: #18181b; }
+  [data-celion-slide="cover"] { color: #18181b; }
   .bad { color: red; }
 }`,
       },
@@ -203,30 +203,30 @@ test("validateEbookDocument rejects unscoped CSS selectors inside at-rules", () 
   });
 
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((error) => error.includes('CSS selector ".bad" must start with [data-celion-page="cover"]')));
+  assert.ok(result.errors.some((error) => error.includes('CSS selector ".bad" must start with [data-celion-slide="cover"]')));
 });
 
 test("validateEbookDocument rejects unscoped pseudo selectors", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         css: `.bad:hover { color: red; }`,
       },
     ],
   });
 
   assert.equal(result.ok, false);
-  assert.ok(result.errors.some((error) => error.includes('CSS selector ".bad:hover" must start with [data-celion-page="cover"]')));
+  assert.ok(result.errors.some((error) => error.includes('CSS selector ".bad:hover" must start with [data-celion-slide="cover"]')));
 });
 
 test("validateEbookDocument rejects non-block CSS at-rules", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         css: `@import url("https://example.com/x.css");`,
       },
     ],
@@ -239,10 +239,10 @@ test("validateEbookDocument rejects non-block CSS at-rules", () => {
 test("validateEbookDocument rejects unsafe CSS tokens", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        css: `[data-celion-page="cover"] { background-image: url("https://example.com/x.png"); }`,
+        ...validDocument.slides[0],
+        css: `[data-celion-slide="cover"] { background-image: url("https://example.com/x.png"); }`,
       },
     ],
   });
@@ -251,13 +251,13 @@ test("validateEbookDocument rejects unsafe CSS tokens", () => {
   assert.ok(result.errors.some((error) => error.includes("unsafe markup or url() tokens")));
 });
 
-test("validateEbookDocument rejects style-bearing page HTML", () => {
+test("validateEbookDocument rejects style-bearing slide HTML", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace("</section>", `<style>@import url("https://example.com/x.css");</style></section>`),
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace("</section>", `<style>@import url("https://example.com/x.css");</style></section>`),
       },
     ],
   });
@@ -269,10 +269,10 @@ test("validateEbookDocument rejects style-bearing page HTML", () => {
 test("validateEbookDocument rejects inline style attributes", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace("data-role=\"title\"", `data-role="title" style="background-image:url('https://example.com/x.png')"`)
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace("data-role=\"title\"", `data-role="title" style="background-image:url('https://example.com/x.png')"`)
       },
     ],
   });
@@ -299,9 +299,9 @@ test("validateEbookDocument restricts theme CSS to root custom properties", () =
 test("validateEbookDocument rejects unsupported block CSS at-rules", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         css: `@keyframes fade { from { opacity: 0; } to { opacity: 1; } }`,
       },
     ],
@@ -314,9 +314,9 @@ test("validateEbookDocument rejects unsupported block CSS at-rules", () => {
 test("validateEbookDocument rejects malformed manifest entries", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         manifest: {
           editableElements: [
             {
@@ -342,10 +342,10 @@ test("validateEbookDocument rejects malformed manifest entries", () => {
 test("validateEbookDocument rejects editable HTML missing from manifest", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace("</section>", `<span data-celion-id="orphan" data-role="note" data-editable="true">Orphan</span></section>`),
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace("</section>", `<span data-celion-id="orphan" data-role="note" data-editable="true">Orphan</span></section>`),
       },
     ],
   });
@@ -357,10 +357,10 @@ test("validateEbookDocument rejects editable HTML missing from manifest", () => 
 test("validateEbookDocument rejects duplicate editable ids", () => {
   const duplicateHtml = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace(
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace(
           "</section>",
           `<span data-celion-id="cover-title" data-role="note" data-editable="true">Duplicate</span></section>`,
         ),
@@ -373,14 +373,14 @@ test("validateEbookDocument rejects duplicate editable ids", () => {
 
   const duplicateManifest = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         manifest: {
           editableElements: [
-            ...validDocument.pages[0].manifest.editableElements,
+            ...validDocument.slides[0].manifest.editableElements,
             {
-              ...validDocument.pages[0].manifest.editableElements[0],
+              ...validDocument.slides[0].manifest.editableElements[0],
               label: "Duplicate manifest entry",
             },
           ],
@@ -396,10 +396,10 @@ test("validateEbookDocument rejects duplicate editable ids", () => {
 test("validateEbookDocument detects spaced and unquoted editable ids", () => {
   const spacedDuplicate = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace(
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace(
           "</section>",
           `<span data-celion-id = "cover-title" data-role="note" data-editable="true">Duplicate</span></section>`,
         ),
@@ -412,10 +412,10 @@ test("validateEbookDocument detects spaced and unquoted editable ids", () => {
 
   const unquotedOrphan = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
-        html: validDocument.pages[0].html.replace(
+        ...validDocument.slides[0],
+        html: validDocument.slides[0].html.replace(
           "</section>",
           `<span data-celion-id=orphan data-role="note" data-editable="true">Orphan</span></section>`,
         ),
@@ -430,16 +430,16 @@ test("validateEbookDocument detects spaced and unquoted editable ids", () => {
 test("validateEbookDocument rejects manifest selectors that do not target their id", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         manifest: {
           editableElements: [
             {
-              ...validDocument.pages[0].manifest.editableElements[0],
+              ...validDocument.slides[0].manifest.editableElements[0],
               selector: '[data-celion-id="cover-title"] + [data-celion-id="cover-subtitle"]',
             },
-            validDocument.pages[0].manifest.editableElements[1],
+            validDocument.slides[0].manifest.editableElements[1],
           ],
         },
       },
@@ -453,12 +453,12 @@ test("validateEbookDocument rejects manifest selectors that do not target their 
 test("validateEbookDocument rejects manifest entries missing from HTML", () => {
   const result = validateEbookDocument({
     ...validDocument,
-    pages: [
+    slides: [
       {
-        ...validDocument.pages[0],
+        ...validDocument.slides[0],
         manifest: {
           editableElements: [
-            ...validDocument.pages[0].manifest.editableElements,
+            ...validDocument.slides[0].manifest.editableElements,
             {
               id: "missing-editable",
               role: "note",

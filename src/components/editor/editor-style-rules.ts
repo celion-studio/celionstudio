@@ -8,8 +8,8 @@ export function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function layoutMarker(pageId: string, elementId: string) {
-  const safePageId = pageId.replace(/\*\//g, "").trim();
+export function layoutMarker(slideId: string, elementId: string) {
+  const safePageId = slideId.replace(/\*\//g, "").trim();
   const safeElementId = elementId.replace(/\*\//g, "").trim();
   return {
     start: `/* celion-layout:${safePageId}:${safeElementId} */`,
@@ -17,8 +17,8 @@ export function layoutMarker(pageId: string, elementId: string) {
   };
 }
 
-export function styleMarker(pageId: string, elementId: string) {
-  const safePageId = pageId.replace(/\*\//g, "").trim();
+export function styleMarker(slideId: string, elementId: string) {
+  const safePageId = slideId.replace(/\*\//g, "").trim();
   const safeElementId = elementId.replace(/\*\//g, "").trim();
   return {
     start: `/* celion-style:${safePageId}:${safeElementId} */`,

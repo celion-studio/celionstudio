@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       errorReason: error instanceof EbookGenerationError ? error.reason : undefined,
       errorMessage: message,
       errorStatus: status,
-      slideCount: error instanceof EbookGenerationError ? error.pageCount : undefined,
+      slideCount: error instanceof EbookGenerationError ? error.slideCount : undefined,
     });
     return NextResponse.json({ message }, { status });
   }

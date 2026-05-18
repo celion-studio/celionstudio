@@ -1,12 +1,12 @@
 "use client";
 
 import { memo, type CSSProperties, type RefObject } from "react";
-import { ArrowLeft, ChevronDown, Download, ImagePlus, Undo2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Download, ImagePlus, Undo2, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import type { CelionEditableElement } from "@/lib/ebook-document";
 import { CelionButton, CelionSegmentedControl } from "@/components/ui/celion-controls";
-import type { PageSummary } from "./editor-preview";
+import type { SlideSummary } from "./editor-preview";
 import type { EditorMode, InspectorLayoutValues, InspectorStyleValues } from "./editor-types";
 import { InspectorControls } from "./inspector-controls";
 
@@ -16,8 +16,10 @@ type TopBarProps = {
   projectTitle: string;
   saveError: string;
   exportError: string;
+  saving: boolean;
   exporting: boolean;
   exportOpen: boolean;
+  exportProgress: { current: number; total: number } | null;
   canExport?: boolean;
   canAddImage?: boolean;
   showModeToggle?: boolean;
@@ -30,14 +32,18 @@ type TopBarProps = {
   onUndo: () => void;
   onToggleExport: () => void;
   onExport: (format: ExportFormat) => void;
+  onDismissSaveError: () => void;
+  onDismissExportError: () => void;
 };
 
 export function EditorTopBar({
   projectTitle,
   saveError,
   exportError,
+  saving,
   exporting,
   exportOpen,
+  exportProgress,
   canExport = true,
   canAddImage = true,
   showModeToggle = true,
@@ -50,6 +56,8 @@ export function EditorTopBar({
   onUndo,
   onToggleExport,
   onExport,
+  onDismissSaveError,
+  onDismissExportError,
 }: TopBarProps) {
   return (
     <div
@@ -105,8 +113,33 @@ export function EditorTopBar({
             </motion.div>
           )}
         </AnimatePresence>
-        {saveError && <span className="editor-status editor-status-error">{saveError}</span>}
-        {exportError && <span className="editor-status editor-status-error">{exportError}</span>}
+        {saving && <span className="editor-status editor-status-saving">Saving…</span>}
+        {saveError && (
+          <span className="editor-status editor-status-error">
+            {saveError}
+            <button
+              type="button"
+              className="editor-status-dismiss"
+              onClick={onDismissSaveError}
+              aria-label="Dismiss save error"
+            >
+              <X size={11} strokeWidth={2} />
+            </button>
+          </span>
+        )}
+        {exportError && (
+          <span className="editor-status editor-status-error">
+            {exportError}
+            <button
+              type="button"
+              className="editor-status-dismiss"
+              onClick={onDismissExportError}
+              aria-label="Dismiss export error"
+            >
+              <X size={11} strokeWidth={2} />
+            </button>
+          </span>
+        )}
 
         <div className="editor-export-anchor">
           <CelionButton
@@ -116,7 +149,11 @@ export function EditorTopBar({
             variant="primary"
           >
             <Download size={13} />
-            {exporting ? "Exporting..." : "Export"}
+            {exporting
+              ? exportProgress
+                ? `Exporting ${exportProgress.current}/${exportProgress.total}`
+                : "Exporting..."
+              : "Export"}
             <ChevronDown size={12} />
           </CelionButton>
           <AnimatePresence>
@@ -171,14 +208,14 @@ function EditorModeToggle({
 type PageListProps = {
   slideCount: number;
   currentSlide: number;
-  pageSummaries: PageSummary[];
+  slideSummaries: SlideSummary[];
   onSelectPage: (index: number) => void;
 };
 
-function EditorPageListComponent({
+function EditorSlideListComponent({
   slideCount,
   currentSlide,
-  pageSummaries,
+  slideSummaries,
   onSelectPage,
 }: PageListProps) {
   return (
@@ -204,10 +241,10 @@ function EditorPageListComponent({
           </span>
           <span className="editor-page-copy">
             <span className="editor-page-title">
-              {pageSummaries[index]?.title || `Page ${index + 1}`}
+              {slideSummaries[index]?.title || `Page ${index + 1}`}
             </span>
             <span className="editor-page-role">
-              {pageSummaries[index]?.eyebrow || (index === 0 ? "Cover" : "Content")}
+              {slideSummaries[index]?.eyebrow || (index === 0 ? "Cover" : "Content")}
             </span>
           </span>
         </motion.button>
@@ -216,7 +253,7 @@ function EditorPageListComponent({
   );
 }
 
-export const EditorPageList = memo(EditorPageListComponent);
+export const EditorSlideList = memo(EditorSlideListComponent);
 
 type PreviewPaneProps = {
   html: string;

@@ -7,7 +7,7 @@ import {
 import {
   validateCelionSlideHtml,
 } from "@/lib/ebook-html";
-import { EBOOK_PAGE_SIZE_CSS_PX, EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
+import { SLIDE_SIZE_CSS_PX, SLIDE_SIZE_PX } from "@/lib/ebook-format";
 import { EBOOK_STYLE_PROMPTS } from "@/lib/ebook-style";
 import {
   compileEbookDocumentToHtml,
@@ -118,7 +118,7 @@ export type EbookGenerationBatchTrace = {
   completedAt?: string;
   durationMs?: number;
   status: "started" | "success" | "failure";
-  pageCount?: number;
+  slideCount?: number;
   pageTitles?: string[];
   errorReason?: string;
   errorMessage?: string;
@@ -138,7 +138,7 @@ const HTML_SYSTEM = `You are a world-class A5 HTML/CSS slide publication designe
 You receive an approved editorial plan.
 Do not invent a new structure. Do not rename slide headlines. Do not add generic outline pages.
 Your job is to turn the plan into a beautiful finished A5 HTML/CSS slide document with strong layout variety and editorial taste.
-Return JSON only: { "document": { "version": 1, "size": { "width": ${EBOOK_PAGE_SIZE_PX.width}, "height": ${EBOOK_PAGE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "pages": [] } }`;
+Return JSON only: { "document": { "version": 1, "size": { "width": ${SLIDE_SIZE_PX.width}, "height": ${SLIDE_SIZE_PX.height}, "unit": "px" }, "title": "publication title", "themeCss": "", "slides": [] } }`;
 
 function tonePromptFor(tone?: string) {
   return TONE_PROMPTS[tone ?? ""] ?? tone ?? "use the best tone for the source and reader";
@@ -236,7 +236,7 @@ function buildHtmlPrompt(args: EbookGenerationArgs, plan: EbookPlan): string {
 Design inputs:
 - Visual mood: ${args.ebookStyle} (${stylePrompt})
 - Accent color: ${args.accentColor}
-- Page size: ${EBOOK_PAGE_SIZE_CSS_PX}
+- Page size: ${SLIDE_SIZE_CSS_PX}
 
 Approved plan:
 ${JSON.stringify(planForHtmlPrompt(plan), null, 2)}
@@ -266,23 +266,23 @@ Design direction:
 
 Technical contract:
 - Output only JSON with one "document" field.
-- Generate all pages in one response. Do not require page-by-page calls.
-- Generate exactly ${plan.slides.length} pages: one page per approved slide, no more and no fewer.
-- The document must have version: 1, title, size: { width: ${EBOOK_PAGE_SIZE_PX.width}, height: ${EBOOK_PAGE_SIZE_PX.height}, unit: "px" }, themeCss, and pages.
-- themeCss may be empty or contain only a single :root block with CSS custom properties such as --accent. Do not put selectors, layout rules, imports, or page styles in themeCss.
-- Each page includes id, index, title, role, html, css, and version.
-- Each page html has root <section data-celion-page="{pageId}" class="celion-page">.
+- Generate all slides in one response. Do not require slide-by-slide calls.
+- Generate exactly ${plan.slides.length} slides: one slide per approved slide, no more and no fewer.
+- The document must have version: 1, title, size: { width: ${SLIDE_SIZE_PX.width}, height: ${SLIDE_SIZE_PX.height}, unit: "px" }, themeCss, and slides.
+- themeCss may be empty or contain only a single :root block with CSS custom properties such as --accent. Do not put selectors, layout rules, imports, or slide styles in themeCss.
+- Each slide includes id, index, title, role, html, css, and version.
+- Each slide html has root <section data-celion-slide="{slideId}" class="celion-page">.
 - Use clean semantic HTML with meaningful class names.
 - Keep editable text, images, card titles, block titles, labels, captions, badges, and list headings as separate DOM nodes.
 - Do not put important editable content in pseudo-elements.
 - Do not add Celion editor metadata manually; Celion will normalize editable elements after generation.
-- Never put style="" attributes in HTML. Put every visual rule in the page css field.
-- Every page CSS selector starts with [data-celion-page="{pageId}"].
+- Never put style="" attributes in HTML. Put every visual rule in the slide css field.
+- Every slide CSS selector starts with [data-celion-slide="{slideId}"].
 - Do not use script, iframe, object, embed, form, input, textarea, button, video, audio, canvas, external JS, or external CSS.
 - Do not use url(), @import, @keyframes, animations, transitions, or markup-like tokens inside CSS.
 - Do not use global selectors like html, body, *, h1, p, div, span, section, or unscoped class selectors.
 - No editable manifest is required from the model.
-- Use page CSS to make each [data-celion-page="{pageId}"] exactly ${EBOOK_PAGE_SIZE_CSS_PX} and overflow: hidden.
+- Use slide CSS to make each [data-celion-slide="{slideId}"] exactly ${SLIDE_SIZE_CSS_PX} and overflow: hidden.
 - Use only browser-safe CSS colors: hex, rgb, rgba, hsl, hsla, named colors, or variables that resolve to those values.
 - Do not use color(), color-mix(), oklch(), lab(), or lch().
 - No placeholders, lorem ipsum, markdown fences, scripts, external assets, or generic filler.
@@ -400,11 +400,11 @@ function validateUsableEbookHtml(html: string) {
 }
 
 function capEbookDocumentPagesForGeneration(document: CelionEbookDocument, maxPages: number): CelionEbookDocument {
-  if (document.pages.length <= maxPages) return document;
+  if (document.slides.length <= maxPages) return document;
 
   return normalizeEbookDocument({
     ...document,
-    pages: document.pages.slice(0, maxPages).map((page, index) => ({
+    slides: document.slides.slice(0, maxPages).map((page, index) => ({
       ...page,
       index,
     })),
@@ -417,7 +417,7 @@ type EbookGenerationErrorOptions = {
   status?: number;
   stage?: EbookGenerationStage;
   validation?: unknown;
-  pageCount?: number;
+  slideCount?: number;
   generationTrace?: EbookGenerationBatchTrace[];
 };
 
@@ -426,7 +426,7 @@ export class EbookGenerationError extends Error {
   readonly status?: number;
   readonly stage?: EbookGenerationStage;
   readonly validation?: unknown;
-  readonly pageCount?: number;
+  readonly slideCount?: number;
   readonly generationTrace?: EbookGenerationBatchTrace[];
 
   constructor(reason: EbookFailureReason, message: string, options: EbookGenerationErrorOptions = {}) {
@@ -436,7 +436,7 @@ export class EbookGenerationError extends Error {
     this.status = options.status;
     this.stage = options.stage;
     this.validation = options.validation;
-    this.pageCount = options.pageCount;
+    this.slideCount = options.slideCount;
     this.generationTrace = options.generationTrace;
   }
 }
@@ -583,15 +583,15 @@ async function generateCompleteEbookDocument(
   const documentValidation = validateEbookDocument(ebookDocument);
   if (!documentValidation.ok) {
     completeTrace("failure", {
-      pageCount: ebookDocument.pages.length,
-      pageTitles: ebookDocument.pages.map((page) => page.title),
+      slideCount: ebookDocument.slides.length,
+      pageTitles: ebookDocument.slides.map((page) => page.title),
       errorReason: "invalid_html",
       errorMessage: documentValidation.errors[0] ?? "Unknown document validation error.",
     });
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",
       documentValidationErrors: documentValidation.errors,
-      pageCount: ebookDocument.pages.length,
+      slideCount: ebookDocument.slides.length,
     });
     return failGeneration(
       "invalid_html",
@@ -601,38 +601,38 @@ async function generateCompleteEbookDocument(
         validation: {
           ok: false,
           errors: documentValidation.errors,
-          pageCount: ebookDocument.pages.length,
+          slideCount: ebookDocument.slides.length,
         },
-        pageCount: ebookDocument.pages.length,
+        slideCount: ebookDocument.slides.length,
         generationTrace,
       },
     );
   }
 
-  if (ebookDocument.pages.length !== plan.slides.length) {
-    const message = `Expected ${plan.slides.length} pages but received ${ebookDocument.pages.length}.`;
+  if (ebookDocument.slides.length !== plan.slides.length) {
+    const message = `Expected ${plan.slides.length} pages but received ${ebookDocument.slides.length}.`;
     completeTrace("failure", {
-      pageCount: ebookDocument.pages.length,
-      pageTitles: ebookDocument.pages.map((page) => page.title),
+      slideCount: ebookDocument.slides.length,
+      pageTitles: ebookDocument.slides.map((page) => page.title),
       errorReason: "invalid_html",
       errorMessage: message,
     });
     warnEbookGenerationFailure("invalid_html", {
       stage: "html",
-      expectedPageCount: plan.slides.length,
-      pageCount: ebookDocument.pages.length,
+      expectedslideCount: plan.slides.length,
+      slideCount: ebookDocument.slides.length,
     });
     return failGeneration(
       "invalid_html",
-      `Gemini returned ${ebookDocument.pages.length} pages for a ${plan.slides.length}-slide plan.`,
+      `Gemini returned ${ebookDocument.slides.length} pages for a ${plan.slides.length}-slide plan.`,
       {
         stage: "html",
         validation: {
           ok: false,
           errors: [message],
-          pageCount: ebookDocument.pages.length,
+          slideCount: ebookDocument.slides.length,
         },
-        pageCount: ebookDocument.pages.length,
+        slideCount: ebookDocument.slides.length,
         generationTrace,
       },
     );
@@ -642,8 +642,8 @@ async function generateCompleteEbookDocument(
   const validation = validateUsableEbookHtml(html);
 
   completeTrace("success", {
-    pageCount: ebookDocument.pages.length,
-    pageTitles: ebookDocument.pages.map((page) => page.title),
+    slideCount: ebookDocument.slides.length,
+    pageTitles: ebookDocument.slides.map((page) => page.title),
   });
 
   return { html, validation, ebookDocument };
@@ -664,7 +664,7 @@ export async function generateEbookHtmlFromPlan(args: EbookGenerationArgs, plan:
       {
         stage: "html",
         validation,
-        pageCount: validation.slideCount,
+        slideCount: validation.slideCount,
         generationTrace,
       },
     );

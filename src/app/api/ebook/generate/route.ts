@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       errorReason: logReasonFor(error),
       errorMessage: message,
       errorStatus: status,
-      slideCount: error instanceof EbookGenerationError ? error.pageCount : undefined,
+      slideCount: error instanceof EbookGenerationError ? error.slideCount : undefined,
     });
     return NextResponse.json({ message }, { status });
   }

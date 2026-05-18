@@ -1,7 +1,7 @@
 import type { CelionEditableElement } from "@/lib/ebook-document";
 
 export type LayoutTarget = {
-  pageId: string;
+  slideId: string;
   element: CelionEditableElement;
 };
 
@@ -57,12 +57,12 @@ function attributeSelector(name: string, value: string) {
   return `[${name}="${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"]`;
 }
 
-export function getLayoutTargetElement(doc: Document, element: CelionEditableElement, pageId?: string) {
+export function getLayoutTargetElement(doc: Document, element: CelionEditableElement, slideId?: string) {
   if (!element.selector.startsWith("[data-celion-id=")) return null;
 
   try {
-    const scope = pageId
-      ? doc.querySelector<HTMLElement>(attributeSelector("data-celion-page", pageId))
+    const scope = slideId
+      ? doc.querySelector<HTMLElement>(attributeSelector("data-celion-slide", slideId))
       : doc;
     return scope?.querySelector<HTMLElement>(element.selector) ?? null;
   } catch {
@@ -248,9 +248,9 @@ export function createPreviewLayoutChrome(
       return;
     }
 
-    const selectedNode = getLayoutTargetElement(doc, target.element, target.pageId);
-    const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-page]");
-    if (selectedNode && pageEl?.getAttribute("data-celion-page") === target.pageId) {
+    const selectedNode = getLayoutTargetElement(doc, target.element, target.slideId);
+    const pageEl = selectedNode?.closest<HTMLElement>("[data-celion-slide]");
+    if (selectedNode && pageEl?.getAttribute("data-celion-slide") === target.slideId) {
       showFor(selectedNode);
     } else {
       hide();
@@ -261,12 +261,12 @@ export function createPreviewLayoutChrome(
     const layoutTarget = options.getCurrentTarget();
     if (!layoutTarget) return;
 
-    const selectedNode = getLayoutTargetElement(doc, layoutTarget.element, layoutTarget.pageId);
+    const selectedNode = getLayoutTargetElement(doc, layoutTarget.element, layoutTarget.slideId);
     const eventTarget = e.target as Node | null;
     if (!selectedNode || !eventTarget) return;
 
-    const pageEl = selectedNode.closest<HTMLElement>("[data-celion-page]");
-    if (pageEl?.getAttribute("data-celion-page") !== layoutTarget.pageId) return;
+    const pageEl = selectedNode.closest<HTMLElement>("[data-celion-slide]");
+    if (pageEl?.getAttribute("data-celion-slide") !== layoutTarget.slideId) return;
 
     const moveHandle = doc.getElementById(moveHandleId);
     const resizeTarget = RESIZE_HANDLES

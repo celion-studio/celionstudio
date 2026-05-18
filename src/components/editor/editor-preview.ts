@@ -1,9 +1,9 @@
-import type { CelionEbookDocument, CelionEbookPage } from "@/lib/ebook-document";
-import { EBOOK_PAGE_SIZE_PX } from "@/lib/ebook-format";
+import type { CelionEbookDocument, CelionSlide } from "@/lib/ebook-document";
+import { SLIDE_SIZE_PX } from "@/lib/ebook-format";
 import { sanitizeEbookHtmlForCanvas } from "@/lib/ebook-html";
 
-const DEFAULT_PAGE_HEIGHT: number = EBOOK_PAGE_SIZE_PX.height;
-const DEFAULT_PAGE_GAP = 18;
+const SLIDE_HEIGHT: number = SLIDE_SIZE_PX.height;
+const SLIDE_GAP = 18;
 const GENERIC_TITLE_PATTERN = /^(?:slide|page)\s*[-_#]?\s*\d+$/i;
 const RUNTIME_TEXT_SELECTOR = [
   "h1",
@@ -25,7 +25,7 @@ const RUNTIME_TEXT_SELECTOR = [
   "div",
 ].join(",");
 
-export type PageSummary = {
+export type SlideSummary = {
   title: string;
   eyebrow: string;
 };
@@ -87,19 +87,19 @@ function formatRole(role: string, index: number) {
     .replace(/\b\w/g, (match) => match.toUpperCase()) || `Page ${index + 1}`;
 }
 
-function pageTitle(page: CelionEbookPage, index: number) {
+function pageTitle(page: CelionSlide, index: number) {
   if (isUsefulPageTitle(page.title)) return page.title.trim();
   return titleFromHtml(page.html) || `Page ${index + 1}`;
 }
 
-export function buildPageSummariesFromDocument(document: CelionEbookDocument): PageSummary[] {
-  return document.pages.map((page, index) => ({
+export function buildSlideSummariesFromDocument(document: CelionEbookDocument): SlideSummary[] {
+  return document.slides.map((page, index) => ({
     title: pageTitle(page, index).slice(0, 42),
     eyebrow: formatRole(page.role, index).slice(0, 24),
   }));
 }
 
-export function buildPageSummariesFromElements(pages: Element[]): PageSummary[] {
+export function buildSlideSummariesFromElements(pages: Element[]): SlideSummary[] {
   return pages.map((page, index) => {
     const title =
       page.querySelector("h1, h2, h3")?.textContent?.trim() ||
@@ -116,7 +116,7 @@ export function buildPageSummariesFromElements(pages: Element[]): PageSummary[] 
   });
 }
 
-export function pickSelectableElement(page: CelionEbookPage, candidateIds: string[]) {
+export function pickSelectableElement(page: CelionSlide, candidateIds: string[]) {
   const manifestById = new Map(page.manifest.editableElements.map((element) => [element.id, element]));
   const candidates = candidateIds
     .map((id) => manifestById.get(id))
@@ -158,7 +158,7 @@ export function pickRuntimeTextElement(pointedElements: Element[], target: HTMLE
   return candidates[0] ?? null;
 }
 
-export function buildPreviewFrameCss(pageGap = DEFAULT_PAGE_GAP) {
+export function buildPreviewFrameCss(slideGap = SLIDE_GAP) {
   return `
       html, body { overflow: hidden !important; width: 100% !important; }
       body {
@@ -166,7 +166,7 @@ export function buildPreviewFrameCss(pageGap = DEFAULT_PAGE_GAP) {
       }
       .slide {
         background: #ffffff !important;
-        margin-bottom: ${pageGap}px !important;
+        margin-bottom: ${slideGap}px !important;
         outline: none !important;
         box-shadow: none !important;
       }
@@ -176,25 +176,25 @@ export function buildPreviewFrameCss(pageGap = DEFAULT_PAGE_GAP) {
     `;
 }
 
-export function applyPreviewPageSpacing(
-  pages: HTMLElement[],
-  pageGap = DEFAULT_PAGE_GAP,
+export function applyPreviewSlideSpacing(
+  slides: HTMLElement[],
+  slideGap = SLIDE_GAP,
 ) {
-  pages.forEach((page, index) => {
-    page.style.marginTop = "0";
-    page.style.marginRight = "auto";
-    page.style.marginBottom = index === pages.length - 1 ? "0" : `${pageGap}px`;
-    page.style.marginLeft = "auto";
-    page.style.outline = "none";
-    page.style.boxShadow = "none";
+  slides.forEach((slide, index) => {
+    slide.style.marginTop = "0";
+    slide.style.marginRight = "auto";
+    slide.style.marginBottom = index === slides.length - 1 ? "0" : `${slideGap}px`;
+    slide.style.marginLeft = "auto";
+    slide.style.outline = "none";
+    slide.style.boxShadow = "none";
   });
 }
 
 export function estimatePreviewIframeHeight(
-  pageCount: number,
-  pageHeight = DEFAULT_PAGE_HEIGHT,
-  pageGap = DEFAULT_PAGE_GAP,
+  slideCount: number,
+  slideHeight = SLIDE_HEIGHT,
+  slideGap = SLIDE_GAP,
 ) {
-  if (pageCount <= 0) return pageHeight;
-  return Math.max(pageHeight, pageCount * (pageHeight + pageGap) + 40);
+  if (slideCount <= 0) return slideHeight;
+  return Math.max(slideHeight, slideCount * (slideHeight + slideGap) + 40);
 }
